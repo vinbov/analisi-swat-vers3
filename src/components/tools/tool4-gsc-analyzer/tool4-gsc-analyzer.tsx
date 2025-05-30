@@ -26,7 +26,7 @@ const GSC_SHEET_MAPPING: Record<GscReportType, string[]> = {
 };
 const GSC_SHEET_DISPLAY_ORDER: GscReportType[] = ['filters', 'queries', 'pages', 'countries', 'devices', 'searchAppearance'];
 
-const GSC_LOGO_URL = "https://placehold.co/150x50/1e3a8a/FFFFFF?text=GSC+Tool"; // Corrected FFFFFF
+const GSC_LOGO_URL = "https://placehold.co/150x50/1e3a8a/FFFFFF?text=GSC+Tool";
 
 export function Tool4GSCAnalyzer() {
     const [gscExcelFile, setGscExcelFile] = useState<{ content: ArrayBuffer; name: string } | null>(null);
@@ -285,7 +285,7 @@ export function Tool4GSCAnalyzer() {
                 datasets: [{
                     label: 'Clic (Corrente)',
                     data: topItemsByClicks.map(it => it.clicks_current),
-                    backgroundColor: chartColors.slice(0, topItemsByClicks.length), // Use multiple colors if needed
+                    backgroundColor: chartColors.slice(0, topItemsByClicks.length),
                 }]
             };
         }
