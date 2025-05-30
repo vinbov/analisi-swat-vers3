@@ -8,7 +8,7 @@ export function AppHeader() {
       <Link href="/" passHref>
         <Image
           id="appLogo"
-          src="/images/logo-swat-analisi.png" // Percorso all'immagine locale
+          src="/images/logo-swat-analisi.png" // Assicurati che questo percorso sia corretto
           alt="Logo SWAT Analisi"
           width={150}
           height={50}
