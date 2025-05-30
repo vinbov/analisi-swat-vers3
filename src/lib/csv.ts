@@ -1,11 +1,6 @@
 
-import {
-  type CsvRowTool1, // 'type' specifica che questo è un import di tipo
-  type CsvRowTool2, // 'type' specifica che questo è un import di tipo
-  EXPECTED_COLUMNS_TOOL1,
-  EXPECTED_COLUMNS_TOOL2,
-  COLUMN_ALIASES_TOOL1
-} from './types';
+import type { CsvRowTool1, CsvRowTool2 } from './types'; // Type-only imports
+import { EXPECTED_COLUMNS_TOOL1, EXPECTED_COLUMNS_TOOL2, COLUMN_ALIASES_TOOL1 } from './types'; // Value imports
 
 // --- Funzioni di Utilità ---
 function removeBOM(str: string): string {
@@ -264,4 +259,3 @@ export function exportToCSV(filename: string, headers: string[], data: Record<st
     URL.revokeObjectURL(url);
   }
 }
-

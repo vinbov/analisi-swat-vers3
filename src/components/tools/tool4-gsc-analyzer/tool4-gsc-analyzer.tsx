@@ -26,7 +26,7 @@ const GSC_SHEET_MAPPING: Record<GscReportType, string[]> = {
 };
 const GSC_SHEET_DISPLAY_ORDER: GscReportType[] = ['filters', 'queries', 'pages', 'countries', 'devices', 'searchAppearance'];
 
-const GSC_LOGO_URL = "https://placehold.co/150x50/1e3a8a/FFFFFF?text=GSC+Tool";
+const GSC_LOGO_URL = "https://placehold.co/150x50/1e3a8a/FFFFFF?text=GSC+Tool"; // Corrected FFFFFF
 
 export function Tool4GSCAnalyzer() {
     const [gscExcelFile, setGscExcelFile] = useState<{ content: ArrayBuffer; name: string } | null>(null);
@@ -43,6 +43,7 @@ export function Tool4GSCAnalyzer() {
     const router = useRouter();
 
     const handleFileLoad = useCallback((content: string, name: string, arrayBufferContent?: ArrayBuffer) => {
+        console.log("[Tool4 handleFileLoad] File received:", name, "ArrayBuffer present:", !!arrayBufferContent, "Length:", arrayBufferContent?.byteLength);
         if (arrayBufferContent && arrayBufferContent.byteLength > 0) {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
@@ -62,11 +63,7 @@ export function Tool4GSCAnalyzer() {
         setAnalyzedGscData(null);
         setError(null);
         setGscFiltersDisplay("");
-        // Non c'è un fileInputRef direttamente qui, la FileUploadZone gestisce il suo input internamente
-        // Potremmo aver bisogno di un modo per far resettare FileUploadZone dall'esterno se necessario
-        // Per ora, impostare gscExcelFile a null dovrebbe essere sufficiente per la logica di questo componente.
     };
-    // const fileInputRef = useRef<HTMLInputElement>(null); // Non usato direttamente qui
 
     const parseSheetData = (sheet: XLSX.WorkSheet, reportType: GscReportType): GscSheetRow[] => {
         console.log(`[Tool4 ParseSheetData] Parsing sheet for reportType: ${reportType}`);
@@ -149,7 +146,7 @@ export function Tool4GSCAnalyzer() {
 
         const headers = headersRaw.map((h, idx) => {
             const trimmedHeader = String(h || '').trim().toLowerCase();
-            if (idx === 0 && reportType !== 'filters') return 'item'; // Primary item column for non-filter sheets
+            if (idx === 0 && reportType !== 'filters') return 'item'; 
             return headerMap[trimmedHeader] || trimmedHeader.replace(/\s+/g, '_').replace(/[^\w_]/gi, '') || `column_${idx}`;
         });
          console.log(`[Tool4 ParseSheetData] Mapped headers for ${reportType}:`, headers);
@@ -273,7 +270,7 @@ export function Tool4GSCAnalyzer() {
                 .map(([name, value], index) => ({ name, value, fill: chartColors[index % chartColors.length] }))
                 .sort((a,b) => b.value - a.value);
             
-            chartDataForBar = { // Also prepare bar data for consistency if needed elsewhere
+            chartDataForBar = { 
                 labels: chartDataForPie.map(d => d.name),
                 datasets: [{
                     label: 'Clic per Dispositivo',
@@ -288,7 +285,7 @@ export function Tool4GSCAnalyzer() {
                 datasets: [{
                     label: 'Clic (Corrente)',
                     data: topItemsByClicks.map(it => it.clicks_current),
-                    backgroundColor: chartColors[0],
+                    backgroundColor: chartColors.slice(0, topItemsByClicks.length), // Use multiple colors if needed
                 }]
             };
         }
@@ -308,12 +305,12 @@ export function Tool4GSCAnalyzer() {
         setLoadingMessage("Lettura file...");
         setError(null);
         setParsedGscData(null);
-        setAnalyzedGscData(null); // Reset previous analysis
+        setAnalyzedGscData(null); 
         setGscFiltersDisplay("");
         console.log("[Tool4 ProcessGSCData] State reset, loading indicator shown.");
 
         try {
-            console.log("[Tool4 ProcessGSCData] Reading GSC Excel file content...");
+            console.log("[Tool4 ProcessGSCData] Reading GSC Excel file content. File name:", gscExcelFile.name);
             const workbook = XLSX.read(gscExcelFile.content, { type: 'array', cellDates: true });
             console.log("[Tool4 ProcessGSCData] Workbook read. Sheet names:", workbook.SheetNames);
             
@@ -326,6 +323,7 @@ export function Tool4GSCAnalyzer() {
             if (filtersSheetName) {
                 console.log(`[Tool4 ProcessGSCData] Found filters sheet: ${filtersSheetName}`);
                 newParsedData.filters = parseSheetData(workbook.Sheets[filtersSheetName], 'filters');
+                 console.log(`[Tool4 ProcessGSCData] Parsed filters data (count: ${newParsedData.filters?.length}):`, newParsedData.filters?.slice(0,2));
                 if (newParsedData.filters && newParsedData.filters.length > 0) {
                     filtersText += '<ul>';
                     newParsedData.filters.forEach(filter => {
@@ -368,11 +366,11 @@ export function Tool4GSCAnalyzer() {
                     newParsedData[reportType] = [];
                     newAnalyzedData[reportType] = undefined;
                 }
-                 setProgress(prev => prev + (100 / GSC_SHEET_DISPLAY_ORDER.length)); // Simple progress update
+                 setProgress(prev => prev + (100 / GSC_SHEET_DISPLAY_ORDER.length)); 
             }
 
-            console.log("[Tool4 ProcessGSCData] Final parsed data:", newParsedData);
-            console.log("[Tool4 ProcessGSCData] Final analyzed data:", newAnalyzedData);
+            console.log("[Tool4 ProcessGSCData] Final newParsedData to be set:", newParsedData);
+            console.log("[Tool4 ProcessGSCData] Final newAnalyzedData to be set:", newAnalyzedData);
             setParsedGscData(newParsedData);
             setAnalyzedGscData(newAnalyzedData);
             
@@ -545,7 +543,7 @@ export function Tool4GSCAnalyzer() {
                                     </Button>
                                 </CardHeader>
                                 <CardContent>
-                                    <CardDescription className="mb-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: analysis.summaryText}} />
+                                    {analysis.summaryText && <CardDescription className="mb-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: analysis.summaryText}} /> }
 
                                     {(chartDataForRender.labels.length > 0 || pieDataForRender.length > 0) ? (
                                         <div className="my-6 h-[350px] md:h-[400px]">
