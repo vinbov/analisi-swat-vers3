@@ -1,3 +1,4 @@
+
 "use client"
 
 import type { PertinenceAnalysisResult } from '@/lib/types';
@@ -12,6 +13,24 @@ export function TablePertinenceResults({ results }: TablePertinenceResultsProps)
   }
 
   const headers = ['Keyword', 'Settore Analizzato', 'Pertinenza', 'Priorità SEO', 'Motivazione'];
+
+  const getPriorityIndicator = (priority: string): React.ReactNode => {
+    let colorClass = 'bg-gray-400'; // Default color
+    if (priority.includes('Alta') || priority.includes('Mantenimento')) {
+      colorClass = 'bg-green-500';
+    } else if (priority.includes('Media')) {
+      colorClass = 'bg-yellow-400';
+    } else if (priority.includes('Bassa') || priority.includes('Non Applicabile') || priority.includes('Dati Insufficienti')) {
+      colorClass = 'bg-red-500';
+    }
+
+    return (
+      <span className="flex items-center">
+        <span className={`inline-block w-3 h-3 rounded-full mr-2 ${colorClass}`}></span>
+        {priority}
+      </span>
+    );
+  };
 
   return (
     <div className="table-container">
@@ -29,7 +48,9 @@ export function TablePertinenceResults({ results }: TablePertinenceResultsProps)
               <td className="font-medium text-foreground">{row.keyword}</td>
               <td>{row.settore}</td>
               <td className={row.pertinenza === "Errore" ? "text-destructive" : ""}>{row.pertinenza}</td>
-              <td className={row.prioritaSEO === "Errore" ? "text-destructive" : ""}>{row.prioritaSEO}</td>
+              <td className={row.prioritaSEO === "Errore" ? "text-destructive" : ""}>
+                {row.prioritaSEO !== "Errore" ? getPriorityIndicator(row.prioritaSEO) : row.prioritaSEO}
+              </td>
               <td className={`wrap-text-detail ${row.motivazioneSEO.startsWith("Errore") ? "text-destructive" : ""}`}>{row.motivazioneSEO}</td>
             </tr>
           ))}
