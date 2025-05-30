@@ -32,8 +32,8 @@ export function Tool4GSCAnalyzer() {
     const [gscExcelFile, setGscExcelFile] = useState<{ content: ArrayBuffer; name: string } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("");
-    const [progress, setProgress] = useState(0); 
-    
+    const [progress, setProgress] = useState(0);
+
     const [parsedGscData, setParsedGscData] = useState<GscParsedData | null>(null);
     const [analyzedGscData, setAnalyzedGscData] = useState<GscAnalyzedData | null>(null);
     const [gscFiltersDisplay, setGscFiltersDisplay] = useState<string>("");
@@ -47,7 +47,6 @@ export function Tool4GSCAnalyzer() {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
         } else {
-            // Log per debug più dettagliato
             console.error("Tool4 handleFileLoad: arrayBufferContent non valido o vuoto.", { name, arrayBufferContent });
             setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
             setGscExcelFile(null);
@@ -64,7 +63,7 @@ export function Tool4GSCAnalyzer() {
         setError(null);
         setGscFiltersDisplay("");
     };
-    
+
     const parseSheetData = (sheet: XLSX.WorkSheet, reportType: GscReportType): GscSheetRow[] => {
         const jsonData = XLSX.utils.sheet_to_json<any>(sheet, { header: 1, blankrows: false, defval: null });
         if (jsonData.length === 0) return [];
@@ -88,10 +87,10 @@ export function Tool4GSCAnalyzer() {
         }
 
         if (headerRowIndex === -1) {
-            if (jsonData.length > 0 && reportType === 'filters') { 
+            if (jsonData.length > 0 && reportType === 'filters') {
                 headersRaw = jsonData[0] as any[];
                 dataRows = jsonData.slice(1) as any[][];
-            } else if (jsonData.length > 0 && reportType !== 'filters') { 
+            } else if (jsonData.length > 0 && reportType !== 'filters') {
                  headersRaw = jsonData[0] as any[];
                  dataRows = jsonData.slice(1) as any[][];
                  console.warn(`Tool4: Nessuna riga di intestazione GSC tipica trovata per ${reportType}. Assumendo la prima riga come intestazione.`);
@@ -99,7 +98,7 @@ export function Tool4GSCAnalyzer() {
                 return [];
             }
         }
-        
+
         const headerMap: Record<string, keyof GscSheetRow | 'item'> = {
             "top queries": "item", "top query": "item", "query": "item", "principali query": "item",
             "top pages": "item", "pagina": "item", "pagine principali": "item", "principali pagine": "item",
@@ -117,29 +116,29 @@ export function Tool4GSCAnalyzer() {
             "clicks last 28 days": "clicks_current", "clic ultimi 28 giorni": "clicks_current",
             "previous 3 months clicks": "clicks_previous", "clic 3 mesi precedenti": "clicks_previous", "clic (3 mesi precedenti)": "clicks_previous",
             "clicks previous 28 days": "clicks_previous", "clic 28 giorni precedenti": "clicks_previous",
-            
+
             "last 3 months impressions": "impressions_current", "impressioni ultimi 3 mesi": "impressions_current", "impressioni (ultimi 3 mesi)": "impressions_current",
             "impressions last 28 days": "impressions_current", "impressioni ultimi 28 giorni": "impressions_current",
             "previous 3 months impressions": "impressions_previous", "impressioni 3 mesi precedenti": "impressions_previous", "impressioni (3 mesi precedenti)": "impressions_previous",
             "impressions previous 28 days": "impressions_previous", "impressioni 28 giorni precedenti": "impressions_previous",
-            
+
             "last 3 months ctr": "ctr_current", "ctr ultimi 3 mesi": "ctr_current", "ctr (ultimi 3 mesi)": "ctr_current",
             "ctr last 28 days": "ctr_current", "ctr ultimi 28 giorni": "ctr_current",
             "previous 3 months ctr": "ctr_previous", "ctr 3 mesi precedenti": "ctr_previous", "ctr (3 mesi precedenti)": "ctr_previous",
             "ctr previous 28 days": "ctr_previous", "ctr 28 giorni precedenti": "ctr_previous",
-            
+
             "last 3 months position": "position_current", "posizione ultimi 3 mesi": "position_current", "posizione (ultimi 3 mesi)": "position_current",
             "position last 28 days": "position_current", "posizione ultimi 28 giorni": "position_current",
             "previous 3 months position": "position_previous", "posizione 3 mesi precedenti": "position_previous", "posizione (3 mesi precedenti)": "position_previous",
             "position previous 28 days": "position_previous", "posizione 28 giorni precedenti": "position_previous",
-            
+
             "filter": "filterName", "filtro": "filterName",
             "value": "filterValue", "valore": "filterValue"
         };
 
         const headers = headersRaw.map((h, idx) => {
             const trimmedHeader = String(h || '').trim().toLowerCase();
-            if (idx === 0 && reportType !== 'filters') return 'item'; 
+            if (idx === 0 && reportType !== 'filters') return 'item';
             return headerMap[trimmedHeader] || trimmedHeader.replace(/\s+/g, '_').replace(/[^\w_]/gi, '') || `column_${idx}`;
         });
 
@@ -168,14 +167,17 @@ export function Tool4GSCAnalyzer() {
             }
             if (reportType === 'filters' && !entry.filterName && row[0]) entry.filterName = String(row[0]).trim();
             if (reportType === 'filters' && !entry.filterValue && row[1]) entry.filterValue = String(row[1]).trim();
-            
+
             return entry;
         }).filter(entry => (reportType === 'filters' ? entry.filterName : entry.item) );
     };
 
     const analyzeGSCData = (data: GscSheetRow[], itemKeyType: GscReportType): GscSectionAnalysis | null => {
-        if (!data || data.length === 0) return null;
-        
+        if (!data || data.length === 0) {
+             console.log(`[Tool4 AnalyzeGSCData] No data for ${itemKeyType}, returning null.`);
+            return null;
+        }
+
         let totalCurrentClicks = 0, totalPreviousClicks = 0, totalCurrentImpressions = 0, totalPreviousImpressions = 0;
 
         const processedItems: GscAnalyzedItem[] = data.map(d => {
@@ -195,22 +197,22 @@ export function Tool4GSCAnalyzer() {
 
             const diffClicks = currentClicks - previousClicks;
             const percChangeClicks = previousClicks !== 0 ? (diffClicks / previousClicks) : (currentClicks > 0 ? Infinity : 0);
-            
+
             const diffImpressions = currentImpressions - previousImpressions;
             const percChangeImpressions = previousImpressions !== 0 ? (diffImpressions / previousImpressions) : (currentImpressions > 0 ? Infinity : 0);
 
-            const diffCTR = currentCTR - previousCTR; 
-            
+            const diffCTR = currentCTR - previousCTR;
+
             let diffPosition: number | null = null;
             if (currentPosition !== null && previousPosition !== null) {
-                diffPosition = previousPosition - currentPosition; 
+                diffPosition = previousPosition - currentPosition;
             }
 
             return {
-                item: d.item || "N/D", 
+                item: d.item || "N/D",
                 clicks_current: currentClicks, clicks_previous: previousClicks, diff_clicks: diffClicks, perc_change_clicks: percChangeClicks,
                 impressions_current: currentImpressions, impressions_previous: previousImpressions, diff_impressions: diffImpressions, perc_change_impressions: percChangeImpressions,
-                ctr_current: currentCTR, ctr_previous: previousCTR, diff_ctr: diffCTR, 
+                ctr_current: currentCTR, ctr_previous: previousCTR, diff_ctr: diffCTR,
                 position_current: currentPosition, position_previous: previousPosition, diff_position: diffPosition,
             };
         });
@@ -222,17 +224,25 @@ export function Tool4GSCAnalyzer() {
             summaryText += ` Variazione clic vs periodo precedente: ${overallClickDiff >= 0 ? '+' : ''}${overallClickDiff.toLocaleString()}.`;
             summaryText += ` Variazione impressioni: ${overallImpressionDiff >= 0 ? '+' : ''}${overallImpressionDiff.toLocaleString()}.`;
         }
-        
+
         const topNForChart = 5;
         const topItemsByClicks = [...processedItems]
-                                  .filter(it => it.item) 
+                                  .filter(it => it.item)
                                   .sort((a, b) => (b.clicks_current || 0) - (a.clicks_current || 0))
                                   .slice(0, topNForChart);
-        
+
         const chartColors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-        let chartData;
-        let pieData;
+        let chartDataForBar: GscSectionAnalysis['topItemsByClicksChartData'] = {
+            labels: [],
+            datasets: [{
+                label: 'Clic (Corrente)',
+                data: [],
+                backgroundColor: chartColors[0],
+            }]
+        };
+        let chartDataForPie: GscSectionAnalysis['pieChartData'] = [];
+
 
         if (itemKeyType === 'devices') {
             const deviceSummary = processedItems.reduce((acc, curr) => {
@@ -240,31 +250,33 @@ export function Tool4GSCAnalyzer() {
                 acc[deviceName] = (acc[deviceName] || 0) + curr.clicks_current;
                 return acc;
             }, {} as Record<string, number>);
-            pieData = Object.entries(deviceSummary)
+
+            chartDataForPie = Object.entries(deviceSummary)
                 .map(([name, value], index) => ({ name, value, fill: chartColors[index % chartColors.length] }))
                 .sort((a,b) => b.value - a.value);
-             chartData = {
-                labels: pieData.map(d => d.name),
+
+            // Anche se è un pie chart, popoliamo chartDataForBar con i dati aggregati per consistenza,
+            // il componente ChartGSC userà pieChartData quando type='pie'
+            chartDataForBar = {
+                labels: chartDataForPie.map(d => d.name),
                 datasets: [{
                     label: 'Clic per Dispositivo',
-                    data: pieData.map(d => d.value),
-                    backgroundColor: pieData.map(d=>d.fill),
+                    data: chartDataForPie.map(d => d.value),
+                    backgroundColor: chartDataForPie.map(d=>d.fill),
                 }]
             };
-        } else {
-             chartData = { 
+        } else if (topItemsByClicks.length > 0) {
+             chartDataForBar = {
                 labels: topItemsByClicks.map(it => (String(it.item) || 'N/D').substring(0, 30) + ((String(it.item) || '').length > 30 ? '...' : '')),
                 datasets: [{
                     label: 'Clic (Corrente)',
                     data: topItemsByClicks.map(it => it.clicks_current),
-                    fill: chartColors[0], 
-                    backgroundColor: chartColors[0], 
+                    backgroundColor: chartColors[0],
                 }]
             };
         }
-
-
-        return { summaryText, detailedDataWithDiffs: processedItems, topItemsByClicksChartData: chartData, pieChartData: pieData };
+        console.log(`[Tool4 AnalyzeGSCData] For ${itemKeyType}: chartDataForBar:`, chartDataForBar, "pieChartData:", chartDataForPie);
+        return { summaryText, detailedDataWithDiffs: processedItems, topItemsByClicksChartData: chartDataForBar, pieChartData: chartDataForPie };
     };
 
 
@@ -284,7 +296,7 @@ export function Tool4GSCAnalyzer() {
             const workbook = XLSX.read(gscExcelFile.content, { type: 'array', cellDates: true });
             const newParsedData: GscParsedData = {};
             const newAnalyzedData: GscAnalyzedData = {};
-            
+
             let filtersText = '<h4 class="font-semibold text-sky-700 mb-1">Filtri GSC Applicati all\'Export:</h4>';
             const filtersSheetName = workbook.SheetNames.find(name => GSC_SHEET_MAPPING.filters.some(pn => name.toLowerCase().trim() === pn.toLowerCase().trim()));
             if (filtersSheetName) {
@@ -304,24 +316,28 @@ export function Tool4GSCAnalyzer() {
             setGscFiltersDisplay(filtersText);
 
             for (const reportType of GSC_SHEET_DISPLAY_ORDER) {
-                if (reportType === 'filters') continue; 
-                
+                if (reportType === 'filters') continue;
+
                 setLoadingMessage(`Parsing foglio: ${reportType}...`);
                 const sheetName = workbook.SheetNames.find(name => GSC_SHEET_MAPPING[reportType].some(pn => name.toLowerCase().trim() === pn.toLowerCase().trim()));
-                
+
                 if (sheetName) {
                     const sheetData = parseSheetData(workbook.Sheets[sheetName], reportType);
                     newParsedData[reportType] = sheetData;
                     if (sheetData.length > 0) {
                         setLoadingMessage(`Analisi dati: ${reportType}...`);
                         newAnalyzedData[reportType] = analyzeGSCData(sheetData, reportType) || undefined;
+                    } else {
+                        console.log(`[Tool4 ProcessGSCData] Sheet data for ${reportType} is empty. Setting analyzed data to undefined.`);
+                        newAnalyzedData[reportType] = undefined; // Ensure it's undefined if no data
                     }
                 } else {
                     console.warn(`Foglio per ${reportType} non trovato.`);
                     newParsedData[reportType] = [];
+                    newAnalyzedData[reportType] = undefined;
                 }
             }
-            
+
             setParsedGscData(newParsedData);
             setAnalyzedGscData(newAnalyzedData);
             toast({ title: "Analisi Completata", description: "Dati GSC processati." });
@@ -335,7 +351,7 @@ export function Tool4GSCAnalyzer() {
             setLoadingMessage("");
         }
     };
-    
+
     const getReportItemDisplayName = (type: GscReportType): string => {
         switch(type) {
             case 'queries': return 'Query';
@@ -354,7 +370,7 @@ export function Tool4GSCAnalyzer() {
             return;
         }
         const headers = [
-            getReportItemDisplayName(reportType), "Clic Attuali", "Clic Prec.", "Diff. Clic", "% Clic", 
+            getReportItemDisplayName(reportType), "Clic Attuali", "Clic Prec.", "Diff. Clic", "% Clic",
             "Impr. Attuali", "Impr. Prec.", "Diff. Impr.", "% Impr.",
             "CTR Attuale", "CTR Prec.", "Diff. CTR",
             "Pos. Attuale", "Pos. Prec.", "Diff. Pos."
@@ -402,16 +418,16 @@ export function Tool4GSCAnalyzer() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Caricamento File GSC (Excel/ODS)</CardTitle>
+                    <CardTitle>Caricamento File GSC (Excel/ODS) (Ver.ULTIMO_TENTATIVO)</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <FileUploadZone
                         siteKey="gscExcelFile"
-                        label="File GSC (Excel/ODS)"
+                        label="File GSC (formati .xlsx, .xls, .ods)"
                         onFileLoad={handleFileLoad}
-                        acceptedFileTypes={acceptedExcelTypes} 
+                        acceptedFileTypes={acceptedExcelTypes}
                         dropInstructionText="Trascina qui il file (.xlsx, .xls, .ods) o clicca per selezionare."
-                        expectsArrayBuffer={true} 
+                        expectsArrayBuffer={true}
                     />
                      <p className="text-xs text-muted-foreground mt-1">Il tool analizzerà i fogli: Queries, Pages, Countries, Devices, Search Appearance, Filters (se presenti con nomi standard o comuni alias in italiano/inglese).</p>
                     {gscExcelFile && (
@@ -443,7 +459,7 @@ export function Tool4GSCAnalyzer() {
                     <AlertDescription>{error}</AlertDescription>
                 </Alert>
             )}
-            
+
             {analyzedGscData && !isLoading && (
                 <div className="space-y-8 mt-10">
                     {gscFiltersDisplay && (
@@ -459,6 +475,12 @@ export function Tool4GSCAnalyzer() {
                         const itemDisplayName = getReportItemDisplayName(reportType);
                         const chartType = reportType === 'devices' ? 'pie' : 'bar';
 
+                        console.log(`[Tool4 Debug] Rendering section for ${reportType}. Analysis object:`, analysis);
+                        if (analysis) {
+                             console.log(`[Tool4 Debug] Data for ${reportType} charts: BarData=`, analysis.topItemsByClicksChartData, "PieData=", analysis.pieChartData);
+                        }
+
+
                         if (!analysis || !analysis.detailedDataWithDiffs || analysis.detailedDataWithDiffs.length === 0) {
                              return (
                                 <Card key={reportType}>
@@ -471,7 +493,11 @@ export function Tool4GSCAnalyzer() {
                                 </Card>
                             );
                         }
-                        
+
+                        const chartDataForRender = analysis.topItemsByClicksChartData || { labels: [], datasets: [{ label: 'Clic (Corrente)', data: [], backgroundColor: 'hsl(var(--chart-1))' }] };
+                        const pieDataForRender = analysis.pieChartData || [];
+
+
                         return (
                             <Card key={reportType} id={`${reportType}-analysis-section`}>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -482,19 +508,19 @@ export function Tool4GSCAnalyzer() {
                                 </CardHeader>
                                 <CardContent>
                                     <CardDescription className="mb-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: analysis.summaryText}} />
-                                    
+
                                     <div className="my-6 h-[350px] md:h-[400px]">
-                                        <ChartGSC 
-                                            data={analysis.topItemsByClicksChartData} 
-                                            pieData={analysis.pieChartData}
-                                            type={chartType} 
-                                            title={`Top 5 ${itemDisplayName} per Clic`} 
+                                        <ChartGSC
+                                            data={chartDataForRender}
+                                            pieData={pieDataForRender}
+                                            type={chartType}
+                                            title={`Top 5 ${itemDisplayName} per Clic`}
                                         />
                                     </div>
 
                                     <h4 className="text-lg font-semibold text-foreground mt-6 mb-2">Tabella Dati {itemDisplayName} (Top 20 righe)</h4>
                                     <TableGSC data={analysis.detailedDataWithDiffs.slice(0,20)} itemDisplayName={itemDisplayName} />
-                                   
+
                                     <div className="text-center mt-4">
                                         <Button onClick={() => handleDownloadSectionCSV(reportType)} variant="default" size="sm">
                                             <Download className="mr-2 h-4 w-4"/> Scarica Dati {itemDisplayName} (CSV)
