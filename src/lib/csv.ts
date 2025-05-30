@@ -1,10 +1,11 @@
+
 import type { CsvRowTool1, CsvRowTool2, EXPECTED_COLUMNS_TOOL1, EXPECTED_COLUMNS_TOOL2, COLUMN_ALIASES_TOOL1 } from './types';
 
 // --- Funzioni di Utilità ---
 function removeBOM(str: string): string {
   if (!str) return "";
+  // Character code 0xFEFF is the BOM character
   if (str.charCodeAt(0) === 0xFEFF) {
-    // console.log("BOM rimosso dalla stringa.");
     return str.substring(1);
   }
   return str;
@@ -34,28 +35,42 @@ function getFirstLogicalLineAndRest(text: string): { headerLine: string; restOfT
   return { headerLine, restOfText };
 }
 
-function parseCsvValues(line: string): string[] {
+function parseCsvValues(line: string, delimiter: string): string[] {
   const values: string[] = [];
   let inQuotes = false;
   let currentValue = '';
+  const delimiterChar = delimiter.charAt(0);
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     if (char === '"') {
+      // If an escaped quote (two double quotes)
       if (inQuotes && i + 1 < line.length && line[i+1] === '"') {
-        currentValue += '"'; // Escaped quote
-        i++;
+        currentValue += '"';
+        i++; // Skip the next quote
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (char === ',' && !inQuotes) {
-      values.push(currentValue.trim());
+    } else if (char === delimiterChar && !inQuotes) {
+      values.push(currentValue);
       currentValue = '';
     } else {
       currentValue += char;
     }
   }
-  values.push(currentValue.trim()); // Add last value
-  return values.map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+  values.push(currentValue); // Add the last value
+
+  // Post-process each value: unquote and trim
+  return values.map(v => {
+    let val = v;
+    // Remove surrounding quotes if they exist
+    if (val.startsWith('"') && val.endsWith('"')) {
+      val = val.substring(1, val.length - 1);
+    }
+    // Replace escaped double quotes with a single double quote
+    val = val.replace(/""/g, '"');
+    return val.trim();
+  });
 }
 
 
@@ -67,15 +82,16 @@ function getColumnIndices<T extends Record<string, string>, A extends Record<str
   requiredKeys: (keyof T)[]
 ): Record<keyof T, number> {
   const columnIndices = {} as Record<keyof T, number>;
+  const lowercasedHeaders = headers.map(h => h.toLowerCase());
 
   for (const key in expectedColumns) {
     const typedKey = key as keyof T;
     const expectedHeader = expectedColumns[typedKey].toLowerCase();
-    let index = headers.findIndex(h => h === expectedHeader);
+    let index = lowercasedHeaders.findIndex(h => h === expectedHeader);
 
     if (index === -1 && columnAliases[typedKey as string]) {
       for (const alias of columnAliases[typedKey as string]) {
-        index = headers.findIndex(h => h === alias.toLowerCase());
+        index = lowercasedHeaders.findIndex(h => h === alias.toLowerCase());
         if (index !== -1) break;
       }
     }
@@ -89,13 +105,32 @@ function getColumnIndices<T extends Record<string, string>, A extends Record<str
   return columnIndices;
 }
 
+function detectDelimiter(headerLine: string): string {
+    const commaCount = (headerLine.match(/,/g) || []).length;
+    const semicolonCount = (headerLine.match(/;/g) || []).length;
+    // Prefer semicolon if it's more frequent, otherwise default to comma.
+    // This is a simple heuristic; more complex CSVs might need a more robust detection.
+    if (semicolonCount > commaCount && semicolonCount > 0) {
+        return ';';
+    }
+    return ',';
+}
+
+
 export function parseCSVTool1(csvText: string, siteNameForError: string): CsvRowTool1[] {
   let content = removeBOM(csvText.trim());
   const { headerLine, restOfText } = getFirstLogicalLineAndRest(content);
   
-  const headers = headerLine.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
-    .map(h => h.trim().replace(/^"|"$/g, '').replace(/\r\n|\n|\r/g, ' ').trim().toLowerCase());
+  if (!headerLine) {
+    throw new Error(`File CSV per ${siteNameForError} sembra vuoto o non contiene una riga di intestazione valida.`);
+  }
   
+  const detectedDelimiter = detectDelimiter(headerLine);
+  // console.log(`Tool1: Delimitatore rilevato per ${siteNameForError}: '${detectedDelimiter}'`);
+
+  const headers = parseCsvValues(headerLine, detectedDelimiter)
+    .map(h => h.replace(/\r\n|\n|\r/g, ' ').trim()); // Keep original case for getColumnIndices which handles lowercasing
+
   const requiredKeysTool1: (keyof typeof EXPECTED_COLUMNS_TOOL1)[] = ['keyword', 'posizione', 'url'];
   const columnIndices = getColumnIndices(headers, EXPECTED_COLUMNS_TOOL1, COLUMN_ALIASES_TOOL1, siteNameForError, requiredKeysTool1);
 
@@ -104,7 +139,7 @@ export function parseCSVTool1(csvText: string, siteNameForError: string): CsvRow
 
   for (const line of dataLines) {
     if (!line.trim()) continue;
-    const values = parseCsvValues(line);
+    const values = parseCsvValues(line, detectedDelimiter);
     const entry: Partial<CsvRowTool1> = {};
 
     entry.keyword = (columnIndices.keyword !== -1 && values[columnIndices.keyword]) ? values[columnIndices.keyword].toLowerCase() : undefined;
@@ -126,7 +161,6 @@ export function parseCSVTool1(csvText: string, siteNameForError: string): CsvRow
     
     entry.intento = columnIndices.intento !== -1 ? values[columnIndices.intento] : 'N/A';
     
-    // Optional fields
     entry.varTraffico = columnIndices.varTraffico !== -1 ? values[columnIndices.varTraffico] : 'N/A';
     entry.trafficoStimato = columnIndices.trafficoStimato !== -1 ? values[columnIndices.trafficoStimato] : 'N/A';
     entry.cpcMedio = columnIndices.cpcMedio !== -1 ? values[columnIndices.cpcMedio] : 'N/A';
@@ -140,19 +174,26 @@ export function parseCSVTool1(csvText: string, siteNameForError: string): CsvRow
 export function parseCSVTool2(csvText: string): CsvRowTool2[] {
   let content = removeBOM(csvText.trim());
   const { headerLine, restOfText } = getFirstLogicalLineAndRest(content);
-  
-  const headers = headerLine.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
-    .map(h => h.trim().replace(/^"|"$/g, '').replace(/\r\n|\n|\r/g, ' ').trim().toLowerCase());
+
+  if (!headerLine) {
+    throw new Error(`File CSV per Tool 2 sembra vuoto o non contiene una riga di intestazione valida.`);
+  }
+
+  const detectedDelimiter = detectDelimiter(headerLine);
+  // console.log(`Tool2: Delimitatore rilevato: '${detectedDelimiter}'`);
+
+  const headers = parseCsvValues(headerLine, detectedDelimiter)
+    .map(h => h.replace(/\r\n|\n|\r/g, ' ').trim());
 
   const requiredKeysTool2: (keyof typeof EXPECTED_COLUMNS_TOOL2)[] = ['keyword'];
-  const columnIndices = getColumnIndices(headers, EXPECTED_COLUMNS_TOOL2, COLUMN_ALIASES_TOOL1, "Tool 2", requiredKeysTool2);
+  const columnIndices = getColumnIndices(headers, EXPECTED_COLUMNS_TOOL2, COLUMN_ALIASES_TOOL1, "Tool 2", requiredKeysTool2); // Using COLUMN_ALIASES_TOOL1 as they are shared
   
   const data: CsvRowTool2[] = [];
   const dataLines = restOfText.replace(/\r\n?/g, '\n').split('\n').filter(line => line.trim() !== '');
 
   for (const line of dataLines) {
     if (!line.trim()) continue;
-    const values = parseCsvValues(line);
+    const values = parseCsvValues(line, detectedDelimiter);
     const entry: Partial<CsvRowTool2> = {};
 
     entry.keyword = (columnIndices.keyword !== -1 && values[columnIndices.keyword]) ? values[columnIndices.keyword].toLowerCase() : undefined;
@@ -195,10 +236,8 @@ export function exportToCSV(filename: string, headers: string[], data: Record<st
 
   data.forEach(item => {
     const row = headers.map(header => {
-      // Find the key in the item that corresponds to the header (case-insensitive and space-insensitive match)
       const itemKey = Object.keys(item).find(k => 
         k.toLowerCase().replace(/\s+/g, '') === header.toLowerCase().replace(/\s+/g, '') ||
-        // Specific mapping for 7C fields which have underscores in object but not in header
         (header.startsWith('7C_') && k.toLowerCase().replace(/\s+/g, '') === header.substring(3).toLowerCase().replace(/\s+/g, ''))
       );
       return escapeCSVField(itemKey ? item[itemKey] : "");
@@ -206,7 +245,7 @@ export function exportToCSV(filename: string, headers: string[], data: Record<st
     csvContent += row.join(",") + "\r\n";
   });
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); // Added BOM for Excel compatibility
   const link = document.createElement("a");
   if (link.download !== undefined) {
     const url = URL.createObjectURL(blob);
@@ -216,5 +255,7 @@ export function exportToCSV(filename: string, headers: string[], data: Record<st
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 }
+
