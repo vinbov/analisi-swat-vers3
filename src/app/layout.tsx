@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
@@ -6,7 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'SEO Toolkit Pro | Suite SEO Multi-Tool Avanzata',
+  title: 'ANALISI S.W.A.T. (Strengths, Weaknesses, Approaches, Tactics) Punti di forza, debolezze, approcci, tattiche',
   description: 'Una suite completa di strumenti SEO per analisi comparative, valutazione di pertinenza keyword e scraping di annunci Facebook, potenziata da AI.',
 };
 
