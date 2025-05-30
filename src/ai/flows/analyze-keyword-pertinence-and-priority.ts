@@ -1,5 +1,3 @@
-// 'use server'
-
 'use server';
 
 /**
@@ -64,7 +62,7 @@ const analyzeKeywordPertinenceAndPriorityPrompt = ai.definePrompt({
 
 **STEP 1: Relevance Assessment ("In Target" / "Out of Target")**
 Guiding Principle for Relevance: A keyword is "In Target" if an entity operating in the "{{{industry}}}" could realistically create relevant content, or if the keyword reflects a problem, question, or interest that the sector addresses. Also, consider generic keywords or questions if the industry can provide an authoritative answer. It is "Out of Target" if it clearly belongs to other areas without a logical connection.
-Relevance Criteria: 
+Relevance Criteria:
 - High Relevance ("In Target"): Directly related to the core products/services of the "{{{industry}}}", or a very common problem/question the industry solves.
 - Medium Relevance ("In Target"): Tangentially related, could be a shoulder topic or a less direct user need but still addressable by the "{{{industry}}}".
 - Low Relevance ("Out of Target"): Very loosely connected or clearly unrelated to the "{{{industry}}}".

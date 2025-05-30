@@ -13,7 +13,7 @@ export function AppHeader() {
           width={150}
           height={50}
           className="h-12 mb-4 object-contain"
-          style={{ height: "auto" }}
+          style={{ height: "auto", width: "auto" }}
           data-ai-hint="logo abstract"
         />
       </Link>

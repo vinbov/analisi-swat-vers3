@@ -10,7 +10,7 @@ import { analyzeAdAngleAction } from '@/app/actions/tool3-actions';
 import { TableScrapedAds } from './table-scraped-ads';
 import { TableAngleAnalysis } from './table-angle-analysis';
 import { exportToCSV } from '@/lib/csv';
-import { PlayIcon, Download, AlertCircle, Bot, SearchCode, Loader2 } from 'lucide-react';
+import { PlayIcon, Download, AlertCircle, Bot, SearchCode, Loader2, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 
@@ -37,11 +37,17 @@ export function Tool3Scraper() {
 
   // Effect to get OpenAI API key from Tool 2's input field if available
   useEffect(() => {
-    const tool2ApiKeyInput = document.getElementById('apiKeyTool2') as HTMLInputElement;
-    if (tool2ApiKeyInput && tool2ApiKeyInput.value) {
-      setOpenAIApiKey(tool2ApiKeyInput.value);
+    // This logic might be problematic if Tool 2's input isn't always mounted or accessible
+    // For now, we keep it but prioritize the local input if filled
+    try {
+      const tool2ApiKeyInput = document.getElementById('apiKeyTool2') as HTMLInputElement;
+      if (tool2ApiKeyInput && tool2ApiKeyInput.value && !openAIApiKey) { // only set if local is empty
+        setOpenAIApiKey(tool2ApiKeyInput.value);
+      }
+    } catch (e) {
+      // It's fine if it doesn't exist, just means we rely on local input
     }
-  }, []);
+  }, [openAIApiKey]);
 
 
   const runScraping = async () => {
@@ -148,13 +154,23 @@ export function Tool3Scraper() {
       setError("Nessun annuncio disponibile per l'analisi. Esegui prima lo scraping.");
       return;
     }
-    const currentOpenAIApiKey = openAIApiKey || (document.getElementById('apiKeyTool2') as HTMLInputElement)?.value.trim();
+    // Prioritize local input, then check Tool 2's input as fallback
+    let currentOpenAIApiKey = openAIApiKey.trim();
+    if (!currentOpenAIApiKey) {
+        try {
+            const tool2ApiKeyInput = document.getElementById('apiKeyTool2') as HTMLInputElement;
+            if (tool2ApiKeyInput && tool2ApiKeyInput.value) {
+                currentOpenAIApiKey = tool2ApiKeyInput.value.trim();
+            }
+        } catch(e) { /* ignore if not found */ }
+    }
+
     if (!currentOpenAIApiKey) {
       setError("Inserisci la tua OpenAI API Key (nel Tool 2 o qui) per l'analisi dell'angle.");
       toast({ title: "API Key Mancante", description: "Inserisci la OpenAI API Key per l'analisi.", variant: "destructive" });
       return;
     }
-    setOpenAIApiKey(currentOpenAIApiKey); // Ensure it's set for future use if entered here
+    if (!openAIApiKey) setOpenAIApiKey(currentOpenAIApiKey); 
 
     setIsLoadingAnalysis(true);
     setLoadingMessage("Analisi angle in corso con OpenAI...");
@@ -165,7 +181,7 @@ export function Tool3Scraper() {
         const analysisResult = await analyzeAdAngleAction({
           adText: ad.testo,
           adTitle: ad.titolo,
-        }, currentOpenAIApiKey); // Pass API key
+        }, currentOpenAIApiKey); 
         return { ...ad, angleAnalysis: analysisResult };
       } catch (e: any) {
         console.error(`Errore analisi angle per ad "${ad.titolo}":`, e);
@@ -261,7 +277,7 @@ export function Tool3Scraper() {
               onChange={(e) => setOpenAIApiKey(e.target.value)}
               placeholder="Recuperata dal Tool 2 o inserisci qui" 
             />
-            <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C. Se già inserita nel Tool 2, verrà usata quella.</p>
+            <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C. Se già inserita nel Tool 2 (ora rimosso), inseriscila qui.</p>
           </div>
         </CardContent>
       </Card>

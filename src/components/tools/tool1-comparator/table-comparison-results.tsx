@@ -1,6 +1,6 @@
 "use client"
 
-import React from 'react'; // Aggiunta importazione React
+import React from 'react'; 
 import type { ComparisonResult } from '@/lib/types';
 import Link from 'next/link';
 

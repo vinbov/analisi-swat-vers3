@@ -9,7 +9,6 @@ export interface CsvRowTool1 {
   difficolta: number | null;
   opportunity: number | null;
   intento: string;
-  // Optional columns from original HTML that might not be strictly used in core logic
   varTraffico?: string;
   trafficoStimato?: string;
   cpcMedio?: string;
@@ -17,7 +16,7 @@ export interface CsvRowTool1 {
 
 export interface CompetitorEntry {
   name: string;
-  pos: number | string | null; // Can be 'N/P'
+  pos: number | string | null; 
   url: string;
 }
 
@@ -35,10 +34,10 @@ export interface ComparisonResult {
 // Tool 2: Keyword Pertinence & Priority Analyzer
 export interface CsvRowTool2 {
   keyword: string;
-  volume: number | string; // Can be "N/A"
-  difficolta: number | string; // Can be "N/A"
-  opportunity: number | string; // Can be "N/A"
-  posizione: number | string; // Can be "N/A"
+  volume: number | string; 
+  difficolta: number | string; 
+  opportunity: number | string; 
+  posizione: number | string; 
   url: string;
   intento: string;
 }
@@ -49,13 +48,16 @@ export interface PertinenceAnalysisResult {
   pertinenza: string;
   prioritaSEO: string;
   motivazioneSEO: string;
+  volume?: number | string;
+  kd?: number | string;
+  opportunity?: number | string;
+  posizione?: number | string;
+  url?: string;
+  intento?: string;
 }
 
 // Tool 3: Facebook Ads Library Scraper
 export interface ApifyRawAdItem {
-  // Define based on expected structure from Apify actor 'curious_coder~facebook-ads-library-scraper'
-  // This can be complex, for now let's assume a simplified processed structure.
-  // Based on original JS, it looks for snapshot.cards or snapshot directly
   snapshot?: {
     cards?: Array<{
       body?: string;
@@ -73,13 +75,12 @@ export interface ApifyRawAdItem {
     images?: Array<{ url?: string }>;
     page_profile_picture_url?: string;
   };
-  url?: string; // Fallback URL
-  // Other fields from Apify...
+  url?: string; 
   [key: string]: any;
 }
 
 export interface ScrapedAd {
-  id: string; // Add an ID for keying in React lists
+  id: string; 
   testo: string;
   titolo: string;
   link: string;
@@ -87,22 +88,29 @@ export interface ScrapedAd {
 }
 
 export interface AngleAnalysisScores {
-  C1: number; // Chiarezza
-  C2: number; // Coinvolgimento
-  C3: number; // Concretezza
-  C4: number; // Coerenza
-  C5: number; // Credibilità
-  C6: number; // CTA
-  C7: number; // Contesto
+  C1: number; 
+  C2: number; 
+  C3: number; 
+  C4: number; 
+  C5: number; 
+  C6: number; 
+  C7: number; 
 }
 
 export interface AngleAnalysis {
-  scores: AngleAnalysisScores;
+  c1Clarity: number;
+  c2Engagement: number;
+  c3Concreteness: number;
+  c4Coherence: number;
+  c5Credibility: number;
+  c6CallToAction: number;
+  c7Context: number;
+  scores: AngleAnalysisScores; // Kept for potential direct use if AI returns this nested
   totalScore: number;
   evaluation: string;
   detailedAnalysis: string;
-  error?: string; // In case of parsing or AI error
-  raw?: string; // Raw AI response if parsing fails
+  error?: string; 
+  raw?: string; 
 }
 
 export interface AdWithAngleAnalysis extends ScrapedAd {
@@ -114,7 +122,7 @@ export interface AdWithAngleAnalysis extends ScrapedAd {
 export type GscReportType = 'queries' | 'pages' | 'countries' | 'devices' | 'searchAppearance' | 'filters';
 
 export interface GscSheetRow {
-  item?: string; // Represents Query, Page, Country, Device, Search Appearance string
+  item?: string; 
   clicks_current?: number;
   clicks_previous?: number;
   impressions_current?: number;
@@ -123,10 +131,8 @@ export interface GscSheetRow {
   ctr_previous?: number;
   position_current?: number | null;
   position_previous?: number | null;
-  // For filters sheet
   filterName?: string;
   filterValue?: string;
-  // Allow any other property from XLSX
   [key: string]: any;
 }
 
@@ -135,17 +141,17 @@ export interface GscAnalyzedItem {
   clicks_current: number;
   clicks_previous: number;
   diff_clicks: number;
-  perc_change_clicks: number; // as fraction, format as % in UI
+  perc_change_clicks: number; 
   impressions_current: number;
   impressions_previous: number;
   diff_impressions: number;
-  perc_change_impressions: number; // as fraction
+  perc_change_impressions: number; 
   ctr_current: number;
   ctr_previous: number;
-  diff_ctr: number; // absolute diff
+  diff_ctr: number; 
   position_current: number | null;
   position_previous: number | null;
-  diff_position: number | null; // note: higher previous position is "better" so diff is prev - curr
+  diff_position: number | null; 
 }
 
 export interface GscSectionAnalysis {
@@ -159,10 +165,9 @@ export interface GscSectionAnalysis {
         backgroundColor?: string | string[];
         borderColor?: string | string[];
         borderWidth?: number;
-        fill?: string; // for recharts Bar
+        fill?: string; 
     }>;
   };
-   // For PieChart (e.g., devices)
   pieChartData?: Array<{ name: string; value: number; fill: string }>;
 }
 
@@ -194,26 +199,26 @@ export type DetailPageSection =
   | 'mySiteOnlyKeywordsSectionTool1' 
   | 'competitorOnlyKeywordsSectionTool1'
   | 'angleAnalysisDetail'
-  | GscReportType; // Adding GSC report types as detail page sections
+  | GscReportType; 
 
 
-export type ChartConfig = any; // From recharts/Chart.js
+export type ChartConfig = any; 
 
 export interface DetailPageDataTool1 {
   pageTitle: string;
   description: string;
-  chartConfig?: ChartConfig; // Should be recharts compatible structure
+  chartComponent?: React.ReactNode; 
   tableData?: ComparisonResult[];
   tableHeaders?: string[];
   tableType?: 'common' | 'mySiteOnly' | 'competitorOnly';
   activeCompetitorNames?: string[];
-  additionalContent?: string; // For things like top 10 lists
+  additionalContent?: string; 
 }
 
 export interface DetailPageDataTool3 {
   pageTitle: string;
-  descriptionHTML: string; // Can contain HTML for 7C framework description
-  chartConfig?: ChartConfig; // Should be recharts compatible
+  descriptionHTML: string; 
+  chartConfig?: ChartConfig; 
   tableData: AdWithAngleAnalysis[];
 }
 
@@ -235,14 +240,13 @@ export const EXPECTED_COLUMNS_TOOL1: Record<keyof CsvRowTool1, string> = {
 };
 
 export const COLUMN_ALIASES_TOOL1: Record<keyof Partial<CsvRowTool1>, string[]> = { 
-  difficolta: ['keyword difficulty', 'key diff'], 
-  opportunity: ['keyword opportunity'], 
-  posizione: ['pos']
+  difficolta: ['keyword difficulty', 'key diff', 'kd'], 
+  opportunity: ['keyword opportunity', 'opportunity score'], 
+  posizione: ['pos', 'position']
 };
 
 export const EXPECTED_COLUMNS_TOOL2: Record<keyof CsvRowTool2, string> = { 
   keyword: 'Keyword', posizione: 'Pos', url: 'URL', volume: 'Volume',
   difficolta: 'Keyword Difficulty', opportunity: 'Keyword Opportunity', intento: 'Intent'
 };
-export const COLUMN_ALIASES_TOOL2 = COLUMN_ALIASES_TOOL1; // Same aliases
-
+export const COLUMN_ALIASES_TOOL2 = COLUMN_ALIASES_TOOL1;

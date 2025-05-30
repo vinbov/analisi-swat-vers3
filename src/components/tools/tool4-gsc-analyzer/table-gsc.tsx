@@ -65,7 +65,7 @@ export function TableGSC({ data, itemDisplayName, isDetailPage = false }: TableG
               
               <td className="text-center">{formatPosition(row.position_current)}</td>
               <td className="text-center">{formatPosition(row.position_previous)}</td>
-              <td className={`text-center ${row.diff_position !== null ? getChangeColor(row.diff_position) : ''}`}>{formatPosition(row.diff_position)}</td>
+              <td className={`text-center ${row.diff_position !== null ? getChangeColor(row.diff_position * -1) : ''}`}>{formatPosition(row.diff_position)}</td>
             </tr>
           ))}
         </tbody>

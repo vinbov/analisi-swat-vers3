@@ -85,7 +85,6 @@ export function FileUploadZone({
     if (file) {
       const fileTypeIsValid = acceptedFileTypes.split(',').some(type => {
         const trimmedType = type.trim();
-        // Case-insensitive check for extensions, direct match for MIME types
         return (trimmedType.startsWith('.') && file.name.toLowerCase().endsWith(trimmedType.toLowerCase())) || file.type === trimmedType;
       });
 
@@ -94,7 +93,7 @@ export function FileUploadZone({
           title: "File non valido",
           description: `DEBUG - Tipi file ricevuti dal genitore: [${acceptedFileTypes}]. Il file "${file.name}" (tipo: ${file.type || 'sconosciuto'}) non è tra questi.`,
           variant: "destructive",
-          duration: 10000, // Longer duration for debug
+          duration: 10000,
         });
         setFileName(null);
         setFileSize(null);

@@ -16,15 +16,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 
 const APP_CHUNK_SIZE_TOOL2_OFFLINE = 50;
 
-// Helper function for tokenization and cleaning
-function tokenizeAndClean(text: string): string[] {
+const STOP_WORDS_IT = [
+  "a", "ad", "al", "allo", "ai", "agli", "all", "agl", "alla", "alle", "con", "col", "coi", "da", "dal", "dallo", "dai", "dagli", "dall", "dagl", "dalla", "dalle",
+  "di", "del", "dello", "dei", "degli", "dell", "degl", "della", "delle", "in", "nel", "nello", "nei", "negli", "nell", "negl", "nella", "nelle", "su", "sul", "sullo",
+  "sui", "sugli", "sull", "sugl", "sulla", "sulle", "per", "tra", "fra", "e", "ed", "o", "od", "ma", "però", "anche", "pure", "né", "ne", "se", "che", "chi", "cui",
+  "non", "il", "lo", "i", "gli", "la", "le", "un", "uno", "una", "mio", "mia", "miei", "mie", "tuo", "tua", "tuoi", "tue", "suo", "sua", "suoi", "sue", "nostro",
+  "nostra", "nostri", "nostre", "vostro", "vostra", "vostri", "vostre", "loro", "questo", "questa", "questi", "queste", "quello", "quella", "quelli", "quelle",
+  "ci", "vi", "si", "io", "tu", "lui", "lei", "noi", "voi", "essi", "esse", "me", "te", "sé", "c'", "l'", "un'", "qual", "dov'", "com'", "è", "ha"
+];
+
+
+function tokenizeAndClean(text: string, stopWords: string[] = []): string[] {
     if (!text || typeof text !== 'string') return [];
-    return text.toLowerCase()
-               .replace(/[^\w\s'-]/g, '') 
-               .split(/\s+/) 
-               .map(token => token.replace(/^['-]|['-]$/g, '')) 
-               .filter(token => token.length > 1 && token !== '-' && token !== "'");
+    const cleanedText = text.toLowerCase()
+                           .replace(/[^\w\s'-]/g, '') // Rimuove punteggiatura tranne apostrofi e trattini interni
+                           .replace(/\s+/g, ' ') // Normalizza spazi multipli
+                           .trim();
+
+    const tokens = cleanedText.split(/\s+/)
+        .map(token => token.replace(/^['-]|['-]$/g, '')) // Rimuove apostrofi/trattini all'inizio/fine dei token
+        .filter(token => token.length > 1 && token !== '-' && token !== "'" && !stopWords.includes(token.toLowerCase()));
+    return tokens;
 }
+
 
 export function Tool2Analyzer() {
   const [industry, setIndustry] = useState('');
@@ -54,16 +68,18 @@ export function Tool2Analyzer() {
   };
 
   const checkPertinenzaOffline = (keywordAnalizzata: string, settoreGlobale: string, paroleChiavePrincipaliInput: string): { pertinente: boolean; motivazione: string } => {
-    const kwTokens = tokenizeAndClean(keywordAnalizzata);
-    const settoreTokens = tokenizeAndClean(settoreGlobale);
-    const paroleChiavePrincipali = tokenizeAndClean(paroleChiavePrincipaliInput);
+    const kwTokens = tokenizeAndClean(keywordAnalizzata, STOP_WORDS_IT);
+    const settoreTokens = tokenizeAndClean(settoreGlobale, STOP_WORDS_IT);
+    const paroleChiavePrincipali = tokenizeAndClean(paroleChiavePrincipaliInput, STOP_WORDS_IT);
+    
     const modificatoriInformativi = ["significato", "cos'è", "come funziona", "guida", "tutorial", "definizione", "spiegazione", "informazioni", "dettagli", "base", "principiante", "avanzato", "cosa sono", "perché", "quando"];
     const modificatoriCommerciali = ["prezzi", "costo", "offerta", "sconto", "comprare", "acquistare", "vendita", "noleggio", "servizio di", "consulenza per", "preventivo", "shop", "negozio", "migliore", "top"];
     
     let punteggioPertinenza = 0;
-    let motivazioneLogSet = new Set<string>(); // Usare un Set per evitare duplicati di messaggi
-    let kwTokensAlreadyMatchedForPK = new Set<string>();
-    let kwTokensAlreadyMatchedForSettore = new Set<string>();
+    const motivazioneLogSet = new Set<string>();
+    const kwTokensAlreadyMatchedForPK = new Set<string>();
+    const kwTokensAlreadyMatchedForSettore = new Set<string>();
+    let modificatoreLogAdded = false;
 
     for (const pkToken of paroleChiavePrincipali) {
         for (const kwToken of kwTokens) {
@@ -88,7 +104,6 @@ export function Tool2Analyzer() {
     
     let modificatoreTrovato = null;
     let tokenChiaveConModificatoreTrovato = null;
-    let modificatoreLogAdded = false;
 
     for (const mod of [...modificatoriInformativi, ...modificatoriCommerciali]) {
         if (kwTokens.includes(mod)) {
@@ -107,12 +122,12 @@ export function Tool2Analyzer() {
         punteggioPertinenza += 2;
         let tipoIntento = modificatoriInformativi.includes(modificatoreTrovato) ? "informativo" : "commerciale/transazionale";
         motivazioneLogSet.add(`Rilevato intento ${tipoIntento} ('${modificatoreTrovato}') associato al termine di settore '${tokenChiaveConModificatoreTrovato}'.`);
-        modificatoreLogAdded = true; // Assicura che venga aggiunto una sola volta
+        modificatoreLogAdded = true; 
     }
     
     const motivazioneFinale = Array.from(motivazioneLogSet).join(" ");
-
     const sogliaMinimaPertinenza = paroleChiavePrincipali.length > 0 || settoreTokens.length > 0 ? 2 : 1; 
+
     if (punteggioPertinenza >= sogliaMinimaPertinenza) { 
         return { pertinente: true, motivazione: "In Target. " + (motivazioneFinale.length > 0 ? motivazioneFinale : "Corrispondenza generica con il settore.") };
     } else {

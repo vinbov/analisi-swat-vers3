@@ -16,11 +16,11 @@ export function TablePertinenceResults({ results }: TablePertinenceResultsProps)
 
   const getPriorityIndicator = (priority: string): React.ReactNode => {
     let colorClass = 'bg-gray-400'; // Default color
-    if (priority.includes('Alta') || priority.includes('Mantenimento')) {
+    if (priority.toLowerCase().includes('alta') || priority.toLowerCase().includes('mantenimento')) {
       colorClass = 'bg-green-500';
-    } else if (priority.includes('Media')) {
+    } else if (priority.toLowerCase().includes('media')) {
       colorClass = 'bg-yellow-400';
-    } else if (priority.includes('Bassa') || priority.includes('Non Applicabile') || priority.includes('Dati Insufficienti')) {
+    } else if (priority.toLowerCase().includes('bassa') || priority.toLowerCase().includes('non applicabile') || priority.toLowerCase().includes('dati insufficienti')) {
       colorClass = 'bg-red-500';
     }
 

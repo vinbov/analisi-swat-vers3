@@ -1,6 +1,7 @@
 
-import type { CsvRowTool1, CsvRowTool2 } from './types'; // Type-only imports
-import { EXPECTED_COLUMNS_TOOL1, EXPECTED_COLUMNS_TOOL2, COLUMN_ALIASES_TOOL1 } from './types'; // Value imports
+import type { CsvRowTool1, CsvRowTool2 } from './types';
+import { EXPECTED_COLUMNS_TOOL1, EXPECTED_COLUMNS_TOOL2, COLUMN_ALIASES_TOOL1, COLUMN_ALIASES_TOOL2 } from './types';
+
 
 // --- Funzioni di Utilità ---
 function removeBOM(str: string): string {
@@ -109,8 +110,6 @@ function getColumnIndices<T extends Record<string, string>, A extends Record<str
 function detectDelimiter(headerLine: string): string {
     const commaCount = (headerLine.match(/,/g) || []).length;
     const semicolonCount = (headerLine.match(/;/g) || []).length;
-    // Prefer semicolon if it's more frequent, otherwise default to comma.
-    // This is a simple heuristic; more complex CSVs might need a more robust detection.
     if (semicolonCount > commaCount && semicolonCount > 0) {
         return ';';
     }
@@ -127,10 +126,9 @@ export function parseCSVTool1(csvText: string, siteNameForError: string): CsvRow
   }
   
   const detectedDelimiter = detectDelimiter(headerLine);
-  // console.log(`Tool1: Delimitatore rilevato per ${siteNameForError}: '${detectedDelimiter}'`);
 
   const headers = parseCsvValues(headerLine, detectedDelimiter)
-    .map(h => h.replace(/\r\n|\n|\r/g, ' ').trim()); // Keep original case for getColumnIndices which handles lowercasing
+    .map(h => h.replace(/\r\n|\n|\r/g, ' ').trim()); 
 
   const requiredKeysTool1: (keyof typeof EXPECTED_COLUMNS_TOOL1)[] = ['keyword', 'posizione', 'url'];
   const columnIndices = getColumnIndices(headers, EXPECTED_COLUMNS_TOOL1, COLUMN_ALIASES_TOOL1, siteNameForError, requiredKeysTool1);
@@ -181,13 +179,12 @@ export function parseCSVTool2(csvText: string): CsvRowTool2[] {
   }
 
   const detectedDelimiter = detectDelimiter(headerLine);
-  // console.log(`Tool2: Delimitatore rilevato: '${detectedDelimiter}'`);
 
   const headers = parseCsvValues(headerLine, detectedDelimiter)
     .map(h => h.replace(/\r\n|\n|\r/g, ' ').trim());
 
   const requiredKeysTool2: (keyof typeof EXPECTED_COLUMNS_TOOL2)[] = ['keyword'];
-  const columnIndices = getColumnIndices(headers, EXPECTED_COLUMNS_TOOL2, COLUMN_ALIASES_TOOL1, "Tool 2", requiredKeysTool2); // Using COLUMN_ALIASES_TOOL1 as they are shared
+  const columnIndices = getColumnIndices(headers, EXPECTED_COLUMNS_TOOL2, COLUMN_ALIASES_TOOL2, "Tool 2", requiredKeysTool2); 
   
   const data: CsvRowTool2[] = [];
   const dataLines = restOfText.replace(/\r\n?/g, '\n').split('\n').filter(line => line.trim() !== '');
