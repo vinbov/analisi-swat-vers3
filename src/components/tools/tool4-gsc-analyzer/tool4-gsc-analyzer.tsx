@@ -47,7 +47,7 @@ export function Tool4GSCAnalyzer() {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
         } else {
-            setError("Errore nel caricamento del file. Contenuto non valido o file vuoto.");
+            setError("Errore nel caricamento del file Excel. Il contenuto non è valido, il file è vuoto, o non è un ArrayBuffer.");
             setGscExcelFile(null);
         }
         setParsedGscData(null);
@@ -399,12 +399,12 @@ export function Tool4GSCAnalyzer() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Caricamento File Excel GSC (.xlsx)</CardTitle>
+                    <CardTitle>Caricamento File Excel GSC (Ver.2)</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <FileUploadZone
                         siteKey="gscExcelFile"
-                        label="File Excel GSC"
+                        label="File Excel GSC (Ver.2)"
                         onFileLoad={handleFileLoad}
                         acceptedFileTypes=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel"
                         dropInstructionText="Trascina qui il file Excel (.xlsx, .xls) o clicca per selezionare."
