@@ -12,9 +12,9 @@ export function AppHeader() {
           alt="Logo ANALISI S.W.A.T."
           width={150}
           height={50}
-          className="h-12 mb-4 object-contain"
-          style={{ height: "auto", width: "auto" }}
+          className="mb-4 object-contain" // Simplified className
           data-ai-hint="logo abstract"
+          priority // Added priority
         />
       </Link>
       <h1 className="text-4xl md:text-5xl font-bold" style={{ color: 'hsl(var(--sky-700))' }}>
