@@ -406,7 +406,7 @@ export function Tool4GSCAnalyzer() {
                         siteKey="gscExcelFile"
                         label="File Excel GSC (Ver.2)"
                         onFileLoad={handleFileLoad}
-                        acceptedFileTypes=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel"
+                        acceptedFileTypes=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel" // Assicurati che questa sia la stringa corretta
                         dropInstructionText="Trascina qui il file Excel (.xlsx, .xls) o clicca per selezionare."
                         expectsArrayBuffer={true} 
                     />
