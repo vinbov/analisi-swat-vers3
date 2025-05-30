@@ -26,7 +26,7 @@ const GSC_SHEET_MAPPING: Record<GscReportType, string[]> = {
 };
 const GSC_SHEET_DISPLAY_ORDER: GscReportType[] = ['filters', 'queries', 'pages', 'countries', 'devices', 'searchAppearance'];
 
-const GSC_LOGO_URL = "https://placehold.co/150x50/1e3a8a/FFFFFF?text=GSC+Tool";
+const GSC_LOGO_URL = "https://placehold.co/150x50/1e3a8a/FFFFFF?text=GSC+Tool"; // Corretto FFFFFFF -> FFFFFF
 
 export function Tool4GSCAnalyzer() {
     const [gscExcelFile, setGscExcelFile] = useState<{ content: ArrayBuffer; name: string } | null>(null);
@@ -62,7 +62,9 @@ export function Tool4GSCAnalyzer() {
         setAnalyzedGscData(null);
         setError(null);
         setGscFiltersDisplay("");
+        if (fileInputRef.current) fileInputRef.current.value = ""; // Reset input
     };
+    const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
 
     const parseSheetData = (sheet: XLSX.WorkSheet, reportType: GscReportType): GscSheetRow[] => {
         const jsonData = XLSX.utils.sheet_to_json<any>(sheet, { header: 1, blankrows: false, defval: null });
@@ -88,10 +90,10 @@ export function Tool4GSCAnalyzer() {
 
         if (headerRowIndex === -1) {
             if (jsonData.length > 0 && reportType === 'filters') {
-                headersRaw = jsonData[0] as any[];
+                headersRaw = jsonData[0] as any[]; // Assume la prima riga per il foglio filtri
                 dataRows = jsonData.slice(1) as any[][];
             } else if (jsonData.length > 0 && reportType !== 'filters') {
-                 headersRaw = jsonData[0] as any[];
+                 headersRaw = jsonData[0] as any[]; // Fallback per altri fogli
                  dataRows = jsonData.slice(1) as any[][];
                  console.warn(`Tool4: Nessuna riga di intestazione GSC tipica trovata per ${reportType}. Assumendo la prima riga come intestazione.`);
             } else {
@@ -152,7 +154,7 @@ export function Tool4GSCAnalyzer() {
                     value = (value === undefined || value === null || String(value).trim() === "" || String(value).trim() === "-") ? 0 : parseInt(String(value).replace(/[^\d]/g, '')) || 0;
                 } else if (key === 'ctr_current' || key === 'ctr_previous') {
                     if (typeof value === 'string') value = parseFloat(value.replace('%', '').replace(',', '.')) / 100;
-                    else if (typeof value === 'number') value = (value > 1 && value <= 100) ? value / 100 : value;
+                    else if (typeof value === 'number') value = (value > 1 && value <= 100) ? value / 100 : value; // Assume percent if > 1
                     else value = 0;
                     value = isNaN(value) ? 0 : value;
                 } else if (key === 'position_current' || key === 'position_previous') {
@@ -167,12 +169,13 @@ export function Tool4GSCAnalyzer() {
             }
             if (reportType === 'filters' && !entry.filterName && row[0]) entry.filterName = String(row[0]).trim();
             if (reportType === 'filters' && !entry.filterValue && row[1]) entry.filterValue = String(row[1]).trim();
-
+            
             return entry;
-        }).filter(entry => (reportType === 'filters' ? entry.filterName : entry.item) );
+        }).filter(entry => (reportType === 'filters' ? entry.filterName : entry.item) ); // Assicura che l'item principale esista
     };
 
     const analyzeGSCData = (data: GscSheetRow[], itemKeyType: GscReportType): GscSectionAnalysis | null => {
+        console.log(`[Tool4 AnalyzeGSCData] Analyzing data for ${itemKeyType}. Input data length: ${data?.length}`);
         if (!data || data.length === 0) {
              console.log(`[Tool4 AnalyzeGSCData] No data for ${itemKeyType}, returning null.`);
             return null;
@@ -205,7 +208,7 @@ export function Tool4GSCAnalyzer() {
 
             let diffPosition: number | null = null;
             if (currentPosition !== null && previousPosition !== null) {
-                diffPosition = previousPosition - currentPosition;
+                diffPosition = previousPosition - currentPosition; // Positive diff means improvement
             }
 
             return {
@@ -227,7 +230,7 @@ export function Tool4GSCAnalyzer() {
 
         const topNForChart = 5;
         const topItemsByClicks = [...processedItems]
-                                  .filter(it => it.item)
+                                  .filter(it => it.item) // Assicurati che item esista
                                   .sort((a, b) => (b.clicks_current || 0) - (a.clicks_current || 0))
                                   .slice(0, topNForChart);
 
@@ -244,7 +247,7 @@ export function Tool4GSCAnalyzer() {
         let chartDataForPie: GscSectionAnalysis['pieChartData'] = [];
 
 
-        if (itemKeyType === 'devices') {
+        if (itemKeyType === 'devices') { // Specific for pie chart
             const deviceSummary = processedItems.reduce((acc, curr) => {
                 const deviceName = curr.item || 'Sconosciuto';
                 acc[deviceName] = (acc[deviceName] || 0) + curr.clicks_current;
@@ -254,9 +257,8 @@ export function Tool4GSCAnalyzer() {
             chartDataForPie = Object.entries(deviceSummary)
                 .map(([name, value], index) => ({ name, value, fill: chartColors[index % chartColors.length] }))
                 .sort((a,b) => b.value - a.value);
-
-            // Anche se è un pie chart, popoliamo chartDataForBar con i dati aggregati per consistenza,
-            // il componente ChartGSC userà pieChartData quando type='pie'
+            
+            // For consistency if bar chart is ever used for devices
             chartDataForBar = {
                 labels: chartDataForPie.map(d => d.name),
                 datasets: [{
@@ -265,7 +267,8 @@ export function Tool4GSCAnalyzer() {
                     backgroundColor: chartDataForPie.map(d=>d.fill),
                 }]
             };
-        } else if (topItemsByClicks.length > 0) {
+
+        } else if (topItemsByClicks.length > 0) { // For bar charts
              chartDataForBar = {
                 labels: topItemsByClicks.map(it => (String(it.item) || 'N/D').substring(0, 30) + ((String(it.item) || '').length > 30 ? '...' : '')),
                 datasets: [{
@@ -313,7 +316,7 @@ export function Tool4GSCAnalyzer() {
             } else {
                 filtersText += '<p>Foglio "Filters" non trovato.</p>';
             }
-            setGscFiltersDisplay(filtersText);
+            setGscFiltersDisplay(filtersText); // Imposta immediatamente i filtri
 
             for (const reportType of GSC_SHEET_DISPLAY_ORDER) {
                 if (reportType === 'filters') continue;
@@ -323,13 +326,13 @@ export function Tool4GSCAnalyzer() {
 
                 if (sheetName) {
                     const sheetData = parseSheetData(workbook.Sheets[sheetName], reportType);
-                    newParsedData[reportType] = sheetData;
+                    newParsedData[reportType] = sheetData; // Salva i dati parsati
                     if (sheetData.length > 0) {
                         setLoadingMessage(`Analisi dati: ${reportType}...`);
-                        newAnalyzedData[reportType] = analyzeGSCData(sheetData, reportType) || undefined;
+                        newAnalyzedData[reportType] = analyzeGSCData(sheetData, reportType) || undefined; // Salva i dati analizzati
                     } else {
                         console.log(`[Tool4 ProcessGSCData] Sheet data for ${reportType} is empty. Setting analyzed data to undefined.`);
-                        newAnalyzedData[reportType] = undefined; // Ensure it's undefined if no data
+                        newAnalyzedData[reportType] = undefined; // Importante per la logica di rendering
                     }
                 } else {
                     console.warn(`Foglio per ${reportType} non trovato.`);
@@ -338,8 +341,8 @@ export function Tool4GSCAnalyzer() {
                 }
             }
 
-            setParsedGscData(newParsedData);
-            setAnalyzedGscData(newAnalyzedData);
+            setParsedGscData(newParsedData); // Aggiorna stato dati parsati
+            setAnalyzedGscData(newAnalyzedData); // Aggiorna stato dati analizzati
             toast({ title: "Analisi Completata", description: "Dati GSC processati." });
 
         } catch (e: any) {
@@ -381,7 +384,7 @@ export function Tool4GSCAnalyzer() {
             "% Clic": isFinite(d.perc_change_clicks) ? (d.perc_change_clicks * 100).toFixed(1) + '%' : (d.perc_change_clicks === Infinity ? '+Inf%' : 'N/A'),
             "Impr. Attuali": d.impressions_current, "Impr. Prec.": d.impressions_previous, "Diff. Impr.": d.diff_impressions,
             "% Impr.": isFinite(d.perc_change_impressions) ? (d.perc_change_impressions * 100).toFixed(1) + '%' : (d.perc_change_impressions === Infinity ? '+Inf%' : 'N/A'),
-            "CTR Attuale": (d.ctr_current * 100).toFixed(2) + '%', "CTR Prec.": (d.ctr_previous * 100).toFixed(2) + '%',
+            "CTR Attuale": (d.ctr_current * 100).toFixed(2) + '%', "CTR Prec.": (d.ctr_previous * 100).toFixed(2) + '%', // Corretto
             "Diff. CTR": (d.diff_ctr * 100).toFixed(2) + 'pp',
             "Pos. Attuale": d.position_current?.toFixed(1) || 'N/A', "Pos. Prec.": d.position_previous?.toFixed(1) || 'N/A',
             "Diff. Pos.": d.diff_position?.toFixed(1) || 'N/A',
@@ -418,7 +421,7 @@ export function Tool4GSCAnalyzer() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Caricamento File GSC (Excel/ODS) (Ver.ULTIMO_TENTATIVO)</CardTitle>
+                    <CardTitle>Caricamento File GSC Excel/ODS (Ver.ULTIMO_TENTATIVO)</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <FileUploadZone
@@ -428,6 +431,7 @@ export function Tool4GSCAnalyzer() {
                         acceptedFileTypes={acceptedExcelTypes}
                         dropInstructionText="Trascina qui il file (.xlsx, .xls, .ods) o clicca per selezionare."
                         expectsArrayBuffer={true}
+                        // Pass the ref to FileUploadZone if it accepts it, or manage reset differently
                     />
                      <p className="text-xs text-muted-foreground mt-1">Il tool analizzerà i fogli: Queries, Pages, Countries, Devices, Search Appearance, Filters (se presenti con nomi standard o comuni alias in italiano/inglese).</p>
                     {gscExcelFile && (
@@ -475,14 +479,11 @@ export function Tool4GSCAnalyzer() {
                         const itemDisplayName = getReportItemDisplayName(reportType);
                         const chartType = reportType === 'devices' ? 'pie' : 'bar';
 
-                        console.log(`[Tool4 Debug] Rendering section for ${reportType}. Analysis object:`, analysis);
-                        if (analysis) {
-                             console.log(`[Tool4 Debug] Data for ${reportType} charts: BarData=`, analysis.topItemsByClicksChartData, "PieData=", analysis.pieChartData);
-                        }
-
-
+                        console.log(`[Tool4 Rendering Section] ReportType: ${reportType}, Analysis available: ${!!analysis}`);
+                        
                         if (!analysis || !analysis.detailedDataWithDiffs || analysis.detailedDataWithDiffs.length === 0) {
-                             return (
+                             console.log(`[Tool4 Rendering Section] No data or empty detailedDataWithDiffs for ${reportType}. Skipping card.`);
+                             return ( // Mostra comunque una card con un messaggio
                                 <Card key={reportType}>
                                     <CardHeader>
                                         <CardTitle className="text-xl font-semibold">Analisi {itemDisplayName}</CardTitle>
@@ -493,6 +494,7 @@ export function Tool4GSCAnalyzer() {
                                 </Card>
                             );
                         }
+                        console.log(`[Tool4 Rendering Section] Rendering card for ${reportType}. Chart Data:`, analysis.topItemsByClicksChartData, "Pie Data:", analysis.pieChartData);
 
                         const chartDataForRender = analysis.topItemsByClicksChartData || { labels: [], datasets: [{ label: 'Clic (Corrente)', data: [], backgroundColor: 'hsl(var(--chart-1))' }] };
                         const pieDataForRender = analysis.pieChartData || [];
