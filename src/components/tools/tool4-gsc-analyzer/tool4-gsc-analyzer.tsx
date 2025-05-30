@@ -31,7 +31,7 @@ export function Tool4GSCAnalyzer() {
     const [gscExcelFile, setGscExcelFile] = useState<{ content: ArrayBuffer; name: string } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("");
-    const [progress, setProgress] = useState(0); // Not used yet, but can be for chunked processing
+    const [progress, setProgress] = useState(0); 
     
     const [parsedGscData, setParsedGscData] = useState<GscParsedData | null>(null);
     const [analyzedGscData, setAnalyzedGscData] = useState<GscAnalyzedData | null>(null);
@@ -42,11 +42,11 @@ export function Tool4GSCAnalyzer() {
     const router = useRouter();
 
     const handleFileLoad = useCallback((content: string, name: string, arrayBufferContent?: ArrayBuffer) => {
-        if (arrayBufferContent) {
+        if (arrayBufferContent && arrayBufferContent.byteLength > 0) {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
         } else {
-            setError("Errore nel caricamento del file. Contenuto non valido.");
+            setError("Errore nel caricamento del file. Contenuto non valido o file vuoto.");
             setGscExcelFile(null);
         }
         setParsedGscData(null);
@@ -70,7 +70,6 @@ export function Tool4GSCAnalyzer() {
         let dataRows: any[][] = [];
         let headerRowIndex = -1;
 
-        // Try to find the header row (up to first 5 rows)
         for (let i = 0; i < Math.min(5, jsonData.length); i++) {
             const row = jsonData[i] as any[];
             if (row && row.some(h => typeof h === 'string' && (
@@ -86,10 +85,13 @@ export function Tool4GSCAnalyzer() {
         }
 
         if (headerRowIndex === -1) {
-             // Fallback if no typical header found, assume first row for simple sheets like 'Filters'
-            if (jsonData.length > 0) {
+            if (jsonData.length > 0 && reportType === 'filters') { // Special handling for simple 'Filters' sheet
                 headersRaw = jsonData[0] as any[];
                 dataRows = jsonData.slice(1) as any[][];
+            } else if (jsonData.length > 0 && reportType !== 'filters') { // Assume first row if no typical GSC headers found
+                 headersRaw = jsonData[0] as any[];
+                 dataRows = jsonData.slice(1) as any[][];
+                 console.warn(`Tool4: Nessuna riga di intestazione GSC tipica trovata per ${reportType}. Assumendo la prima riga come intestazione.`);
             } else {
                 return [];
             }
@@ -134,7 +136,7 @@ export function Tool4GSCAnalyzer() {
 
         const headers = headersRaw.map((h, idx) => {
             const trimmedHeader = String(h || '').trim().toLowerCase();
-            if (idx === 0 && reportType !== 'filters') return 'item'; // Primary dimension
+            if (idx === 0 && reportType !== 'filters') return 'item'; 
             return headerMap[trimmedHeader] || trimmedHeader.replace(/\s+/g, '_').replace(/[^\w_]/gi, '') || `column_${idx}`;
         });
 
@@ -153,7 +155,7 @@ export function Tool4GSCAnalyzer() {
                     value = isNaN(value) ? 0 : value;
                 } else if (key === 'position_current' || key === 'position_previous') {
                     value = (value === undefined || value === null || String(value).trim() === "" || String(value).trim() === "-") ? null : parseFloat(String(value).replace(',', '.')) || null;
-                } else if (key === 'item') {
+                } else if (key === 'item' || key === 'filterName' || key === 'filterValue') {
                     value = String(value || '').trim();
                 }
                 entry[key] = value;
@@ -252,8 +254,8 @@ export function Tool4GSCAnalyzer() {
                 datasets: [{
                     label: 'Clic (Corrente)',
                     data: topItemsByClicks.map(it => it.clicks_current),
-                    fill: chartColors[0], // For Bar in Recharts
-                    backgroundColor: chartColors[0], // For Chart.js compatibility if needed
+                    fill: chartColors[0], 
+                    backgroundColor: chartColors[0], 
                 }]
             };
         }
@@ -299,7 +301,7 @@ export function Tool4GSCAnalyzer() {
             setGscFiltersDisplay(filtersText);
 
             for (const reportType of GSC_SHEET_DISPLAY_ORDER) {
-                if (reportType === 'filters') continue; // Already processed
+                if (reportType === 'filters') continue; 
                 
                 setLoadingMessage(`Parsing foglio: ${reportType}...`);
                 const sheetName = workbook.SheetNames.find(name => GSC_SHEET_MAPPING[reportType].some(pn => name.toLowerCase().trim() === pn.toLowerCase().trim()));
@@ -379,6 +381,8 @@ export function Tool4GSCAnalyzer() {
             itemDisplayName: getReportItemDisplayName(reportType),
             analyzedData: analysis,
             chartType: reportType === 'devices' ? 'pie' : 'bar',
+            pageTitle: `Dettaglio GSC: ${getReportItemDisplayName(reportType)}`,
+            description: analysis.summaryText,
         }));
         router.push(`/tool4/${reportType}`);
     };
@@ -401,8 +405,8 @@ export function Tool4GSCAnalyzer() {
                         siteKey="gscExcelFile"
                         label="File Excel GSC"
                         onFileLoad={handleFileLoad}
-                        acceptedFileTypes=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        dropInstructionText="Trascina qui il file Excel (.xlsx) o clicca per selezionare."
+                        acceptedFileTypes=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel"
+                        dropInstructionText="Trascina qui il file Excel (.xlsx, .xls) o clicca per selezionare."
                         expectsArrayBuffer={true} 
                     />
                      <p className="text-xs text-muted-foreground mt-1">Il tool analizzerà i fogli: Queries, Pages, Countries, Devices, Search Appearance, Filters (se presenti con nomi standard o comuni alias in italiano/inglese).</p>

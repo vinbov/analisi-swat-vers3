@@ -7,13 +7,13 @@ import { XIcon, UploadCloudIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface FileUploadZoneProps {
-  onFileLoad: (fileContent: string, fileName: string, arrayBufferContent?: ArrayBuffer) => void; // Added arrayBufferContent
-  siteKey: string; // Unique key for this drop zone instance
+  onFileLoad: (fileContent: string, fileName: string, arrayBufferContent?: ArrayBuffer) => void;
+  siteKey: string;
   label?: string;
   optional?: boolean;
-  acceptedFileTypes?: string; // e.g., ".csv,text/csv"
+  acceptedFileTypes?: string;
   dropInstructionText?: string;
-  expectsArrayBuffer?: boolean; // New prop
+  expectsArrayBuffer?: boolean;
 }
 
 export function FileUploadZone({
@@ -23,7 +23,7 @@ export function FileUploadZone({
   optional = false,
   acceptedFileTypes = ".csv,text/csv,application/vnd.ms-excel",
   dropInstructionText = "Trascina qui il file CSV o clicca.",
-  expectsArrayBuffer = false, // Default to false
+  expectsArrayBuffer = false,
 }: FileUploadZoneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -37,8 +37,6 @@ export function FileUploadZone({
     reader.onload = (e) => {
       if (expectsArrayBuffer) {
         const arrayBufferContent = e.target?.result as ArrayBuffer;
-        // For array buffer, we might not have a meaningful string content unless specifically handled
-        // Passing an empty string for string content, or a marker.
         onFileLoad("", file.name, arrayBufferContent);
       } else {
         const stringContent = e.target?.result as string;
@@ -71,7 +69,8 @@ export function FileUploadZone({
     if (file) {
       const fileTypeIsValid = acceptedFileTypes.split(',').some(type => {
         const trimmedType = type.trim();
-        return file.name.endsWith(trimmedType) || file.type === trimmedType;
+        // Case-insensitive check for extensions, direct match for MIME types
+        return (trimmedType.startsWith('.') && file.name.toLowerCase().endsWith(trimmedType.toLowerCase())) || file.type === trimmedType;
       });
 
       if (!fileTypeIsValid) {
@@ -111,15 +110,14 @@ export function FileUploadZone({
   }, [handleFileChange]);
 
   const handleReset = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation(); // Prevent triggering dropzone click
+    e.stopPropagation(); 
     setFileName(null);
     setFileSize(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    onFileLoad("", ""); // Notify parent that file is cleared
-    // Parent component should handle clearing its own file state
-  }, [onFileLoad]);
+    onFileLoad("", "", expectsArrayBuffer ? new ArrayBuffer(0) : undefined); // Notify parent, pass empty ArrayBuffer if expected
+  }, [onFileLoad, expectsArrayBuffer]);
 
   return (
     <div>
