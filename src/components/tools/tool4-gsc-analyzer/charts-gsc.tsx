@@ -6,8 +6,8 @@ import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Leg
 import type { GscSectionAnalysis } from '@/lib/types';
 
 interface ChartGSCProps {
-  data?: GscSectionAnalysis['topItemsByClicksChartData'];
-  pieData?: GscSectionAnalysis['pieChartData'];
+  data?: GscSectionAnalysis['topItemsByClicksChartData']; // For Bar charts
+  pieData?: GscSectionAnalysis['pieChartData'];      // For Pie charts
   type: 'bar' | 'pie';
   title: string;
 }
@@ -15,16 +15,11 @@ interface ChartGSCProps {
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export function ChartGSC({ data, pieData, type, title }: ChartGSCProps) {
-  console.log(`[ChartGSC Debug] Props received: type=${type}, title=${title}, barData available: ${!!data?.datasets?.[0]?.data?.length}, pieData available: ${!!pieData?.length}`);
-  // console.log(`[ChartGSC Debug] Bar data details:`, JSON.stringify(data));
-  // console.log(`[ChartGSC Debug] Pie data details:`, JSON.stringify(pieData));
-
-
   if (type === 'bar') {
-    if (!data || !data.datasets || data.datasets.length === 0 || data.datasets[0].data.length === 0 || !data.labels || data.labels.length === 0) {
-      console.log(`[ChartGSC Debug] No sufficient data for bar chart. Title: ${title}`);
-      return <p className="text-muted-foreground text-center py-8">Nessun dato sufficiente per il grafico a barre: {title}.</p>;
+    if (!data || !data.labels || data.labels.length === 0 || !data.datasets || data.datasets.length === 0 || data.datasets[0].data.length === 0) {
+      return <p className="text-muted-foreground text-center py-8">Dati insufficienti per il grafico a barre: {title}.</p>;
     }
+    // Ensure data for Recharts BarChart is an array of objects
     const chartData = data.labels.map((label, index) => ({
       name: label,
       value: data.datasets[0].data[index] || 0,
@@ -34,7 +29,6 @@ export function ChartGSC({ data, pieData, type, title }: ChartGSCProps) {
             ? data.datasets[0].backgroundColor 
             : COLORS[index % COLORS.length]
     }));
-    console.log(`[ChartGSC Debug] Bar chart data prepared for Recharts:`, JSON.stringify(chartData));
 
     return (
       <div className="h-full w-full">
@@ -60,10 +54,9 @@ export function ChartGSC({ data, pieData, type, title }: ChartGSCProps) {
 
   if (type === 'pie') {
     if (!pieData || pieData.length === 0) {
-      console.log(`[ChartGSC Debug] No sufficient data for pie chart. Title: ${title}`);
-      return <p className="text-muted-foreground text-center py-8">Nessun dato sufficiente per il grafico a torta: {title}.</p>;
+      return <p className="text-muted-foreground text-center py-8">Dati insufficienti per il grafico a torta: {title}.</p>;
     }
-    console.log(`[ChartGSC Debug] Pie chart data prepared for Recharts:`, JSON.stringify(pieData));
+    // pieData should already be in the format: { name: string, value: number, fill: string }[]
     return (
       <div className="h-full w-full">
         <h4 className="text-lg font-semibold text-center mb-4 text-foreground">{title}</h4>
@@ -75,7 +68,7 @@ export function ChartGSC({ data, pieData, type, title }: ChartGSCProps) {
               cy="50%"
               labelLine={false}
               outerRadius="80%"
-              fill="#8884d8"
+              fill="#8884d8" // Default fill, will be overridden by Cell
               dataKey="value"
               nameKey="name"
               label={({ name, percent, value }) => `${name}: ${value.toLocaleString()} (${(percent * 100).toFixed(0)}%)`}
@@ -94,4 +87,3 @@ export function ChartGSC({ data, pieData, type, title }: ChartGSCProps) {
 
   return <p className="text-muted-foreground">Tipo di grafico non supportato: {type}.</p>;
 }
-

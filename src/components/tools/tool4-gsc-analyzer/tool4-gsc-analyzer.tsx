@@ -43,6 +43,7 @@ export function Tool4GSCAnalyzer() {
     const router = useRouter();
 
     useEffect(() => {
+      // This log is crucial to see if and how analyzedGscData is being updated.
       console.log("[Tool4 Effect] analyzedGscData state updated:", analyzedGscData);
     }, [analyzedGscData]);
 
@@ -56,8 +57,9 @@ export function Tool4GSCAnalyzer() {
         } else {
             setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
             setGscExcelFile(null);
+            toast({ title: "Errore File", description: "Contenuto file non valido o file vuoto.", variant: "destructive" });
         }
-    }, []);
+    }, [toast]);
 
     const handleResetFile = () => {
         setGscExcelFile(null);
@@ -65,9 +67,9 @@ export function Tool4GSCAnalyzer() {
         setAnalyzedGscData(null);
         setError(null);
         setGscFiltersDisplay("");
-        // Potrebbe essere necessario un modo per resettare l'input file nel componente FileUploadZone se non lo fa da solo
+        const fileInput = document.getElementById('gscExcelFileInputTool4') as HTMLInputElement;
+        if (fileInput) fileInput.value = "";
     };
-
 
     const parseSheetData = (workbook: XLSX.WorkBook, sheetName: string, reportType: GscReportType): GscSheetRow[] => {
         const sheet = workbook.Sheets[sheetName];
@@ -84,6 +86,7 @@ export function Tool4GSCAnalyzer() {
         let dataRows: any[][] = [];
         let headerRowIndex = -1;
 
+        // Try to find the header row more robustly
         for (let i = 0; i < Math.min(5, jsonData.length); i++) {
             const row = jsonData[i] as any[];
             if (row && row.some(h => typeof h === 'string' && (
@@ -98,7 +101,7 @@ export function Tool4GSCAnalyzer() {
             }
         }
         
-        if (headerRowIndex === -1) {
+        if (headerRowIndex === -1) { // Fallback if no clear header row is found
             if (jsonData.length > 0 && reportType === 'filters') {
                 headersRaw = jsonData[0] as any[]; 
                 dataRows = jsonData.slice(1) as any[][];
@@ -213,11 +216,11 @@ export function Tool4GSCAnalyzer() {
             const diffCTR = currentCTR - previousCTR;
             let diffPosition: number | null = null;
             if (currentPosition !== null && previousPosition !== null) {
-                diffPosition = previousPosition - currentPosition;
+                diffPosition = previousPosition - currentPosition; // Higher previous pos is better
             }
 
             return {
-                item: d.item || "N/D",
+                item: d.item || (d[itemKeyType as keyof GscSheetRow] as string) || "N/D",
                 clicks_current: currentClicks, clicks_previous: previousClicks, diff_clicks: diffClicks, perc_change_clicks: percChangeClicks,
                 impressions_current: currentImpressions, impressions_previous: previousImpressions, diff_impressions: diffImpressions, perc_change_impressions: percChangeImpressions,
                 ctr_current: currentCTR, ctr_previous: previousCTR, diff_ctr: diffCTR,
@@ -236,18 +239,23 @@ export function Tool4GSCAnalyzer() {
         const topNForChart = 5;
         const chartColors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
+        // Data for Bar charts
         const topItemsByClicks = [...processedItems]
                                   .filter(it => it.item && it.clicks_current > 0)
                                   .sort((a, b) => (b.clicks_current || 0) - (a.clicks_current || 0))
                                   .slice(0, topNForChart);
         
-        // Always initialize chart data structures
         const topItemsByClicksChartData: GscSectionAnalysis['topItemsByClicksChartData'] = {
-            labels: [],
-            datasets: [{ label: 'Clic (Corrente)', data: [], backgroundColor: chartColors[0] }]
+            labels: topItemsByClicks.map(it => (String(it.item) || 'N/D').substring(0, 30) + ((String(it.item) || '').length > 30 ? '...' : '')),
+            datasets: [{ 
+                label: 'Clic (Corrente)', 
+                data: topItemsByClicks.map(it => it.clicks_current), 
+                backgroundColor: topItemsByClicks.map((_, index) => chartColors[index % chartColors.length])
+            }]
         };
+        
+        // Data for Pie chart (specifically for 'devices')
         let pieChartData: GscSectionAnalysis['pieChartData'] = [];
-
         if (itemKeyType === 'devices' && processedItems.length > 0) {
             const deviceSummary = processedItems.reduce((acc, curr) => {
                 const deviceName = curr.item || 'Sconosciuto';
@@ -256,10 +264,11 @@ export function Tool4GSCAnalyzer() {
             }, {} as Record<string, number>);
 
             pieChartData = Object.entries(deviceSummary)
-                .filter(([, value]) => value > 0)
+                .filter(([, value]) => value > 0) // Ensure value is positive for pie chart
                 .map(([name, value], index) => ({ name, value, fill: chartColors[index % chartColors.length] }))
                 .sort((a,b) => b.value - a.value);
             
+            // If pie chart has data, we can also populate topItemsByClicksChartData for consistency or specific bar representation of pie data
             if (pieChartData.length > 0) {
                 topItemsByClicksChartData.labels = pieChartData.map(d => d.name);
                 topItemsByClicksChartData.datasets = [{ 
@@ -268,27 +277,21 @@ export function Tool4GSCAnalyzer() {
                     backgroundColor: pieChartData.map(d=>d.fill) 
                 }];
             }
-        } else if (topItemsByClicks.length > 0) {
-             topItemsByClicksChartData.labels = topItemsByClicks.map(it => (String(it.item) || 'N/D').substring(0, 30) + ((String(it.item) || '').length > 30 ? '...' : ''));
-             topItemsByClicksChartData.datasets = [{ 
-                label: 'Clic (Corrente)', 
-                data: topItemsByClicks.map(it => it.clicks_current), 
-                backgroundColor: topItemsByClicks.map((_, index) => chartColors[index % chartColors.length]) 
-            }];
         }
         
         return { summaryText, detailedDataWithDiffs: processedItems, topItemsByClicksChartData, pieChartData };
     };
 
     const processGSCData = async () => {
-        console.log("[Tool4 Button Click] 'Analizza Dati GSC' clicked. Calling processGSCData.");
+        console.log("[Tool4 Button Click] 'Analizza Dati GSC' clicked. About to call processGSCData.");
         if (!gscExcelFile || !gscExcelFile.content) {
+            console.error("[Tool4 ProcessGSCData DEBUG] ERROR: No gscExcelFile or no content. File:", gscExcelFile);
             setError("Nessun file Excel/ODS caricato o contenuto non valido.");
+            toast({ title: "File Mancante", description: "Carica un file Excel/ODS.", variant: "destructive" });
+            setIsLoading(false);
             return;
         }
-        console.log("[Tool4 ProcessGSCData DEBUG] Function called.");
-        console.log("[Tool4 ProcessGSCData DEBUG] gscExcelFile details:", { name: gscExcelFile.name, contentExists: !!gscExcelFile.content, contentLength: gscExcelFile.content?.byteLength });
-
+        console.log("[Tool4 ProcessGSCData DEBUG] gscExcelFile and content exist. Name:", gscExcelFile.name, "Size:", gscExcelFile.content.byteLength);
 
         setIsLoading(true);
         setLoadingMessage("Lettura file...");
@@ -296,13 +299,19 @@ export function Tool4GSCAnalyzer() {
         setParsedGscData(null); 
         setAnalyzedGscData(null); 
         setGscFiltersDisplay("");
+        setProgress(0);
+
+        // Use a timeout to allow UI to update before heavy processing
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         try {
             console.log("[Tool4 ProcessGSCData DEBUG] Attempting XLSX.read. File name:", gscExcelFile.name);
             const workbook = XLSX.read(gscExcelFile.content, { type: 'array', cellDates: true });
             console.log("[Tool4 ProcessGSCData DEBUG] Workbook read successfully. Sheet names:", workbook.SheetNames);
             
-            const newParsedData: GscParsedData = {};
+            const newParsedData: GscParsedData = {
+                filters: undefined, queries: undefined, pages: undefined, countries: undefined, devices: undefined, searchAppearance: undefined
+            };
             const newAnalyzedData: GscAnalyzedData = {
                 queries: undefined, pages: undefined, countries: undefined, devices: undefined, searchAppearance: undefined,
             };
@@ -327,10 +336,10 @@ export function Tool4GSCAnalyzer() {
             setGscFiltersDisplay(filtersText);
 
             let currentProgress = 0;
-            const progressIncrement = 100 / (GSC_SHEET_DISPLAY_ORDER.filter(type => type !== 'filters').length || 1); 
+            const reportTypesToProcess = GSC_SHEET_DISPLAY_ORDER.filter(type => type !== 'filters');
+            const progressIncrement = 100 / (reportTypesToProcess.length || 1); 
 
-            for (const reportType of GSC_SHEET_DISPLAY_ORDER) {
-                if (reportType === 'filters') continue;
+            for (const reportType of reportTypesToProcess) {
                 setLoadingMessage(`Parsing foglio: ${reportType}...`);
                 const sheetName = workbook.SheetNames.find(name => GSC_SHEET_MAPPING[reportType].some(pn => name.toLowerCase().trim() === pn.toLowerCase().trim()));
 
@@ -342,19 +351,22 @@ export function Tool4GSCAnalyzer() {
                         setLoadingMessage(`Analisi dati: ${reportType}...`);
                         newAnalyzedData[reportType] = analyzeGSCData(sheetData, reportType) || undefined;
                     } else {
-                        newAnalyzedData[reportType] = undefined;
+                        newAnalyzedData[reportType] = undefined; // Ensure it's explicitly undefined if no data
                     }
                 } else {
-                    newParsedData[reportType] = [];
+                    newParsedData[reportType] = []; // Ensure array for parsed if sheet not found
                     newAnalyzedData[reportType] = undefined;
                 }
                  currentProgress += progressIncrement;
                  setProgress(Math.min(currentProgress, 100)); 
-                 await new Promise(resolve => setTimeout(resolve, 10));
+                 await new Promise(resolve => setTimeout(resolve, 10)); // Brief pause for UI
             }
 
+            console.log("[Tool4 ProcessGSCData DEBUG] FINAL newParsedData before setState:", newParsedData);
+            console.log("[Tool4 ProcessGSCData DEBUG] FINAL newAnalyzedData before setState:", newAnalyzedData);
+
             setParsedGscData(newParsedData);
-            setAnalyzedGscData(newAnalyzedData); // This will trigger the useEffect
+            setAnalyzedGscData(newAnalyzedData);
             
             toast({ title: "Analisi Completata", description: "Dati GSC processati." });
 
@@ -416,7 +428,7 @@ export function Tool4GSCAnalyzer() {
             reportType,
             itemDisplayName: getReportItemDisplayName(reportType),
             analyzedData: analysis,
-            chartType: reportType === 'devices' ? 'pie' : 'bar',
+            chartType: reportType === 'devices' ? 'pie' : 'bar', // Determine chart type for detail page
             pageTitle: `Dettaglio GSC: ${getReportItemDisplayName(reportType)}`,
             description: analysis.summaryText,
         }));
@@ -435,7 +447,7 @@ export function Tool4GSCAnalyzer() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Caricamento File GSC Excel/ODS</CardTitle>
+                    <CardTitle>Caricamento File GSC Excel/ODS (Ver.ULTIMO_TENTATIVO)</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <FileUploadZone
@@ -446,7 +458,7 @@ export function Tool4GSCAnalyzer() {
                         dropInstructionText="Trascina qui il file (.xlsx, .xls, .ods) o clicca per selezionare."
                         expectsArrayBuffer={true}
                     />
-                     <p className="text-xs text-muted-foreground mt-1">Il tool analizzerà i fogli: Queries, Pages, Countries, Devices, Search Appearance, Filters (se presenti con nomi standard o comuni alias in italiano/inglese).</p>
+                     <p className="text-xs text-muted-foreground mt-1">Il tool analizzerà i fogli: Filters, Queries, Pages, Countries, Devices, Search Appearance (se presenti con nomi standard o comuni alias in italiano/inglese).</p>
                     {gscExcelFile && (
                          <Button onClick={handleResetFile} variant="outline" size="sm" className="mt-2">Rimuovi File</Button>
                     )}
@@ -456,7 +468,10 @@ export function Tool4GSCAnalyzer() {
             {gscExcelFile && (
                 <div className="text-center">
                     <Button 
-                        onClick={processGSCData} 
+                        onClick={() => {
+                            console.log("[Tool4 Button Click] 'Analizza Dati GSC' clicked. About to call processGSCData.");
+                            processGSCData();
+                        }}
                         disabled={isLoading} 
                         className="action-button bg-sky-600 hover:bg-sky-700 text-white text-lg"
                     >
@@ -496,7 +511,13 @@ export function Tool4GSCAnalyzer() {
                         const itemDisplayName = getReportItemDisplayName(reportType);
                         const chartType = reportType === 'devices' ? 'pie' : 'bar';
                         
-                        if (!analysis || !analysis.detailedDataWithDiffs || analysis.detailedDataWithDiffs.length === 0) {
+                        // Ensure analysis and its data structures are valid before trying to render
+                        const hasValidAnalysis = analysis && analysis.detailedDataWithDiffs && analysis.detailedDataWithDiffs.length > 0;
+                        const hasBarChartData = hasValidAnalysis && analysis.topItemsByClicksChartData && analysis.topItemsByClicksChartData.labels && analysis.topItemsByClicksChartData.labels.length > 0 && analysis.topItemsByClicksChartData.datasets[0]?.data.length > 0;
+                        const hasPieChartData = hasValidAnalysis && analysis.pieChartData && analysis.pieChartData.length > 0;
+                        const shouldRenderChart = chartType === 'bar' ? hasBarChartData : hasPieChartData;
+
+                        if (!hasValidAnalysis) { // If no valid analysis for this report type, show a message or skip
                              return (
                                 <Card key={reportType}>
                                     <CardHeader>
@@ -509,26 +530,22 @@ export function Tool4GSCAnalyzer() {
                             );
                         }
                         
-                        const chartDataForRender = (analysis.topItemsByClicksChartData && analysis.topItemsByClicksChartData.labels && analysis.topItemsByClicksChartData.labels.length > 0)
-                            ? analysis.topItemsByClicksChartData 
-                            : { labels: [], datasets: [{ label: `Clic (Corrente) - ${itemDisplayName}`, data: [], backgroundColor: 'hsl(var(--chart-1))' }] };
-                        
-                        const pieDataForRender = (analysis.pieChartData && Array.isArray(analysis.pieChartData) && analysis.pieChartData.length > 0)
-                            ? analysis.pieChartData
-                            : [];
+                        const chartDataForRender = analysis.topItemsByClicksChartData || { labels: [], datasets: [{ label: `Clic (Corrente) - ${itemDisplayName}`, data: [], backgroundColor: [] }] };
+                        const pieDataForRender = analysis.pieChartData || [];
+
 
                         return (
                             <Card key={reportType} id={`${reportType}-analysis-section`}>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                     <CardTitle className="text-xl font-semibold">Analisi {itemDisplayName}</CardTitle>
-                                    <Button variant="outline" size="sm" onClick={() => openDetailPage(reportType)}>
+                                    <Button variant="outline" size="sm" onClick={() => openDetailPage(reportType)} disabled={!hasValidAnalysis}>
                                         <Eye className="mr-2 h-4 w-4"/> Vedi Dettaglio
                                     </Button>
                                 </CardHeader>
                                 <CardContent>
                                     {analysis.summaryText && <CardDescription className="mb-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: analysis.summaryText}} /> }
 
-                                    {(chartType === 'bar' && chartDataForRender.labels.length > 0 && chartDataForRender.datasets[0].data.length > 0) || (chartType === 'pie' && pieDataForRender.length > 0) ? (
+                                    {shouldRenderChart ? (
                                         <div className="my-6 h-[350px] md:h-[400px]">
                                             <ChartGSC
                                                 data={chartDataForRender}
@@ -545,7 +562,7 @@ export function Tool4GSCAnalyzer() {
                                     <TableGSC data={analysis.detailedDataWithDiffs.slice(0,20)} itemDisplayName={itemDisplayName} />
 
                                     <div className="text-center mt-4">
-                                        <Button onClick={() => handleDownloadSectionCSV(reportType)} variant="default" size="sm">
+                                        <Button onClick={() => handleDownloadSectionCSV(reportType)} variant="default" size="sm" disabled={!hasValidAnalysis}>
                                             <Download className="mr-2 h-4 w-4"/> Scarica Dati {itemDisplayName} (CSV)
                                         </Button>
                                     </div>
@@ -558,3 +575,4 @@ export function Tool4GSCAnalyzer() {
         </div>
     );
 }
+
