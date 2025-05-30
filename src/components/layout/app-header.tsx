@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -12,7 +13,7 @@ export function AppHeader() {
           width={150}
           height={50}
           className="h-12 mb-4 object-contain"
-          style={{ height: "auto" }} // Aggiunto per mantenere aspect ratio
+          style={{ height: "auto" }}
           data-ai-hint="logo abstract"
         />
       </Link>
