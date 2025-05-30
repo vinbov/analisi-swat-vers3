@@ -8,13 +8,13 @@ export function AppHeader() {
       <Link href="/" passHref>
         <Image
           id="appLogo"
-          src="https://placehold.co/150x50/0284c7/FFFFFF?text=SWAT+Analisi"
+          src="https://placehold.co/150x50.png" // URL Semplificato
           alt="Logo ANALISI S.W.A.T."
           width={150}
           height={50}
-          className="mb-4 object-contain" // Simplified className
+          className="mb-4 object-contain"
           data-ai-hint="logo abstract"
-          priority // Added priority
+          priority
         />
       </Link>
       <h1 className="text-4xl md:text-5xl font-bold" style={{ color: 'hsl(var(--sky-700))' }}>
