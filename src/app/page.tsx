@@ -6,12 +6,13 @@ import { ToolNavigation } from '@/components/layout/tool-navigation';
 import { Tool1Comparator } from '@/components/tools/tool1-comparator/tool1-comparator';
 import { Tool2Analyzer } from '@/components/tools/tool2-analyzer/tool2-analyzer';
 import { Tool3Scraper } from '@/components/tools/tool3-scraper/tool3-scraper';
-import { Card, CardContent } from '@/components/ui/card';
+import { Tool4GSCAnalyzer } from '@/components/tools/tool4-gsc-analyzer/tool4-gsc-analyzer'; // Import new tool
 
 const tools = [
   { id: 'tool1', label: 'Analizzatore Comparativo KW' },
   { id: 'tool2', label: 'Analizzatore Pertinenza & Priorità KW' },
   { id: 'tool3', label: 'FB Ads Library Scraper' },
+  { id: 'tool4', label: 'Analizzatore Dati GSC' }, // Add new tool
 ];
 
 export default function HomePage() {
@@ -37,6 +38,11 @@ export default function HomePage() {
           {activeTool === 'tool3' && (
             <div id="tool3-container">
               <Tool3Scraper />
+            </div>
+          )}
+          {activeTool === 'tool4' && ( // Add new tool container
+            <div id="tool4-container">
+              <Tool4GSCAnalyzer />
             </div>
           )}
         </main>

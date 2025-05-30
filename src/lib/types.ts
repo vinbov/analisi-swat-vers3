@@ -1,4 +1,5 @@
 
+
 // Tool 1: Keyword Comparator
 export interface CsvRowTool1 {
   keyword: string;
@@ -109,6 +110,81 @@ export interface AdWithAngleAnalysis extends ScrapedAd {
   analysisError?: string;
 }
 
+// Tool 4: GSC Analyzer
+export type GscReportType = 'queries' | 'pages' | 'countries' | 'devices' | 'searchAppearance' | 'filters';
+
+export interface GscSheetRow {
+  item?: string; // Represents Query, Page, Country, Device, Search Appearance string
+  clicks_current?: number;
+  clicks_previous?: number;
+  impressions_current?: number;
+  impressions_previous?: number;
+  ctr_current?: number;
+  ctr_previous?: number;
+  position_current?: number | null;
+  position_previous?: number | null;
+  // For filters sheet
+  filterName?: string;
+  filterValue?: string;
+  // Allow any other property from XLSX
+  [key: string]: any;
+}
+
+export interface GscAnalyzedItem {
+  item: string;
+  clicks_current: number;
+  clicks_previous: number;
+  diff_clicks: number;
+  perc_change_clicks: number; // as fraction, format as % in UI
+  impressions_current: number;
+  impressions_previous: number;
+  diff_impressions: number;
+  perc_change_impressions: number; // as fraction
+  ctr_current: number;
+  ctr_previous: number;
+  diff_ctr: number; // absolute diff
+  position_current: number | null;
+  position_previous: number | null;
+  diff_position: number | null; // note: higher previous position is "better" so diff is prev - curr
+}
+
+export interface GscSectionAnalysis {
+  summaryText: string;
+  detailedDataWithDiffs: GscAnalyzedItem[];
+  topItemsByClicksChartData: { 
+    labels: string[]; 
+    datasets: Array<{
+        label: string;
+        data: number[];
+        backgroundColor?: string | string[];
+        borderColor?: string | string[];
+        borderWidth?: number;
+        fill?: string; // for recharts Bar
+    }>;
+  };
+   // For PieChart (e.g., devices)
+  pieChartData?: Array<{ name: string; value: number; fill: string }>;
+}
+
+
+export interface GscParsedData {
+  queries?: GscSheetRow[];
+  pages?: GscSheetRow[];
+  countries?: GscSheetRow[];
+  devices?: GscSheetRow[];
+  searchAppearance?: GscSheetRow[];
+  filters?: GscSheetRow[];
+}
+
+export interface GscAnalyzedData {
+  queries?: GscSectionAnalysis;
+  pages?: GscSectionAnalysis;
+  countries?: GscSectionAnalysis;
+  devices?: GscSectionAnalysis;
+  searchAppearance?: GscSectionAnalysis;
+}
+
+
 // For detail pages
 export type DetailPageSection = 
   | 'distribution' 
@@ -117,14 +193,16 @@ export type DetailPageSection =
   | 'commonKeywordsSectionTool1' 
   | 'mySiteOnlyKeywordsSectionTool1' 
   | 'competitorOnlyKeywordsSectionTool1'
-  | 'angleAnalysisDetail';
+  | 'angleAnalysisDetail'
+  | GscReportType; // Adding GSC report types as detail page sections
+
 
 export type ChartConfig = any; // From recharts/Chart.js
 
 export interface DetailPageDataTool1 {
   pageTitle: string;
   description: string;
-  chartConfig?: ChartConfig;
+  chartConfig?: ChartConfig; // Should be recharts compatible structure
   tableData?: ComparisonResult[];
   tableHeaders?: string[];
   tableType?: 'common' | 'mySiteOnly' | 'competitorOnly';
@@ -135,9 +213,19 @@ export interface DetailPageDataTool1 {
 export interface DetailPageDataTool3 {
   pageTitle: string;
   descriptionHTML: string; // Can contain HTML for 7C framework description
-  chartConfig?: ChartConfig;
+  chartConfig?: ChartConfig; // Should be recharts compatible
   tableData: AdWithAngleAnalysis[];
 }
+
+export interface DetailPageDataTool4 {
+  pageTitle: string;
+  description: string;
+  analyzedData: GscSectionAnalysis | null;
+  itemDisplayName: string; 
+  reportType: GscReportType;
+  chartType?: 'bar' | 'pie';
+}
+
 
 // CSV Column mapping
 export const EXPECTED_COLUMNS_TOOL1: Record<keyof CsvRowTool1, string> = { 
@@ -157,3 +245,4 @@ export const EXPECTED_COLUMNS_TOOL2: Record<keyof CsvRowTool2, string> = {
   difficolta: 'Keyword Difficulty', opportunity: 'Keyword Opportunity', intento: 'Intent'
 };
 export const COLUMN_ALIASES_TOOL2 = COLUMN_ALIASES_TOOL1; // Same aliases
+
