@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useRef, useState, useCallback } from 'react';
@@ -21,7 +22,7 @@ export function FileUploadZone({
   siteKey,
   label,
   optional = false,
-  acceptedFileTypes = ".csv,text/csv,application/vnd.ms-excel",
+  acceptedFileTypes = ".csv,text/csv,application/vnd.ms-excel", // Default
   dropInstructionText = "Trascina qui il file CSV o clicca.",
   expectsArrayBuffer = false,
 }: FileUploadZoneProps) {
@@ -37,7 +38,22 @@ export function FileUploadZone({
     reader.onload = (e) => {
       if (expectsArrayBuffer) {
         const arrayBufferContent = e.target?.result as ArrayBuffer;
-        onFileLoad("", file.name, arrayBufferContent);
+        // Check if arrayBufferContent is valid and has a byteLength > 0
+        if (arrayBufferContent && arrayBufferContent.byteLength > 0) {
+          onFileLoad("", file.name, arrayBufferContent);
+        } else {
+          console.error(`FileUploadZone (${siteKey}): ArrayBuffer vuoto o non valido per il file ${file.name}`);
+          toast({
+            title: "Errore di lettura file",
+            description: `Il contenuto del file ${file.name} sembra essere vuoto o non leggibile come ArrayBuffer.`,
+            variant: "destructive",
+          });
+          setFileName(null);
+          setFileSize(null);
+          if (fileInputRef.current) fileInputRef.current.value = ""; // Clear the input
+          onFileLoad("", "", new ArrayBuffer(0)); // Notify parent with empty buffer
+          return;
+        }
       } else {
         const stringContent = e.target?.result as string;
         onFileLoad(stringContent, file.name);
@@ -62,7 +78,7 @@ export function FileUploadZone({
       reader.readAsText(file, 'UTF-8');
     }
 
-  }, [onFileLoad, expectsArrayBuffer, toast]);
+  }, [onFileLoad, expectsArrayBuffer, toast, siteKey]);
 
 
   const handleFileChange = useCallback((file: File | null) => {
@@ -76,8 +92,9 @@ export function FileUploadZone({
       if (!fileTypeIsValid) {
         toast({
           title: "File non valido",
-          description: `Per favore, seleziona un file di tipo: ${acceptedFileTypes}`,
+          description: `DEBUG - Tipi file ricevuti dal genitore: [${acceptedFileTypes}]. Il file "${file.name}" (tipo: ${file.type || 'sconosciuto'}) non è tra questi.`,
           variant: "destructive",
+          duration: 10000, // Longer duration for debug
         });
         setFileName(null);
         setFileSize(null);
@@ -116,7 +133,7 @@ export function FileUploadZone({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    onFileLoad("", "", expectsArrayBuffer ? new ArrayBuffer(0) : undefined); // Notify parent, pass empty ArrayBuffer if expected
+    onFileLoad("", "", expectsArrayBuffer ? new ArrayBuffer(0) : undefined); 
   }, [onFileLoad, expectsArrayBuffer]);
 
   return (

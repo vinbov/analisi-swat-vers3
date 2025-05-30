@@ -47,7 +47,9 @@ export function Tool4GSCAnalyzer() {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
         } else {
-            setError("Errore nel caricamento del file Excel. Il contenuto non è valido, il file è vuoto, o non è un ArrayBuffer.");
+            // Log per debug più dettagliato
+            console.error("Tool4 handleFileLoad: arrayBufferContent non valido o vuoto.", { name, arrayBufferContent });
+            setError("Errore nel caricamento del file Excel. Il contenuto non è valido o il file è vuoto.");
             setGscExcelFile(null);
         }
         setParsedGscData(null);
@@ -86,10 +88,10 @@ export function Tool4GSCAnalyzer() {
         }
 
         if (headerRowIndex === -1) {
-            if (jsonData.length > 0 && reportType === 'filters') { // Special handling for simple 'Filters' sheet
+            if (jsonData.length > 0 && reportType === 'filters') { 
                 headersRaw = jsonData[0] as any[];
                 dataRows = jsonData.slice(1) as any[][];
-            } else if (jsonData.length > 0 && reportType !== 'filters') { // Assume first row if no typical GSC headers found
+            } else if (jsonData.length > 0 && reportType !== 'filters') { 
                  headersRaw = jsonData[0] as any[];
                  dataRows = jsonData.slice(1) as any[][];
                  console.warn(`Tool4: Nessuna riga di intestazione GSC tipica trovata per ${reportType}. Assumendo la prima riga come intestazione.`);
@@ -388,25 +390,26 @@ export function Tool4GSCAnalyzer() {
         router.push(`/tool4/${reportType}`);
     };
 
+    const acceptedExcelTypes = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel";
 
     return (
         <div className="space-y-8">
             <header className="text-center">
-                 <Image src={GSC_LOGO_URL} alt="Logo GSC Tool" width={150} height={50} className="mx-auto h-12 mb-4 object-contain" data-ai-hint="logo abstract" />
+                 <Image src={GSC_LOGO_URL} alt="Logo GSC Tool" width={150} height={50} className="mx-auto h-12 mb-4 object-contain" data-ai-hint="logo excel" />
                 <h2 className="text-3xl font-bold text-sky-700">Analizzatore Dati Google Search Console</h2>
                 <p className="text-muted-foreground mt-2">Carica il tuo export Excel da GSC per un'analisi descrittiva dei dati.</p>
             </header>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Caricamento File Excel GSC (Ver.2)</CardTitle>
+                    <CardTitle>Caricamento File GSC Excel (Ver.ULTIMO_TENTATIVO)</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <FileUploadZone
                         siteKey="gscExcelFile"
-                        label="File Excel GSC (Ver.2)"
+                        label="File Excel GSC"
                         onFileLoad={handleFileLoad}
-                        acceptedFileTypes=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel" // Assicurati che questa sia la stringa corretta
+                        acceptedFileTypes={acceptedExcelTypes} 
                         dropInstructionText="Trascina qui il file Excel (.xlsx, .xls) o clicca per selezionare."
                         expectsArrayBuffer={true} 
                     />
@@ -506,5 +509,3 @@ export function Tool4GSCAnalyzer() {
         </div>
     );
 }
-
-    
