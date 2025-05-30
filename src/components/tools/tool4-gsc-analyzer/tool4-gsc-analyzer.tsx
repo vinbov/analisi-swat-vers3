@@ -26,7 +26,7 @@ const GSC_SHEET_MAPPING: Record<GscReportType, string[]> = {
 };
 const GSC_SHEET_DISPLAY_ORDER: GscReportType[] = ['filters', 'queries', 'pages', 'countries', 'devices', 'searchAppearance'];
 
-const GSC_LOGO_URL = "https://placehold.co/150x50/1e3a8a/FFFFFF?text=GSC+Tool"; // Corrected to FFFFFF
+const GSC_LOGO_URL = "https://placehold.co/150x50/1e3a8a/FFFFFF?text=GSC+Tool";
 
 export function Tool4GSCAnalyzer() {
     const [gscExcelFile, setGscExcelFile] = useState<{ content: ArrayBuffer; name: string } | null>(null);
@@ -42,19 +42,24 @@ export function Tool4GSCAnalyzer() {
     const { toast } = useToast();
     const router = useRouter();
 
+    useEffect(() => {
+      console.log("[Tool4 Effect] analyzedGscData state updated:", analyzedGscData);
+    }, [analyzedGscData]);
+
     const handleFileLoad = useCallback((content: string, name: string, arrayBufferContent?: ArrayBuffer) => {
         console.log("[Tool4 handleFileLoad] File received:", name, "ArrayBuffer present:", !!arrayBufferContent, "Length:", arrayBufferContent?.byteLength);
         if (arrayBufferContent && arrayBufferContent.byteLength > 0) {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
+            // Reset previous results when a new file is loaded
+            setParsedGscData(null);
+            setAnalyzedGscData(null);
+            setGscFiltersDisplay("");
         } else {
             console.error("Tool4 handleFileLoad: arrayBufferContent non valido o vuoto.", { name, arrayBufferContent });
             setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
             setGscExcelFile(null);
         }
-        setParsedGscData(null);
-        setAnalyzedGscData(null);
-        setGscFiltersDisplay("");
     }, []);
 
     const handleResetFile = () => {
@@ -69,15 +74,15 @@ export function Tool4GSCAnalyzer() {
         console.log(`[Tool4 ParseSheetData] Parsing sheet for reportType: ${reportType}`);
         const jsonData = XLSX.utils.sheet_to_json<any>(sheet, { header: 1, blankrows: false, defval: null });
         if (jsonData.length === 0) {
-            console.log(`[Tool4 ParseSheetData] Sheet for ${reportType} is empty or unreadable.`);
+            console.warn(`[Tool4 ParseSheetData] Sheet for ${reportType} is empty or unreadable.`);
             return [];
         }
+        console.log(`[Tool4 ParseSheetData] Raw data from sheet for ${reportType} (first 5 rows):`, JSON.stringify(jsonData.slice(0,5)));
 
         let headersRaw: any[] = [];
         let dataRows: any[][] = [];
         let headerRowIndex = -1;
 
-        // Try to find header row more robustly
         for (let i = 0; i < Math.min(5, jsonData.length); i++) {
             const row = jsonData[i] as any[];
             if (row && row.some(h => typeof h === 'string' && (
@@ -93,21 +98,20 @@ export function Tool4GSCAnalyzer() {
             }
         }
         
-        if (headerRowIndex === -1) { // Fallback if no typical headers are found
-            if (jsonData.length > 0 && reportType === 'filters') { // For filters, often just two columns
+        if (headerRowIndex === -1) {
+            if (jsonData.length > 0 && reportType === 'filters') {
                 headersRaw = jsonData[0] as any[]; 
                 dataRows = jsonData.slice(1) as any[][];
                  console.log(`[Tool4 ParseSheetData] No typical GSC headers found for FILTERS, using first row as headers:`, headersRaw);
-            } else if (jsonData.length > 0 && reportType !== 'filters') { // For other types, if no typical headers, assume first row
+            } else if (jsonData.length > 0 && reportType !== 'filters') {
                  headersRaw = jsonData[0] as any[]; 
                  dataRows = jsonData.slice(1) as any[][];
                  console.warn(`[Tool4 ParseSheetData] No typical GSC headers found for ${reportType}. Assuming first row as headers:`, headersRaw);
             } else {
-                console.log(`[Tool4 ParseSheetData] Sheet for ${reportType} has no headers and no data rows.`);
+                console.warn(`[Tool4 ParseSheetData] Sheet for ${reportType} has no headers and no data rows.`);
                 return [];
             }
         }
-
 
         const headerMap: Record<string, keyof GscSheetRow | 'item'> = {
             "top queries": "item", "top query": "item", "query": "item", "principali query": "item",
@@ -173,24 +177,22 @@ export function Tool4GSCAnalyzer() {
                 }
                 entry[key] = value;
             });
-            // Ensure primary item key has a value if it's the first column and not filters
             if (!entry.item && reportType !== 'filters' && row[0] !== undefined && row[0] !== null) {
                 entry.item = String(row[0]).trim();
             }
-            // For filters, ensure filterName is populated from the first column if not mapped
             if (reportType === 'filters' && !entry.filterName && row[0]) entry.filterName = String(row[0]).trim();
             if (reportType === 'filters' && !entry.filterValue && row[1]) entry.filterValue = String(row[1]).trim();
             
             return entry;
-        }).filter(entry => (reportType === 'filters' ? entry.filterName : entry.item) ); // Ensure primary item exists
-        console.log(`[Tool4 ParseSheetData] Parsed ${parsedRows.length} rows for ${reportType}. First row:`, JSON.stringify(parsedRows[0]));
+        }).filter(entry => (reportType === 'filters' ? entry.filterName : entry.item) ); 
+        console.log(`[Tool4 ParseSheetData] Parsed ${parsedRows.length} rows for ${reportType}. First parsed row (if any):`, JSON.stringify(parsedRows[0]));
         return parsedRows;
     };
 
     const analyzeGSCData = (data: GscSheetRow[], itemKeyType: GscReportType): GscSectionAnalysis | null => {
         console.log(`[Tool4 AnalyzeGSCData] Analyzing data for ${itemKeyType}. Input data length: ${data?.length}`);
         if (!data || data.length === 0) {
-             console.log(`[Tool4 AnalyzeGSCData] No data for ${itemKeyType}, returning null.`);
+             console.warn(`[Tool4 AnalyzeGSCData] No data to analyze for ${itemKeyType}, returning null.`);
             return null;
         }
 
@@ -213,15 +215,12 @@ export function Tool4GSCAnalyzer() {
 
             const diffClicks = currentClicks - previousClicks;
             const percChangeClicks = previousClicks !== 0 ? (diffClicks / previousClicks) : (currentClicks > 0 ? Infinity : 0);
-
             const diffImpressions = currentImpressions - previousImpressions;
             const percChangeImpressions = previousImpressions !== 0 ? (diffImpressions / previousImpressions) : (currentImpressions > 0 ? Infinity : 0);
-
             const diffCTR = currentCTR - previousCTR;
-
             let diffPosition: number | null = null;
             if (currentPosition !== null && previousPosition !== null) {
-                diffPosition = previousPosition - currentPosition; // Higher previous pos is better, so positive diff means improvement
+                diffPosition = previousPosition - currentPosition;
             }
 
             return {
@@ -234,9 +233,8 @@ export function Tool4GSCAnalyzer() {
         });
         console.log(`[Tool4 AnalyzeGSCData] Processed ${processedItems.length} items for ${itemKeyType}. First processed item:`, JSON.stringify(processedItems[0]));
 
-
         let summaryText = `Clic totali (periodo corrente): ${totalCurrentClicks.toLocaleString()}. Impressioni totali: ${totalCurrentImpressions.toLocaleString()}.`;
-        if(totalPreviousClicks > 0 || totalPreviousImpressions > 0) { // Only show comparison if previous data exists
+        if(totalPreviousClicks > 0 || totalPreviousImpressions > 0) {
             const overallClickDiff = totalCurrentClicks - totalPreviousClicks;
             const overallImpressionDiff = totalCurrentImpressions - totalPreviousImpressions;
             summaryText += ` Variazione clic vs periodo precedente: ${overallClickDiff >= 0 ? '+' : ''}${overallClickDiff.toLocaleString()}.`;
@@ -246,22 +244,16 @@ export function Tool4GSCAnalyzer() {
 
         const topNForChart = 5;
         const topItemsByClicks = [...processedItems]
-                                  .filter(it => it.item && it.clicks_current > 0) // Ensure item exists and clicks > 0 for charts
+                                  .filter(it => it.item && it.clicks_current > 0)
                                   .sort((a, b) => (b.clicks_current || 0) - (a.clicks_current || 0))
                                   .slice(0, topNForChart);
-
+        
         const chartColors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
         let chartDataForBar: GscSectionAnalysis['topItemsByClicksChartData'] = {
-            labels: [],
-            datasets: [{
-                label: 'Clic (Corrente)',
-                data: [],
-                backgroundColor: chartColors[0], // Default color
-            }]
+            labels: [], datasets: [{ label: 'Clic (Corrente)', data: [], backgroundColor: chartColors[0] }]
         };
         let chartDataForPie: GscSectionAnalysis['pieChartData'] = [];
-
 
         if (itemKeyType === 'devices') {
             const deviceSummary = processedItems.reduce((acc, curr) => {
@@ -271,55 +263,52 @@ export function Tool4GSCAnalyzer() {
             }, {} as Record<string, number>);
 
             chartDataForPie = Object.entries(deviceSummary)
-                .filter(([, value]) => value > 0) // Only include devices with clicks
+                .filter(([, value]) => value > 0)
                 .map(([name, value], index) => ({ name, value, fill: chartColors[index % chartColors.length] }))
                 .sort((a,b) => b.value - a.value);
             
-            // Also prepare bar chart data for devices if pie chart is empty or for consistency
             chartDataForBar = { 
                 labels: chartDataForPie.map(d => d.name),
-                datasets: [{
-                    label: 'Clic per Dispositivo',
-                    data: chartDataForPie.map(d => d.value),
-                    backgroundColor: chartDataForPie.map(d=>d.fill),
-                }]
+                datasets: [{ label: 'Clic per Dispositivo', data: chartDataForPie.map(d => d.value), backgroundColor: chartDataForPie.map(d=>d.fill) }]
             };
-
         } else if (topItemsByClicks.length > 0) {
              chartDataForBar = {
                 labels: topItemsByClicks.map(it => (String(it.item) || 'N/D').substring(0, 30) + ((String(it.item) || '').length > 30 ? '...' : '')),
-                datasets: [{
-                    label: 'Clic (Corrente)',
-                    data: topItemsByClicks.map(it => it.clicks_current),
-                    backgroundColor: topItemsByClicks.map((_, index) => chartColors[index % chartColors.length]),
-                }]
+                datasets: [{ label: 'Clic (Corrente)', data: topItemsByClicks.map(it => it.clicks_current), backgroundColor: topItemsByClicks.map((_, index) => chartColors[index % chartColors.length]) }]
             };
         }
         console.log(`[Tool4 AnalyzeGSCData] For ${itemKeyType}: chartDataForBar prepared with ${chartDataForBar.labels.length} labels. Data:`, JSON.stringify(chartDataForBar.datasets[0].data));
         console.log(`[Tool4 AnalyzeGSCData] For ${itemKeyType}: pieChartData prepared with ${chartDataForPie.length} items. Data:`, JSON.stringify(chartDataForPie));
+        
         return { summaryText, detailedDataWithDiffs: processedItems, topItemsByClicksChartData: chartDataForBar, pieChartData: chartDataForPie };
     };
 
-
     const processGSCData = async () => {
-        console.log("[Tool4 ProcessGSCData] Starting GSC data processing...");
+        console.log("[Tool4 ProcessGSCData] STEP 1: Function called.");
         if (!gscExcelFile) {
             setError("Nessun file Excel/ODS caricato.");
-            console.log("[Tool4 ProcessGSCData] No GSC Excel file loaded.");
+            console.error("[Tool4 ProcessGSCData] STEP 2: No GSC Excel file loaded. gscExcelFile is null.");
             return;
         }
+        console.log("[Tool4 ProcessGSCData] STEP 2: gscExcelFile details:", { name: gscExcelFile.name, contentExists: !!gscExcelFile.content, contentLength: gscExcelFile.content?.byteLength });
+        if (!gscExcelFile.content || gscExcelFile.content.byteLength === 0) {
+            setError("Il contenuto del file Excel/ODS è vuoto o non valido.");
+            console.error("[Tool4 ProcessGSCData] STEP 2.1: File content is empty or invalid.");
+            return;
+        }
+
         setIsLoading(true);
         setLoadingMessage("Lettura file...");
         setError(null);
-        setParsedGscData(null);
-        setAnalyzedGscData(null); 
+        setParsedGscData(null); // Reset previous parsed data
+        setAnalyzedGscData(null); // Reset previous analyzed data
         setGscFiltersDisplay("");
-        console.log("[Tool4 ProcessGSCData] State reset, loading indicator shown.");
+        console.log("[Tool4 ProcessGSCData] STEP 3: State reset, loading indicator shown.");
 
         try {
-            console.log("[Tool4 ProcessGSCData] Reading GSC Excel file content. File name:", gscExcelFile.name);
+            console.log("[Tool4 ProcessGSCData] STEP 4: Reading GSC Excel file content. File name:", gscExcelFile.name);
             const workbook = XLSX.read(gscExcelFile.content, { type: 'array', cellDates: true });
-            console.log("[Tool4 ProcessGSCData] Workbook read. Sheet names:", workbook.SheetNames);
+            console.log("[Tool4 ProcessGSCData] STEP 5: Workbook read. Sheet names:", workbook.SheetNames);
             
             const newParsedData: GscParsedData = {};
             const newAnalyzedData: GscAnalyzedData = {};
@@ -328,9 +317,9 @@ export function Tool4GSCAnalyzer() {
             const filtersSheetName = workbook.SheetNames.find(name => GSC_SHEET_MAPPING.filters.some(pn => name.toLowerCase().trim() === pn.toLowerCase().trim()));
             
             if (filtersSheetName) {
-                console.log(`[Tool4 ProcessGSCData] Found filters sheet: ${filtersSheetName}`);
+                console.log(`[Tool4 ProcessGSCData] STEP 6: Found filters sheet: ${filtersSheetName}`);
                 newParsedData.filters = parseSheetData(workbook.Sheets[filtersSheetName], 'filters');
-                 console.log(`[Tool4 ProcessGSCData] Parsed filters data (count: ${newParsedData.filters?.length}):`, JSON.stringify(newParsedData.filters?.slice(0,2)));
+                 console.log(`[Tool4 ProcessGSCData] STEP 6.1: Parsed filters data (count: ${newParsedData.filters?.length}):`, JSON.stringify(newParsedData.filters?.slice(0,2)));
                 if (newParsedData.filters && newParsedData.filters.length > 0) {
                     filtersText += '<ul>';
                     newParsedData.filters.forEach(filter => {
@@ -342,60 +331,61 @@ export function Tool4GSCAnalyzer() {
                 }
             } else {
                 filtersText += '<p>Foglio "Filters" non trovato.</p>';
-                console.log("[Tool4 ProcessGSCData] Filters sheet not found.");
+                console.log("[Tool4 ProcessGSCData] STEP 6: Filters sheet not found.");
             }
             setGscFiltersDisplay(filtersText);
-            console.log("[Tool4 ProcessGSCData] Filters display HTML set.");
+            console.log("[Tool4 ProcessGSCData] STEP 7: Filters display HTML set.");
+
+            let currentProgress = 0;
+            const progressIncrement = 100 / (GSC_SHEET_DISPLAY_ORDER.length -1); // -1 because filters is separate
 
             for (const reportType of GSC_SHEET_DISPLAY_ORDER) {
                 if (reportType === 'filters') continue;
 
-                console.log(`[Tool4 ProcessGSCData] --- Processing reportType: ${reportType} ---`);
+                console.log(`[Tool4 ProcessGSCData] STEP 8: --- Processing reportType: ${reportType} ---`);
                 setLoadingMessage(`Parsing foglio: ${reportType}...`);
                 const sheetName = workbook.SheetNames.find(name => GSC_SHEET_MAPPING[reportType].some(pn => name.toLowerCase().trim() === pn.toLowerCase().trim()));
 
                 if (sheetName) {
-                    console.log(`[Tool4 ProcessGSCData] Found sheet for ${reportType}: ${sheetName}`);
-                    const rawSheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-                    console.log(`[Tool4 ProcessGSCData] Raw data from sheet '${sheetName}' (first 5 rows):`, JSON.stringify(rawSheetData.slice(0,5)));
-                    
+                    console.log(`[Tool4 ProcessGSCData] STEP 8.1: Found sheet for ${reportType}: ${sheetName}`);
                     const sheetData = parseSheetData(workbook.Sheets[sheetName], reportType);
                     newParsedData[reportType] = sheetData;
-                    console.log(`[Tool4 ProcessGSCData] Parsed data for ${reportType} (count: ${sheetData.length}). First parsed row:`, JSON.stringify(sheetData[0]));
+                    console.log(`[Tool4 ProcessGSCData] STEP 8.2: Parsed data for ${reportType} (count: ${sheetData.length}).`);
                     
                     if (sheetData.length > 0) {
                         setLoadingMessage(`Analisi dati: ${reportType}...`);
                         newAnalyzedData[reportType] = analyzeGSCData(sheetData, reportType) || undefined;
-                        console.log(`[Tool4 ProcessGSCData] Analyzed data for ${reportType}:`, JSON.stringify(newAnalyzedData[reportType]));
+                        console.log(`[Tool4 ProcessGSCData] STEP 8.3: Analyzed data for ${reportType} (exists: ${!!newAnalyzedData[reportType]})`);
                     } else {
-                        console.log(`[Tool4 ProcessGSCData] Sheet data for ${reportType} is empty. Setting analyzed data to undefined.`);
+                        console.warn(`[Tool4 ProcessGSCData] STEP 8.3: Sheet data for ${reportType} is empty. Setting analyzed data to undefined.`);
                         newAnalyzedData[reportType] = undefined;
                     }
                 } else {
-                    console.warn(`[Tool4 ProcessGSCData] Sheet for ${reportType} not found with expected names: ${GSC_SHEET_MAPPING[reportType].join(', ')}.`);
+                    console.warn(`[Tool4 ProcessGSCData] STEP 8.1: Sheet for ${reportType} not found with expected names: ${GSC_SHEET_MAPPING[reportType].join(', ')}.`);
                     newParsedData[reportType] = [];
                     newAnalyzedData[reportType] = undefined;
                 }
-                 setProgress(prev => prev + (100 / GSC_SHEET_DISPLAY_ORDER.length)); 
+                 currentProgress += progressIncrement;
+                 setProgress(Math.min(currentProgress, 100)); 
             }
 
-            console.log("[Tool4 ProcessGSCData] Final newParsedData to be set:", JSON.stringify(newParsedData));
-            console.log("[Tool4 ProcessGSCData] Final newAnalyzedData to be set:", JSON.stringify(newAnalyzedData));
+            console.log("[Tool4 ProcessGSCData] STEP 9: Final newParsedData to be set:", JSON.stringify(newParsedData).substring(0, 500) + "...");
+            console.log("[Tool4 ProcessGSCData] STEP 10: Final newAnalyzedData to be set:", JSON.stringify(newAnalyzedData).substring(0, 500) + "...");
             setParsedGscData(newParsedData);
             setAnalyzedGscData(newAnalyzedData);
             
             toast({ title: "Analisi Completata", description: "Dati GSC processati." });
-            console.log("[Tool4 ProcessGSCData] Analysis complete. State updated.");
+            console.log("[Tool4 ProcessGSCData] STEP 11: Analysis complete. State updated.");
 
         } catch (e: any) {
-            console.error("[Tool4 ProcessGSCData] Error during GSC processing:", e);
+            console.error("[Tool4 ProcessGSCData] STEP FINAL_ERROR: Error during GSC processing:", e);
             setError(`Errore nel processamento del file GSC: ${e.message}`);
             toast({ title: "Errore Analisi", description: e.message, variant: "destructive" });
         } finally {
             setIsLoading(false);
             setLoadingMessage("");
             setProgress(0);
-            console.log("[Tool4 ProcessGSCData] Processing finished. Loading state reset.");
+            console.log("[Tool4 ProcessGSCData] STEP FINAL: Processing finished. Loading state reset.");
         }
     };
 
@@ -438,7 +428,7 @@ export function Tool4GSCAnalyzer() {
 
     const openDetailPage = (reportType: GscReportType) => {
         const analysis = analyzedGscData?.[reportType];
-        console.log(`[Tool4 openDetailPage] Opening detail for ${reportType}. Analysis data:`, JSON.stringify(analysis));
+        console.log(`[Tool4 openDetailPage] Opening detail for ${reportType}. Analysis data available: ${!!analysis}`);
         if (!analysis || !analysis.detailedDataWithDiffs || analysis.detailedDataWithDiffs.length === 0) {
             toast({ title: "Dati Insufficienti", description: `Nessun dato dettagliato da visualizzare per ${getReportItemDisplayName(reportType)}.`, variant: "destructive"});
             return;
@@ -486,7 +476,14 @@ export function Tool4GSCAnalyzer() {
 
             {gscExcelFile && (
                 <div className="text-center">
-                    <Button onClick={processGSCData} disabled={isLoading} className="action-button bg-sky-600 hover:bg-sky-700 text-white text-lg">
+                    <Button 
+                        onClick={() => {
+                            console.log("[Tool4 Button Click] 'Analizza Dati GSC' clicked. Calling processGSCData.");
+                            processGSCData();
+                        }} 
+                        disabled={isLoading} 
+                        className="action-button bg-sky-600 hover:bg-sky-700 text-white text-lg"
+                    >
                         {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <BarChart2 className="mr-2 h-5 w-5" />}
                         {isLoading ? "Analisi in corso..." : "Analizza Dati GSC"}
                     </Button>
@@ -539,17 +536,16 @@ export function Tool4GSCAnalyzer() {
                             );
                         }
                         
-                        // Ensure chartDataForRender and pieDataForRender are valid structures even if empty
-                        const chartDataForRender = analysis.topItemsByClicksChartData && analysis.topItemsByClicksChartData.labels 
+                        const chartDataForRender = analysis.topItemsByClicksChartData && analysis.topItemsByClicksChartData.labels && analysis.topItemsByClicksChartData.labels.length > 0
                             ? analysis.topItemsByClicksChartData 
                             : { labels: [], datasets: [{ label: 'Clic (Corrente)', data: [], backgroundColor: 'hsl(var(--chart-1))' }] };
                         
-                        const pieDataForRender = analysis.pieChartData && Array.isArray(analysis.pieChartData)
+                        const pieDataForRender = analysis.pieChartData && Array.isArray(analysis.pieChartData) && analysis.pieChartData.length > 0
                             ? analysis.pieChartData
                             : [];
 
-                        console.log(`[Tool4 Rendering Section] Data for ${reportType} charts: BarData=`, JSON.stringify(chartDataForRender), "PieData=", JSON.stringify(pieDataForRender));
-
+                        console.log(`[Tool4 Rendering Section] For ${reportType}: chartDataForRender -> labels: ${chartDataForRender.labels.length}, dataset data: ${chartDataForRender.datasets[0].data.length}`);
+                        console.log(`[Tool4 Rendering Section] For ${reportType}: pieDataForRender -> items: ${pieDataForRender.length}`);
 
                         return (
                             <Card key={reportType} id={`${reportType}-analysis-section`}>
@@ -592,4 +588,5 @@ export function Tool4GSCAnalyzer() {
         </div>
     );
 }
-
+      
+  
