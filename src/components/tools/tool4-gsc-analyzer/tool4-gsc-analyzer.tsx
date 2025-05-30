@@ -49,7 +49,7 @@ export function Tool4GSCAnalyzer() {
         } else {
             // Log per debug più dettagliato
             console.error("Tool4 handleFileLoad: arrayBufferContent non valido o vuoto.", { name, arrayBufferContent });
-            setError("Errore nel caricamento del file Excel. Il contenuto non è valido o il file è vuoto.");
+            setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
             setGscExcelFile(null);
         }
         setParsedGscData(null);
@@ -270,11 +270,11 @@ export function Tool4GSCAnalyzer() {
 
     const processGSCData = async () => {
         if (!gscExcelFile) {
-            setError("Nessun file Excel caricato.");
+            setError("Nessun file Excel/ODS caricato.");
             return;
         }
         setIsLoading(true);
-        setLoadingMessage("Lettura file Excel...");
+        setLoadingMessage("Lettura file...");
         setError(null);
         setParsedGscData(null);
         setAnalyzedGscData(null);
@@ -390,27 +390,27 @@ export function Tool4GSCAnalyzer() {
         router.push(`/tool4/${reportType}`);
     };
 
-    const acceptedExcelTypes = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel";
+    const acceptedExcelTypes = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.ods,application/vnd.oasis.opendocument.spreadsheet";
 
     return (
         <div className="space-y-8">
             <header className="text-center">
                  <Image src={GSC_LOGO_URL} alt="Logo GSC Tool" width={150} height={50} className="mx-auto h-12 mb-4 object-contain" data-ai-hint="logo excel" />
                 <h2 className="text-3xl font-bold text-sky-700">Analizzatore Dati Google Search Console</h2>
-                <p className="text-muted-foreground mt-2">Carica il tuo export Excel da GSC per un'analisi descrittiva dei dati.</p>
+                <p className="text-muted-foreground mt-2">Carica il tuo export Excel/ODS da GSC per un'analisi descrittiva dei dati.</p>
             </header>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Caricamento File GSC Excel (Ver.ULTIMO_TENTATIVO)</CardTitle>
+                    <CardTitle>Caricamento File GSC (Excel/ODS)</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <FileUploadZone
                         siteKey="gscExcelFile"
-                        label="File Excel GSC"
+                        label="File GSC (Excel/ODS)"
                         onFileLoad={handleFileLoad}
                         acceptedFileTypes={acceptedExcelTypes} 
-                        dropInstructionText="Trascina qui il file Excel (.xlsx, .xls) o clicca per selezionare."
+                        dropInstructionText="Trascina qui il file (.xlsx, .xls, .ods) o clicca per selezionare."
                         expectsArrayBuffer={true} 
                     />
                      <p className="text-xs text-muted-foreground mt-1">Il tool analizzerà i fogli: Queries, Pages, Countries, Devices, Search Appearance, Filters (se presenti con nomi standard o comuni alias in italiano/inglese).</p>
@@ -509,3 +509,4 @@ export function Tool4GSCAnalyzer() {
         </div>
     );
 }
+
