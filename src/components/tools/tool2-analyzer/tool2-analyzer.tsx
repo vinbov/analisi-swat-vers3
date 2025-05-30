@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea'; // Import Textarea
+import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileUploadZone } from '@/components/shared/file-upload-zone';
@@ -14,21 +14,21 @@ import { TablePertinenceResults } from './table-pertinence-results';
 import { PlayIcon, StopCircle, Download, AlertCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-const APP_CHUNK_SIZE_TOOL2_OFFLINE = 50; // Can be larger for offline processing
+const APP_CHUNK_SIZE_TOOL2_OFFLINE = 50;
 
-// Helper function for tokenization and cleaning (moved from original JS)
+// Helper function for tokenization and cleaning
 function tokenizeAndClean(text: string): string[] {
     if (!text || typeof text !== 'string') return [];
     return text.toLowerCase()
-               .replace(/[^\w\s'-]/g, '') // Rimuove punteggiatura tranne apostrofi e trattini interni
-               .split(/\s+/) // Divide per spazi
-               .map(token => token.replace(/^['-]|['-]$/g, '')) // Rimuove apostrofi/trattini iniziali/finali
-               .filter(token => token.length > 1 && token !== '-' && token !== "'"); // Filtra token vuoti o solo trattini/apostrofi
+               .replace(/[^\w\s'-]/g, '') 
+               .split(/\s+/) 
+               .map(token => token.replace(/^['-]|['-]$/g, '')) 
+               .filter(token => token.length > 1 && token !== '-' && token !== "'");
 }
 
 export function Tool2Analyzer() {
   const [industry, setIndustry] = useState('');
-  const [industryKeywords, setIndustryKeywords] = useState(''); // New state for specific industry keywords
+  const [industryKeywords, setIndustryKeywords] = useState('');
   const [csvFile, setCsvFile] = useState<{ content: string; name: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -61,34 +61,40 @@ export function Tool2Analyzer() {
     const modificatoriCommerciali = ["prezzi", "costo", "offerta", "sconto", "comprare", "acquistare", "vendita", "noleggio", "servizio di", "consulenza per", "preventivo", "shop", "negozio", "migliore", "top"];
     
     let punteggioPertinenza = 0;
-    let motivazioneLog: string[] = [];
-    let matchedTokens = new Set<string>(); 
+    let motivazioneLogSet = new Set<string>(); // Usare un Set per evitare duplicati di messaggi
+    let kwTokensAlreadyMatchedForPK = new Set<string>();
+    let kwTokensAlreadyMatchedForSettore = new Set<string>();
 
     for (const pkToken of paroleChiavePrincipali) {
-        if (kwTokens.includes(pkToken)) {
-            punteggioPertinenza += 3;
-            motivazioneLog.push(`Corrisponde alla parola chiave di settore '${pkToken}'.`);
-            matchedTokens.add(pkToken);
+        for (const kwToken of kwTokens) {
+            if (kwToken === pkToken && !kwTokensAlreadyMatchedForPK.has(kwToken)) {
+                punteggioPertinenza += 3;
+                motivazioneLogSet.add(`Corrisponde alla parola chiave di settore '${pkToken}'.`);
+                kwTokensAlreadyMatchedForPK.add(kwToken);
+            }
         }
     }
 
     const tokenSettoreSignificativi = settoreTokens.filter(t => t.length > 2 && !paroleChiavePrincipali.includes(t)); 
     for (const sToken of tokenSettoreSignificativi) {
-        if (kwTokens.includes(sToken) && !matchedTokens.has(sToken)) { 
-            punteggioPertinenza += 2;
-            motivazioneLog.push(`Contiene termine rilevante dal settore ('${settoreGlobale}'): '${sToken}'.`);
-            matchedTokens.add(sToken);
+        for (const kwToken of kwTokens) {
+            if (kwToken === sToken && !paroleChiavePrincipali.includes(kwToken) && !kwTokensAlreadyMatchedForSettore.has(kwToken) && !kwTokensAlreadyMatchedForPK.has(kwToken)) {
+                 punteggioPertinenza += 2;
+                 motivazioneLogSet.add(`Contiene termine rilevante dal settore ('${settoreGlobale}'): '${sToken}'.`);
+                 kwTokensAlreadyMatchedForSettore.add(kwToken);
+            }
         }
     }
     
     let modificatoreTrovato = null;
     let tokenChiaveConModificatoreTrovato = null;
+    let modificatoreLogAdded = false;
 
     for (const mod of [...modificatoriInformativi, ...modificatoriCommerciali]) {
         if (kwTokens.includes(mod)) {
             modificatoreTrovato = mod;
             for (const kwToken of kwTokens) {
-                if (kwToken !== mod && (paroleChiavePrincipali.includes(kwToken) || tokenSettoreSignificativi.includes(kwToken) || matchedTokens.has(kwToken) )) {
+                if (kwToken !== mod && (paroleChiavePrincipali.includes(kwToken) || tokenSettoreSignificativi.includes(kwToken) || kwTokensAlreadyMatchedForPK.has(kwToken) || kwTokensAlreadyMatchedForSettore.has(kwToken) )) {
                     tokenChiaveConModificatoreTrovato = kwToken;
                     break;
                 }
@@ -97,17 +103,20 @@ export function Tool2Analyzer() {
         }
     }
 
-    if (modificatoreTrovato && tokenChiaveConModificatoreTrovato) {
+    if (modificatoreTrovato && tokenChiaveConModificatoreTrovato && !modificatoreLogAdded) {
         punteggioPertinenza += 2;
         let tipoIntento = modificatoriInformativi.includes(modificatoreTrovato) ? "informativo" : "commerciale/transazionale";
-        motivazioneLog.push(`Rilevato intento ${tipoIntento} ('${modificatoreTrovato}') associato al termine di settore '${tokenChiaveConModificatoreTrovato}'.`);
+        motivazioneLogSet.add(`Rilevato intento ${tipoIntento} ('${modificatoreTrovato}') associato al termine di settore '${tokenChiaveConModificatoreTrovato}'.`);
+        modificatoreLogAdded = true; // Assicura che venga aggiunto una sola volta
     }
+    
+    const motivazioneFinale = Array.from(motivazioneLogSet).join(" ");
 
     const sogliaMinimaPertinenza = paroleChiavePrincipali.length > 0 || settoreTokens.length > 0 ? 2 : 1; 
     if (punteggioPertinenza >= sogliaMinimaPertinenza) { 
-        return { pertinente: true, motivazione: "In Target. " + (motivazioneLog.length > 0 ? motivazioneLog.join(" ") : "Corrispondenza generica con il settore.") };
+        return { pertinente: true, motivazione: "In Target. " + (motivazioneFinale.length > 0 ? motivazioneFinale : "Corrispondenza generica con il settore.") };
     } else {
-        return { pertinente: false, motivazione: "Fuori Target. " + (motivazioneLog.length > 0 ? motivazioneLog.join(" ") : `Nessuna corrispondenza forte con il settore '${settoreGlobale}' o le parole chiave fornite.`) };
+        return { pertinente: false, motivazione: "Fuori Target. " + (motivazioneFinale.length > 0 ? motivazioneFinale : `Nessuna corrispondenza forte con il settore '${settoreGlobale}' o le parole chiave fornite.`) };
     }
   };
 
@@ -243,7 +252,7 @@ export function Tool2Analyzer() {
         setProgress(((i + chunk.length) / totalKeywords) * 100);
         
         if (!isAnalysisStoppedRef.current && i + APP_CHUNK_SIZE_TOOL2_OFFLINE < totalKeywords) {
-          await new Promise(resolve => setTimeout(resolve, 0)); // Small delay for UI to update
+          await new Promise(resolve => setTimeout(resolve, 0)); 
         }
       }
 
@@ -273,7 +282,6 @@ export function Tool2Analyzer() {
       return;
     }
     const headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione", "Volume", "KD", "Opportunity", "Posizione", "URL", "Intent"];
-    // Ensure all analysisResults have all fields for CSV, default to N/A or empty string if missing
     const dataToExport = analysisResults.map(res => ({
         "Keyword": res.keyword || "",
         "Settore Analizzato": res.settore || "",
@@ -364,7 +372,7 @@ export function Tool2Analyzer() {
          </Alert>
       )}
 
-      {analysisResults.length > 0 && ( // Show results section even if loading, as results are incremental
+      {analysisResults.length > 0 && ( 
         <section className="mt-10">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -385,5 +393,3 @@ export function Tool2Analyzer() {
     </div>
   );
 }
-
-    
