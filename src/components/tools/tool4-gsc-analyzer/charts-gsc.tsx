@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -14,26 +15,41 @@ interface ChartGSCProps {
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export function ChartGSC({ data, pieData, type, title }: ChartGSCProps) {
+  console.log(`[ChartGSC Debug] Props received: type=${type}, title=${title}, barData available: ${!!data?.datasets?.[0]?.data?.length}, pieData available: ${!!pieData?.length}`);
+  // console.log(`[ChartGSC Debug] Bar data details:`, JSON.stringify(data));
+  // console.log(`[ChartGSC Debug] Pie data details:`, JSON.stringify(pieData));
+
+
   if (type === 'bar') {
-    if (!data || !data.datasets || data.datasets.length === 0 || data.datasets[0].data.length === 0) {
-      return <p className="text-muted-foreground text-center py-8">Nessun dato sufficiente per il grafico a barre.</p>;
+    if (!data || !data.datasets || data.datasets.length === 0 || data.datasets[0].data.length === 0 || !data.labels || data.labels.length === 0) {
+      console.log(`[ChartGSC Debug] No sufficient data for bar chart. Title: ${title}`);
+      return <p className="text-muted-foreground text-center py-8">Nessun dato sufficiente per il grafico a barre: {title}.</p>;
     }
     const chartData = data.labels.map((label, index) => ({
       name: label,
       value: data.datasets[0].data[index] || 0,
+      fill: Array.isArray(data.datasets[0].backgroundColor) 
+            ? data.datasets[0].backgroundColor[index % data.datasets[0].backgroundColor.length] 
+            : typeof data.datasets[0].backgroundColor === 'string' 
+            ? data.datasets[0].backgroundColor 
+            : COLORS[index % COLORS.length]
     }));
+    console.log(`[ChartGSC Debug] Bar chart data prepared for Recharts:`, JSON.stringify(chartData));
 
     return (
       <div className="h-full w-full">
         <h4 className="text-lg font-semibold text-center mb-4 text-foreground">{title}</h4>
         <ResponsiveContainer width="100%" height="calc(100% - 30px)">
-          <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 20 }}>
+          <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 35 }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" angle={-15} textAnchor="end" height={50} interval={0} />
+            <XAxis dataKey="name" angle={-25} textAnchor="end" height={70} interval={0} style={{ fontSize: '0.75rem' }} />
             <YAxis allowDecimals={false} />
             <Tooltip />
             <Legend />
-            <Bar dataKey="value" name={data.datasets[0].label || "Valore"} fill={COLORS[0]}>
+            <Bar dataKey="value" name={data.datasets[0].label || "Valore"}>
+                {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                ))}
               <LabelList dataKey="value" position="top" style={{ fill: 'hsl(var(--foreground))' }}/>
             </Bar>
           </BarChart>
@@ -44,8 +60,10 @@ export function ChartGSC({ data, pieData, type, title }: ChartGSCProps) {
 
   if (type === 'pie') {
     if (!pieData || pieData.length === 0) {
-      return <p className="text-muted-foreground text-center py-8">Nessun dato sufficiente per il grafico a torta.</p>;
+      console.log(`[ChartGSC Debug] No sufficient data for pie chart. Title: ${title}`);
+      return <p className="text-muted-foreground text-center py-8">Nessun dato sufficiente per il grafico a torta: {title}.</p>;
     }
+    console.log(`[ChartGSC Debug] Pie chart data prepared for Recharts:`, JSON.stringify(pieData));
     return (
       <div className="h-full w-full">
         <h4 className="text-lg font-semibold text-center mb-4 text-foreground">{title}</h4>
@@ -60,7 +78,7 @@ export function ChartGSC({ data, pieData, type, title }: ChartGSCProps) {
               fill="#8884d8"
               dataKey="value"
               nameKey="name"
-              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+              label={({ name, percent, value }) => `${name}: ${value.toLocaleString()} (${(percent * 100).toFixed(0)}%)`}
             >
               {pieData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill || COLORS[index % COLORS.length]} />
@@ -74,5 +92,6 @@ export function ChartGSC({ data, pieData, type, title }: ChartGSCProps) {
     );
   }
 
-  return <p className="text-muted-foreground">Tipo di grafico non supportato.</p>;
+  return <p className="text-muted-foreground">Tipo di grafico non supportato: {type}.</p>;
 }
+
