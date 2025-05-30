@@ -8,7 +8,7 @@ export function AppHeader() {
       <Link href="/" passHref>
         <Image
           id="appLogo"
-          src="https://placehold.co/150x50.png" // URL Semplificato
+          src="https://placehold.co/150x50.png" // Corretto da 150x150 a 150x50
           alt="Logo ANALISI S.W.A.T."
           width={150}
           height={50}
