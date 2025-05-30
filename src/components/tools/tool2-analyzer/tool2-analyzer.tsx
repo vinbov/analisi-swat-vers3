@@ -1,23 +1,34 @@
+
 "use client";
 import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileUploadZone } from '@/components/shared/file-upload-zone';
 import { parseCSVTool2, exportToCSV } from '@/lib/csv';
 import type { CsvRowTool2, PertinenceAnalysisResult } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { analyzeKeywordAction } from '@/app/actions/tool2-actions'; 
 import { TablePertinenceResults } from './table-pertinence-results';
 import { PlayIcon, StopCircle, Download, AlertCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-const APP_CHUNK_SIZE_TOOL2 = 10; // Smaller chunk for AI calls to avoid rate limits / long waits
+const APP_CHUNK_SIZE_TOOL2_OFFLINE = 50; // Can be larger for offline processing
+
+// Helper function for tokenization and cleaning (moved from original JS)
+function tokenizeAndClean(text: string): string[] {
+    if (!text || typeof text !== 'string') return [];
+    return text.toLowerCase()
+               .replace(/[^\w\s'-]/g, '') // Rimuove punteggiatura tranne apostrofi e trattini interni
+               .split(/\s+/) // Divide per spazi
+               .map(token => token.replace(/^['-]|['-]$/g, '')) // Rimuove apostrofi/trattini iniziali/finali
+               .filter(token => token.length > 1 && token !== '-' && token !== "'"); // Filtra token vuoti o solo trattini/apostrofi
+}
 
 export function Tool2Analyzer() {
-  const [apiKey, setApiKey] = useState('');
   const [industry, setIndustry] = useState('');
+  const [industryKeywords, setIndustryKeywords] = useState(''); // New state for specific industry keywords
   const [csvFile, setCsvFile] = useState<{ content: string; name: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -42,13 +53,130 @@ export function Tool2Analyzer() {
     toast({ title: "Analisi Interrotta", description: "L'analisi è stata interrotta dall'utente." });
   };
 
+  const checkPertinenzaOffline = (keywordAnalizzata: string, settoreGlobale: string, paroleChiavePrincipaliInput: string): { pertinente: boolean; motivazione: string } => {
+    const kwTokens = tokenizeAndClean(keywordAnalizzata);
+    const settoreTokens = tokenizeAndClean(settoreGlobale);
+    const paroleChiavePrincipali = tokenizeAndClean(paroleChiavePrincipaliInput);
+    const modificatoriInformativi = ["significato", "cos'è", "come funziona", "guida", "tutorial", "definizione", "spiegazione", "informazioni", "dettagli", "base", "principiante", "avanzato", "cosa sono", "perché", "quando"];
+    const modificatoriCommerciali = ["prezzi", "costo", "offerta", "sconto", "comprare", "acquistare", "vendita", "noleggio", "servizio di", "consulenza per", "preventivo", "shop", "negozio", "migliore", "top"];
+    
+    let punteggioPertinenza = 0;
+    let motivazioneLog: string[] = [];
+    let matchedTokens = new Set<string>(); 
+
+    for (const pkToken of paroleChiavePrincipali) {
+        if (kwTokens.includes(pkToken)) {
+            punteggioPertinenza += 3;
+            motivazioneLog.push(`Corrisponde alla parola chiave di settore '${pkToken}'.`);
+            matchedTokens.add(pkToken);
+        }
+    }
+
+    const tokenSettoreSignificativi = settoreTokens.filter(t => t.length > 2 && !paroleChiavePrincipali.includes(t)); 
+    for (const sToken of tokenSettoreSignificativi) {
+        if (kwTokens.includes(sToken) && !matchedTokens.has(sToken)) { 
+            punteggioPertinenza += 2;
+            motivazioneLog.push(`Contiene termine rilevante dal settore ('${settoreGlobale}'): '${sToken}'.`);
+            matchedTokens.add(sToken);
+        }
+    }
+    
+    let modificatoreTrovato = null;
+    let tokenChiaveConModificatoreTrovato = null;
+
+    for (const mod of [...modificatoriInformativi, ...modificatoriCommerciali]) {
+        if (kwTokens.includes(mod)) {
+            modificatoreTrovato = mod;
+            for (const kwToken of kwTokens) {
+                if (kwToken !== mod && (paroleChiavePrincipali.includes(kwToken) || tokenSettoreSignificativi.includes(kwToken) || matchedTokens.has(kwToken) )) {
+                    tokenChiaveConModificatoreTrovato = kwToken;
+                    break;
+                }
+            }
+            if (tokenChiaveConModificatoreTrovato) break;
+        }
+    }
+
+    if (modificatoreTrovato && tokenChiaveConModificatoreTrovato) {
+        punteggioPertinenza += 2;
+        let tipoIntento = modificatoriInformativi.includes(modificatoreTrovato) ? "informativo" : "commerciale/transazionale";
+        motivazioneLog.push(`Rilevato intento ${tipoIntento} ('${modificatoreTrovato}') associato al termine di settore '${tokenChiaveConModificatoreTrovato}'.`);
+    }
+
+    const sogliaMinimaPertinenza = paroleChiavePrincipali.length > 0 || settoreTokens.length > 0 ? 2 : 1; 
+    if (punteggioPertinenza >= sogliaMinimaPertinenza) { 
+        return { pertinente: true, motivazione: "In Target. " + (motivazioneLog.length > 0 ? motivazioneLog.join(" ") : "Corrispondenza generica con il settore.") };
+    } else {
+        return { pertinente: false, motivazione: "Fuori Target. " + (motivazioneLog.length > 0 ? motivazioneLog.join(" ") : `Nessuna corrispondenza forte con il settore '${settoreGlobale}' o le parole chiave fornite.`) };
+    }
+  };
+
+  const valutaPrioritaEMotivazioneOffline = (volume: number | string, kd: number | string, opportunity: number | string, posizione: number | string, pertinenzaInfo: { pertinente: boolean; motivazione: string }): { priorita: string; motivazione: string } => {
+      let prioritaCat = "SEO: N/D";
+      let motivazioneArr = [pertinenzaInfo.motivazione]; 
+
+      const vol = (typeof volume === 'number' && !isNaN(volume)) ? volume : null;
+      const keyDiff = (typeof kd === 'number' && !isNaN(kd)) ? kd : null;
+      const opp = (typeof opportunity === 'number' && !isNaN(opportunity)) ? opportunity : null;
+      const pos = (typeof posizione === 'number' && !isNaN(posizione)) ? posizione : null;
+
+      if (!pertinenzaInfo.pertinente) {
+          return { priorita: "SEO: Non Applicabile", motivazione: pertinenzaInfo.motivazione };
+      }
+
+      if (pos !== null && pos > 0 && pos <= 3) {
+          prioritaCat = "SEO: Mantenimento";
+          motivazioneArr.push(`Posizione attuale (${pos}) eccellente: l'obiettivo è difenderla e monitorare costantemente le performance.`);
+      } else if (vol === null || keyDiff === null) {
+          prioritaCat = "SEO: Dati Insufficienti";
+          motivazioneArr.push("Mancano dati cruciali (Volume e/o KD) per una valutazione SEO completa della priorità.");
+      } else if (vol > 800 && keyDiff < 50 && (opp === null || opp > 60)) {
+          prioritaCat = "SEO: Priorità Alta";
+          motivazioneArr.push("Questa keyword rappresenta un'alta priorità strategica.");
+          motivazioneArr.push(`Il volume di ricerca (${vol}) è elevato e la Keyword Difficulty (${keyDiff}) è considerata gestibile.`);
+          if (opp !== null) motivazioneArr.push(`L'Opportunity Score (${opp}) è promettente.`);
+          if (pos !== null && pos > 3) motivazioneArr.push(`Con una posizione attuale di ${pos}, c'è un buon potenziale di crescita verso le prime posizioni.`);
+           else if (pos === null || pos === 0 || pos > 10) motivazioneArr.push(`Attualmente non nelle prime posizioni (${pos !== null ? pos : 'N/P'}).`);
+      } else if (vol > 300 && keyDiff < 65 && (opp === null || opp > 35)) {
+          prioritaCat = "SEO: Priorità Media";
+          motivazioneArr.push("Priorità media per questa keyword.");
+          motivazioneArr.push(`Presenta un volume di ricerca (${vol}) discreto.`);
+          if (keyDiff < 50) motivazioneArr.push(`La KD (${keyDiff}) è favorevole.`);
+          else motivazioneArr.push(`La KD (${keyDiff}) è di medio livello e richiede un'analisi competitiva per stimare lo sforzo.`);
+          if (opp !== null) motivazioneArr.push(`L'Opportunity Score (${opp}) è interessante.`);
+           if (pos !== null && pos > 0) motivazioneArr.push(`Posizione attuale: ${pos}. Valutare l'ottimizzazione per migliorare.`);
+      } else if (keyDiff !== null && keyDiff > 70 && vol < 500) {
+          prioritaCat = "SEO: Priorità Bassa (Difficile)";
+          motivazioneArr.push("Bassa priorità a causa dell'elevata difficoltà.");
+          motivazioneArr.push(`La KD (${keyDiff}) è molto alta rispetto al volume di ricerca (${vol}).`);
+      } else if (vol < 50) {
+          prioritaCat = "SEO: Priorità Bassa (Volume Scarso)";
+          motivazioneArr.push("Bassa priorità a causa del volume esiguo.");
+          motivazioneArr.push(`Il volume di ricerca (${vol}) è molto basso e potrebbe non giustificare uno sforzo SEO dedicato al momento.`);
+      } else {
+          prioritaCat = "SEO: Priorità Bassa/Da Valutare";
+          motivazioneArr.push("Da valutare attentamente in base alla strategia complessiva.");
+          motivazioneArr.push(`Le metriche (Vol: ${vol ?? 'N/A'}, KD: ${keyDiff ?? 'N/A'}, Opp: ${opp ?? 'N/A'}) suggeriscono un potenziale limitato o uno sforzo elevato.`);
+      }
+      
+      motivazioneArr.push(`Dati metriche -> Volume: ${vol ?? 'N/A'}, KD: ${keyDiff ?? 'N/A'}, Opportunity: ${opp ?? 'N/A'}, Posizione: ${pos ?? 'N/A'}.`);
+      
+      return { priorita: prioritaCat, motivazione: motivazioneArr.join(" ").trim() };
+  };
+
+
   const runAnalysis = async () => {
-    if (!apiKey) { setError("Inserisci la tua OpenAI API Key."); return; }
-    if (!industry) { setError("Inserisci il Settore di Riferimento."); return; }
+    const globalSettore = industry.trim();
+    const paroleChiaveSettore = industryKeywords.trim();
+
     if (!csvFile) { setError("Carica un file CSV con le keyword."); return; }
+    if (!globalSettore && !paroleChiaveSettore) { 
+      setError("Inserisci il Settore di Riferimento e/o le Parole Chiave Specifiche del Settore.");
+      return;
+    }
 
     setIsLoading(true);
-    setLoadingMessage("Preparazione analisi...");
+    setLoadingMessage("Preparazione analisi offline...");
     setProgress(0);
     setError(null);
     setAnalysisResults([]);
@@ -65,53 +193,57 @@ export function Tool2Analyzer() {
       const totalKeywords = keywordData.length;
       const results: PertinenceAnalysisResult[] = [];
       
-      for (let i = 0; i < totalKeywords; i += APP_CHUNK_SIZE_TOOL2) {
+      for (let i = 0; i < totalKeywords; i += APP_CHUNK_SIZE_TOOL2_OFFLINE) {
         if (isAnalysisStoppedRef.current) break;
 
-        const chunk = keywordData.slice(i, i + APP_CHUNK_SIZE_TOOL2);
+        const chunk = keywordData.slice(i, i + APP_CHUNK_SIZE_TOOL2_OFFLINE);
         setLoadingMessage(`Analisi keyword ${i + 1}-${Math.min(i + chunk.length, totalKeywords)} di ${totalKeywords}...`);
         
         const chunkPromises = chunk.map(async (row) => {
           if (isAnalysisStoppedRef.current) return null;
           try {
-            const analysis = await analyzeKeywordAction({
-              keyword: row.keyword,
-              industry: industry,
-              volume: typeof row.volume === 'number' ? row.volume : 0, // Default to 0 if N/A
-              keywordDifficulty: typeof row.difficolta === 'number' ? row.difficolta : 0,
-              opportunity: typeof row.opportunity === 'number' ? row.opportunity : 0,
-              currentPosition: typeof row.posizione === 'number' ? row.posizione : 0,
-              url: row.url,
-              searchIntent: row.intento,
-            }, apiKey); // Pass API key to server action
+            const pertinenzaInfo = checkPertinenzaOffline(row.keyword, globalSettore, paroleChiaveSettore);
+            const analisiPriorita = valutaPrioritaEMotivazioneOffline(row.volume, row.difficolta, row.opportunity, row.posizione, pertinenzaInfo);
+            
             return {
               keyword: row.keyword,
-              settore: industry,
-              pertinenza: analysis.relevance,
-              prioritaSEO: analysis.seoPriority,
-              motivazioneSEO: analysis.motivation,
+              settore: globalSettore,
+              pertinenza: pertinenzaInfo.pertinente ? "In Target" : "Fuori Target",
+              prioritaSEO: analisiPriorita.priorita,
+              motivazioneSEO: analisiPriorita.motivazione,
+              volume: row.volume,
+              kd: row.difficolta,
+              opportunity: row.opportunity,
+              posizione: row.posizione,
+              url: row.url,
+              intento: row.intento
             };
           } catch (e: any) {
             console.error(`Errore analisi keyword ${row.keyword}:`, e);
             return {
               keyword: row.keyword,
-              settore: industry,
+              settore: globalSettore,
               pertinenza: "Errore",
               prioritaSEO: "Errore",
-              motivazioneSEO: e.message || "Errore sconosciuto durante analisi AI",
+              motivazioneSEO: e.message || "Errore sconosciuto durante analisi offline",
+              volume: row.volume,
+              kd: row.difficolta,
+              opportunity: row.opportunity,
+              posizione: row.posizione,
+              url: row.url,
+              intento: row.intento
             };
           }
         });
 
         const chunkResults = (await Promise.all(chunkPromises)).filter(r => r !== null) as PertinenceAnalysisResult[];
         results.push(...chunkResults);
-        setAnalysisResults([...results]); // Update results incrementally for display
+        setAnalysisResults(prev => [...prev, ...chunkResults]);
         
         setProgress(((i + chunk.length) / totalKeywords) * 100);
         
-        // Optional delay to avoid overwhelming API or to be polite
-        if (!isAnalysisStoppedRef.current && i + APP_CHUNK_SIZE_TOOL2 < totalKeywords) {
-          await new Promise(resolve => setTimeout(resolve, 200)); 
+        if (!isAnalysisStoppedRef.current && i + APP_CHUNK_SIZE_TOOL2_OFFLINE < totalKeywords) {
+          await new Promise(resolve => setTimeout(resolve, 0)); // Small delay for UI to update
         }
       }
 
@@ -123,8 +255,8 @@ export function Tool2Analyzer() {
       }
 
     } catch (e: any) {
-      console.error("Errore durante l'analisi (Tool 2):", e);
-      setError(`Errore analisi (Tool 2): ${e.message}`);
+      console.error("Errore durante l'analisi (Tool 2 Offline):", e);
+      setError(`Errore analisi (Tool 2 Offline): ${e.message}`);
       toast({
         title: "Errore di Analisi",
         description: e.message,
@@ -140,36 +272,39 @@ export function Tool2Analyzer() {
       toast({ title: "Nessun dato", description: "Nessun risultato da scaricare.", variant: "destructive" });
       return;
     }
-    const headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione"];
-    exportToCSV("report_analisi_pertinenza_priorita.csv", headers, analysisResults);
+    const headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione", "Volume", "KD", "Opportunity", "Posizione", "URL", "Intent"];
+    // Ensure all analysisResults have all fields for CSV, default to N/A or empty string if missing
+    const dataToExport = analysisResults.map(res => ({
+        "Keyword": res.keyword || "",
+        "Settore Analizzato": res.settore || "",
+        "Pertinenza": res.pertinenza || "",
+        "Priorità SEO": res.prioritaSEO || "",
+        "Motivazione": res.motivazioneSEO || "",
+        "Volume": res.volume !== undefined ? res.volume : "N/A",
+        "KD": res.kd !== undefined ? res.kd : "N/A",
+        "Opportunity": res.opportunity !== undefined ? res.opportunity : "N/A",
+        "Posizione": res.posizione !== undefined ? res.posizione : "N/A",
+        "URL": res.url || "",
+        "Intent": res.intento || ""
+    }));
+    exportToCSV("report_analisi_pertinenza_priorita_offline.csv", headers, dataToExport);
   };
 
   return (
     <div className="space-y-8">
       <header className="text-center">
-        <h2 className="text-3xl font-bold" style={{ color: 'hsl(var(--sky-600))' }}>Analizzatore Pertinenza & Priorità Keyword</h2>
-        <p className="text-muted-foreground mt-2">Determina pertinenza, priorità SEO e motivazione per le tue keyword, usando l'AI.</p>
+        <h2 className="text-3xl font-bold" style={{ color: 'hsl(var(--sky-600))' }}>Analizzatore Pertinenza & Priorità KW (Offline)</h2>
+        <p className="text-muted-foreground mt-2">Determina pertinenza e priorità SEO per le tue keyword con regole offline.</p>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle>Configurazione Analisi</CardTitle>
+          <CardTitle>Configurazione Analisi Offline</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="apiKeyTool2" className="block text-sm font-medium text-foreground mb-1">OpenAI API Key</label>
-              <Input 
-                type="password" 
-                id="apiKeyTool2" 
-                value={apiKey} 
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Inserisci la tua chiave API OpenAI (es. sk-...)" 
-              />
-              <p className="text-xs text-muted-foreground mt-1">La chiave API è usata per le chiamate AI e non viene memorizzata permanentemente.</p>
-            </div>
-            <div>
-              <label htmlFor="settoreTool2" className="block text-sm font-medium text-foreground mb-1">Settore di Riferimento</label>
+              <label htmlFor="settoreTool2" className="block text-sm font-medium text-foreground mb-1">Settore di Riferimento (Generale)</label>
               <Input 
                 type="text" 
                 id="settoreTool2" 
@@ -177,6 +312,18 @@ export function Tool2Analyzer() {
                 onChange={(e) => setIndustry(e.target.value)}
                 placeholder="Es: Marketing Online, Ristorazione, etc." 
               />
+               <p className="text-xs text-muted-foreground mt-1">Usato per un matching generico se le parole chiave specifiche non bastano.</p>
+            </div>
+            <div>
+              <label htmlFor="paroleChiaveSettoreTool2" className="block text-sm font-medium text-foreground mb-1">Parole Chiave Specifiche del Settore (Separate da virgola)</label>
+              <Textarea
+                id="paroleChiaveSettoreTool2"
+                value={industryKeywords}
+                onChange={(e) => setIndustryKeywords(e.target.value)}
+                placeholder="Es: SEO, content marketing, advertising online"
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Le KW più importanti che definiscono il tuo settore. Essenziali per l'analisi di pertinenza.</p>
             </div>
           </div>
           <div>
@@ -193,7 +340,7 @@ export function Tool2Analyzer() {
       <div className="text-center space-x-4">
         <Button onClick={runAnalysis} disabled={isLoading} className="action-button bg-sky-600 hover:bg-sky-700 text-white text-lg">
           {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlayIcon className="mr-2 h-5 w-5" />}
-          {isLoading ? "Analisi in corso..." : "Analizza Keyword"}
+          {isLoading ? "Analisi in corso..." : "Analizza Keyword (Offline)"}
         </Button>
         {isLoading && (
           <Button onClick={handleStopAnalysis} variant="destructive" className="action-button text-lg">
@@ -217,15 +364,15 @@ export function Tool2Analyzer() {
          </Alert>
       )}
 
-      {analysisResults.length > 0 && !isLoading && (
+      {analysisResults.length > 0 && ( // Show results section even if loading, as results are incremental
         <section className="mt-10">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-2xl">Risultati Analisi Pertinenza e Priorità SEO</CardTitle>
-                <CardDescription>{analysisResults.length} keyword analizzate.</CardDescription>
+                <CardTitle className="text-2xl">Risultati Analisi Pertinenza e Priorità SEO (Offline)</CardTitle>
+                <CardDescription>{analysisResults.length} keyword analizzate finora.</CardDescription>
               </div>
-              <Button onClick={handleDownloadCSV} variant="outline">
+              <Button onClick={handleDownloadCSV} variant="outline" disabled={isLoading && analysisResults.length === 0}>
                 Scarica Risultati (CSV) <Download className="ml-2 h-4 w-4" />
               </Button>
             </CardHeader>
@@ -238,3 +385,5 @@ export function Tool2Analyzer() {
     </div>
   );
 }
+
+    
