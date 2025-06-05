@@ -3,21 +3,30 @@
 const { app, BrowserWindow } = require('electron')
 const path = require('node:path')
 
+const TARGET_URL = 'http://localhost:9002';
+
 function createWindow () {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 1200, // Increased width for a potentially complex web app
-    height: 800, // Increased height
+    width: 1200,
+    height: 800,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js')
-      // contextIsolation: true, // Default in recent Electron versions
-      // nodeIntegration: false, // Default in recent Electron versions
+      preload: path.join(__dirname, 'preload.js'),
+      // contextIsolation: true, // Default and recommended
+      // nodeIntegration: false, // Default and recommended
     }
   })
 
-  // Load the URL of your Next.js app.
-  // Make sure your Next.js app is running on http://localhost:9002 !
-  mainWindow.loadURL('http://localhost:9002')
+  // Attempt to load the Next.js app URL
+  mainWindow.loadURL(TARGET_URL)
+    .catch(err => {
+      console.error(`Failed to load URL ${TARGET_URL}, error: ${err.message}. Falling back to index.html.`);
+      // If loading the URL fails (e.g., connection refused), load the local index.html
+      // and pass error information via query parameters.
+      mainWindow.loadFile(path.join(__dirname, 'index.html'), {
+        query: { error: err.code || 'UNKNOWN_ERROR', message: err.message, targetUrl: TARGET_URL }
+      });
+    });
 
   // Open the DevTools (optional, uncomment for debugging).
   // mainWindow.webContents.openDevTools()
