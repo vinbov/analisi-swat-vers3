@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -20,20 +21,25 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
-      // Add other hostnames if Facebook Ad images are directly linked and need optimization via next/image
-      // For example, if Facebook CDN images are used:
-      // {
-      //   protocol: 'https',
-      //   hostname: 'scontent.xx.fbcdn.net', // Example Facebook CDN hostname
-      //   port: '',
-      //   pathname: '/**',
-      // },
-      // {
-      //   protocol: 'https',
-      //   hostname: 'external.xx.fbcdn.net', // Another example
-      //   port: '',
-      //   pathname: '/**',
-      // },
+      // Added configuration for Facebook CDN images
+      {
+        protocol: 'https',
+        hostname: '*.fbcdn.net', // Covers scontent.fbcdn.net, external.fbcdn.net and their subdomains like scontent-mia3-2.xx.fbcdn.net
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'scontent-*.xx.fbcdn.net', // Specific pattern for scontent-location.xx.fbcdn.net if needed, though *.fbcdn.net should cover it
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'graph.facebook.com', // For profile pictures or other assets from Graph API
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
 };
