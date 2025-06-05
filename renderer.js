@@ -7,11 +7,13 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Try to use contextBridge exposed versions first
   if (typeof window.electronVersions !== 'undefined') {
     setVersion('node-version', window.electronVersions.node);
     setVersion('chrome-version', window.electronVersions.chrome);
     setVersion('electron-version', window.electronVersions.electron);
   } else if (typeof process !== 'undefined' && typeof process.versions !== 'undefined') {
+    // Fallback if contextBridge is not used or nodeIntegration is on (less secure)
     console.warn("Renderer.js: Accessing process.versions directly. Consider using contextBridge in preload.js for better security.");
     setVersion('node-version', process.versions.node);
     setVersion('chrome-version', process.versions.chrome);
@@ -24,17 +26,20 @@ window.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const error = params.get('error');
   const targetUrl = params.get('targetUrl');
-  const errorMessage = params.get('message');
+  const errorMessage = params.get('message'); // Retrieve the detailed message
 
   const errorContainer = document.getElementById('error-message-container');
   const normalInfoContainer = document.getElementById('normal-info-container');
 
   if (error && errorContainer && normalInfoContainer) {
     normalInfoContainer.style.display = 'none'; // Hide normal info if error is shown
+
+    // Enhance known error codes for better readability
     let displayError = error;
     if (error === 'ERR_CONNECTION_REFUSED') {
         displayError = 'ERR_CONNECTION_REFUSED (Connessione Rifiutata)';
     }
+    // Add more known error mappings here if needed
 
     errorContainer.innerHTML = `
       <div class="error-box">
@@ -44,7 +49,7 @@ window.addEventListener('DOMContentLoaded', () => {
         ${errorMessage ? `<p>Messaggio: ${errorMessage}</p>` : ''}
         <p><strong>Possibili cause e soluzioni:</strong></p>
         <ul>
-          <li>L'applicazione Next.js ("Analisi S.W.A.T.") potrebbe non essere in esecuzione. Avviala con <code>npm run dev</code> (o il comando appropriato per il tuo progetto Next.js) in un terminale separato.</li>
+          <li>L'applicazione Next.js ("Analisi S.W.A.T.") potrebbe non essere in esecuzione. Avviala con <strong><code>npm run dev</code></strong> (o il comando appropriato per il tuo progetto Next.js) in un terminale separato.</li>
           <li>Verifica che l'applicazione Next.js sia accessibile all'URL <strong>${targetUrl}</strong> nel tuo browser.</li>
           <li>L'URL o la porta (${targetUrl}) configurati in <code>main.js</code> potrebbero essere errati.</li>
           <li>Un firewall sul tuo computer o sulla rete potrebbe bloccare la connessione a <code>localhost</code> sulla porta specificata.</li>
