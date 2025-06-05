@@ -2,9 +2,7 @@
 const { app, BrowserWindow } = require('electron')
 const path = require('node:path')
 
-// NOTA: TARGET_URL e il tentativo di loadURL sono stati rimossi
-// per evitare ERR_CONNECTION_REFUSED se il server Next.js non è in esecuzione.
-// Electron caricherà direttamente index.html.
+const TARGET_URL = 'http://localhost:9002'; // L'URL della tua app Next.js
 
 function createWindow () {
   // Create the browser window.
@@ -13,19 +11,31 @@ function createWindow () {
     height: 800,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      // contextIsolation: true, // Default and recommended
-      // nodeIntegration: false, // Default and recommended
+      // contextIsolation e nodeIntegration hanno valori predefiniti sicuri.
+      // contextIsolation: true, (default)
+      // nodeIntegration: false, (default)
     }
   })
 
-  // Load the local index.html file.
-  // Il file index.html ora contiene istruzioni su come visualizzare
-  // l'app Next.js se lo si desidera (che richiederebbe npm run dev e loadURL).
-  mainWindow.loadFile(path.join(__dirname, 'index.html'))
+  // Tenta di caricare l'URL dell'app Next.js
+  mainWindow.loadURL(TARGET_URL)
+    .then(() => {
+      console.log(`Successfully loaded URL: ${TARGET_URL}`);
+    })
     .catch(err => {
-      // Questo catch è per errori nel caricamento di index.html stesso,
-      // che dovrebbe essere raro.
-      console.error(`Failed to load local index.html: ${err.message || err.code}`);
+      console.error(`Failed to load URL ${TARGET_URL}, error: ${err.message} (${err.code}) loading '${err.url}'. Falling back to index.html.`);
+      // Se il caricamento dell'URL fallisce (es. ERR_CONNECTION_REFUSED), carica l'index.html locale
+      // passando l'errore e l'URL target come parametri querystring.
+      mainWindow.loadFile(path.join(__dirname, 'index.html'), {
+        query: { 
+          error: err.code || 'UNKNOWN_ERROR', 
+          targetUrl: TARGET_URL,
+          message: `${err.message} (${err.code}) loading '${err.url}'` // Aggiungiamo più dettagli del messaggio
+        }
+      }).catch(loadErr => {
+         // Questo catch è per errori nel caricamento di index.html stesso.
+         console.error(`Failed to load local index.html as fallback: ${loadErr.message || loadErr.code}`);
+      });
     });
 
   // Open the DevTools (optional, uncomment for debugging).
