@@ -26,11 +26,11 @@ function createWindow () {
       console.error(`Failed to load URL ${TARGET_URL}, error: ${err.message}. Falling back to index.html.`);
       // Se il caricamento dell'URL fallisce (es. ERR_CONNECTION_REFUSED), carica l'index.html locale
       // passando l'errore e l'URL target come parametri querystring.
-      mainWindow.loadFile(path.join(__dirname, 'index.html'), {
+      mainWindow.loadFile('index.html', { // MODIFIED: Using relative path
         query: { 
           error: err.code || 'UNKNOWN_ERROR', 
           targetUrl: TARGET_URL,
-          message: err.message // Semplificato per evitare ridondanza
+          message: err.message 
         }
       }).catch(loadErr => {
          // Questo catch è per errori nel caricamento di index.html stesso.
