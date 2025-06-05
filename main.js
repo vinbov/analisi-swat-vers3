@@ -13,18 +13,18 @@ function createWindow () {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       // contextIsolation: true, // Default and recommended
-      // nodeIntegration: false, // Default and recommended
+      // nodeIntegration: false, // Default and recommended for loading remote content
     }
   })
 
   // Attempt to load the Next.js app URL
   mainWindow.loadURL(TARGET_URL)
     .catch(err => {
-      console.error(`Failed to load URL ${TARGET_URL}, error: ${err.message}. Falling back to index.html.`);
+      console.error(`Failed to load URL ${TARGET_URL} (Error: ${err.message || err.code}). This usually means the Next.js server is not running or not accessible at this address. Falling back to local index.html.`);
       // If loading the URL fails (e.g., connection refused), load the local index.html
       // and pass error information via query parameters.
       mainWindow.loadFile(path.join(__dirname, 'index.html'), {
-        query: { error: err.code || 'UNKNOWN_ERROR', message: err.message, targetUrl: TARGET_URL }
+        query: { error: err.code || 'UNKNOWN_ERROR', message: err.message || `Could not connect to ${TARGET_URL}`, targetUrl: TARGET_URL }
       });
     });
 
