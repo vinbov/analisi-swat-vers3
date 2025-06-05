@@ -1,9 +1,10 @@
-
 // Modules to control application life and create native browser window
 const { app, BrowserWindow } = require('electron')
 const path = require('node:path')
 
-const TARGET_URL = 'http://localhost:9002';
+// NOTA: TARGET_URL e il tentativo di loadURL sono stati rimossi
+// per evitare ERR_CONNECTION_REFUSED se il server Next.js non è in esecuzione.
+// Electron caricherà direttamente index.html.
 
 function createWindow () {
   // Create the browser window.
@@ -13,19 +14,18 @@ function createWindow () {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       // contextIsolation: true, // Default and recommended
-      // nodeIntegration: false, // Default and recommended for loading remote content
+      // nodeIntegration: false, // Default and recommended
     }
   })
 
-  // Attempt to load the Next.js app URL
-  mainWindow.loadURL(TARGET_URL)
+  // Load the local index.html file.
+  // Il file index.html ora contiene istruzioni su come visualizzare
+  // l'app Next.js se lo si desidera (che richiederebbe npm run dev e loadURL).
+  mainWindow.loadFile(path.join(__dirname, 'index.html'))
     .catch(err => {
-      console.error(`Failed to load URL ${TARGET_URL} (Error: ${err.message || err.code}). This usually means the Next.js server is not running or not accessible at this address. Falling back to local index.html.`);
-      // If loading the URL fails (e.g., connection refused), load the local index.html
-      // and pass error information via query parameters.
-      mainWindow.loadFile(path.join(__dirname, 'index.html'), {
-        query: { error: err.code || 'UNKNOWN_ERROR', message: err.message || `Could not connect to ${TARGET_URL}`, targetUrl: TARGET_URL }
-      });
+      // Questo catch è per errori nel caricamento di index.html stesso,
+      // che dovrebbe essere raro.
+      console.error(`Failed to load local index.html: ${err.message || err.code}`);
     });
 
   // Open the DevTools (optional, uncomment for debugging).
