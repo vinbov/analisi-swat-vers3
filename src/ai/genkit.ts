@@ -1,14 +1,16 @@
-import {genkit} from 'genkit';
-// import {openai} from '@genkit-ai/openai'; // Temporaneamente commentato a causa di problemi di installazione
-// import {googleAI} from '@genkit-ai/googleai'; // Assicurarsi che questo sia rimosso o commentato se non si usa Gemini
+
+import { genkit } from 'genkit';
+// import {openai} from '@genkit-ai/openai'; // Import and enable OpenAI
+
+import {googleAI} from '@genkit-ai/googleai'; // Using GoogleAI as a fallback due to OpenAI plugin install issues
 
 export const ai = genkit({
   plugins: [
-    // openai(), // Temporaneamente commentato
-    // googleAI() 
+    // openai(), // Temporarily disabled due to installation issues for @genkit-ai/openai
+    googleAI() // Using GoogleAI plugin as a fallback. Ensure GOOGLE_API_KEY is in .env
   ],
-  // model: 'openai/gpt-4o', // Temporaneamente commentato - Il modello predefinito dipende dai plugin attivi
+  // model: 'gemini-pro', // You can set a default GoogleAI model here if you wish
   // Se in futuro si volessero usare sia GoogleAI che OpenAI per flow diversi,
   // sarà necessario specificare il modello desiderato in ogni flow/prompt.
-  // Altrimenti, si può rimuovere completamente il plugin googleAI() e riferimenti a modelli Gemini.
 });
+
