@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -6,13 +7,15 @@ import { ToolNavigation } from '@/components/layout/tool-navigation';
 import { Tool1Comparator } from '@/components/tools/tool1-comparator/tool1-comparator';
 import { Tool2Analyzer } from '@/components/tools/tool2-analyzer/tool2-analyzer';
 import { Tool3Scraper } from '@/components/tools/tool3-scraper/tool3-scraper';
-import { Tool4GSCAnalyzer } from '@/components/tools/tool4-gsc-analyzer/tool4-gsc-analyzer'; // Import new tool
+import { Tool4GSCAnalyzer } from '@/components/tools/tool4-gsc-analyzer/tool4-gsc-analyzer';
+import { Tool5MasterReport } from '@/components/tools/tool5-master-report/tool5-master-report'; // Import nuovo tool
 
 const tools = [
   { id: 'tool1', label: 'Analizzatore Comparativo KW' },
   { id: 'tool2', label: 'Analizzatore Pertinenza & Priorità KW' },
   { id: 'tool3', label: 'FB Ads Library Scraper' },
-  { id: 'tool4', label: 'Analizzatore Dati GSC' }, // Add new tool
+  { id: 'tool4', label: 'Analizzatore Dati GSC' },
+  { id: 'tool5', label: 'Report Consolidato' }, // Add new tool
 ];
 
 export default function HomePage() {
@@ -40,9 +43,14 @@ export default function HomePage() {
               <Tool3Scraper />
             </div>
           )}
-          {activeTool === 'tool4' && ( // Add new tool container
+          {activeTool === 'tool4' && (
             <div id="tool4-container">
               <Tool4GSCAnalyzer />
+            </div>
+          )}
+          {activeTool === 'tool5' && ( // Add new tool container
+            <div id="tool5-container">
+              <Tool5MasterReport />
             </div>
           )}
         </main>

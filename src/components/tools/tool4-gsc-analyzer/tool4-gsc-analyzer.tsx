@@ -46,6 +46,9 @@ export function Tool4GSCAnalyzer() {
 
     useEffect(() => {
       console.log("[Tool4 Effect] analyzedGscData state updated:", analyzedGscData);
+      if (analyzedGscData) {
+        localStorage.setItem('tool4ConsolidatedGscData', JSON.stringify(analyzedGscData));
+      }
     }, [analyzedGscData]);
 
     const handleFileLoad = useCallback((content: string, name: string, arrayBufferContent?: ArrayBuffer) => {
@@ -55,6 +58,7 @@ export function Tool4GSCAnalyzer() {
             setParsedGscData(null);
             setAnalyzedGscData(null);
             setGscFiltersDisplay("");
+            localStorage.removeItem('tool4ConsolidatedGscData'); // Clear previous consolidated data
         } else {
             setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
             setGscExcelFile(null);
@@ -68,6 +72,7 @@ export function Tool4GSCAnalyzer() {
         setAnalyzedGscData(null);
         setError(null);
         setGscFiltersDisplay("");
+        localStorage.removeItem('tool4ConsolidatedGscData');
         const fileInput = document.getElementById('gscExcelFileInputTool4') as HTMLInputElement;
         if (fileInput) fileInput.value = "";
     };
@@ -224,7 +229,7 @@ export function Tool4GSCAnalyzer() {
             const diffCTR = currentCTR - previousCTR;
             let diffPosition: number | null = null;
             if (currentPosition !== null && previousPosition !== null) {
-                diffPosition = previousPosition - currentPosition;
+                diffPosition = previousPosition - currentPosition; // Improved logic: positive diff = better rank
             }
 
             return {
@@ -358,7 +363,7 @@ export function Tool4GSCAnalyzer() {
             console.log("[Tool4 ProcessGSCData DEBUG] FINAL newAnalyzedData before setState:", newAnalyzedData);
 
             setParsedGscData(newParsedData);
-            setAnalyzedGscData(newAnalyzedData);
+            setAnalyzedGscData(newAnalyzedData); // This will trigger the useEffect to save to localStorage
             
             toast({ title: "Analisi Completata", description: "Dati GSC processati." });
 
