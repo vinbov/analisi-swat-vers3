@@ -136,16 +136,10 @@ export default function Tool1DetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionId, searchParams]);
 
-  useEffect(() => {
-    return () => {
-      const dataId = searchParams.get('dataId');
-      if (dataId) {
-        // clearTool1TempData(dataId); // Potremmo voler mantenere i dati più a lungo
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
+  // Non è più necessario clearTool1TempData all'unmount qui,
+  // dato che lo store è temporaneo e per sessione/navigazione singola.
+  // Potrebbe essere utile se si vuole essere aggressivi con la memoria, ma
+  // per ora lo store in memoria vivrà finché la scheda principale è aperta.
 
   if (isLoading) {
     return <div className="flex justify-center items-center min-h-screen"><p>Caricamento dettagli...</p></div>;
@@ -210,3 +204,5 @@ export default function Tool1DetailPage() {
     </div>
   );
 }
+
+    

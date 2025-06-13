@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileUploadZone } from '@/components/shared/file-upload-zone';
-import { parseCSVTool1, exportTool1FullReportToXLSX } from '@/lib/csv'; // Modified import
+import { parseCSVTool1, exportTool1FullReportToXLSX } from '@/lib/csv';
 import type { CsvRowTool1, ComparisonResult, DetailPageSection } from '@/lib/types';
 import { KeywordDistributionChart } from './chart-keyword-distribution';
 import { CommonKeywordsTop10Chart } from './chart-common-keywords-top10';
@@ -14,7 +14,6 @@ import { ComparisonResultsTable } from './table-comparison-results';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart3, Download, AlertCircle, Info, FileText, PieChartIcon, LineChart, DownloadCloud } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-// useRouter non serve più qui per la navigazione, window.open la gestirà
 import { storeTool1TempData } from '@/lib/temp-data-store';
 
 
@@ -30,7 +29,6 @@ export function Tool1Comparator() {
   const [error, setError] = useState<string | null>(null);
   
   const { toast } = useToast();
-  // const router = useRouter(); // Non più necessario per openDetailPage
 
   const handleFileLoad = useCallback((siteKey: string, content: string, name: string) => {
     setSiteFiles(prev => ({ ...prev, [siteKey]: { content, name } }));
@@ -357,3 +355,5 @@ export function Tool1Comparator() {
     </div>
   );
 }
+
+    
