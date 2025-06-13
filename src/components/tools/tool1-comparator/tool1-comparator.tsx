@@ -55,10 +55,9 @@ export function Tool1Comparator() {
 
     return () => {
       channelRef.current?.close();
-      setDataForDetailPages(new Map()); 
+      // setDataForDetailPages(new Map()); // This would clear data prematurely if effect re-runs
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, [dataForDetailPages]); // Ensure this effect re-runs if dataForDetailPages changes
 
   const handleFileLoad = useCallback((siteKey: string, content: string, name: string) => {
     setSiteFiles(prev => ({ ...prev, [siteKey]: { content, name } }));
@@ -310,7 +309,7 @@ export function Tool1Comparator() {
               </Button>
             </CardHeader>
             <CardContent>
-              <CardDescription className="mb-3">Questo grafico illustra come il totale delle keyword uniche analizzate si suddivide percentualmente tra: quelle Comuni (condivise con i competitor), i Punti di Forza (esclusive del tuo sito) e le Opportunità (keyword dei competitor per cui il tuo sito non si posiziona).</CardDescription>
+              <CardDescription className="mb-3">Questo grafico illustra come il totale delle keyword uniche analizzate (cioè ogni keyword contata una sola volta, indipendentemente da quanti siti la contengono) si suddivide percentualmente tra: quelle Comuni (condivise tra "Il Mio Sito" e almeno un competitor), i Punti di Forza (esclusive de "Il Mio Sito" rispetto ai competitor analizzati) e le Opportunità (keyword per cui i competitor si posizionano ma "Il Mio Sito" no).</CardDescription>
               <KeywordDistributionChart results={comparisonResults} />
             </CardContent>
           </Card>
