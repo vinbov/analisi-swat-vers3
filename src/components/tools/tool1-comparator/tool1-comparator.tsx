@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -177,11 +178,31 @@ export function Tool1Comparator() {
   };
   
   const openDetailPage = (section: DetailPageSection) => {
-    localStorage.setItem('tool1DetailData', JSON.stringify({
-      comparisonResults,
-      activeCompetitorNames
-    }));
-    router.push(`/tool1/${section}`);
+    try {
+      localStorage.setItem('tool1DetailData', JSON.stringify({
+        comparisonResults,
+        activeCompetitorNames
+      }));
+      router.push(`/tool1/${section}`);
+    } catch (e: any) {
+      if (e.name === 'QuotaExceededError' || (e.message && e.message.toLowerCase().includes('exceeded the quota'))) {
+        toast({
+          title: "Dati Troppo Grandi per Dettaglio",
+          description: "I risultati dell'analisi sono troppo grandi per essere visualizzati nella pagina di dettaglio. Prova con un set di dati più piccolo o scarica il report CSV dalla pagina principale.",
+          variant: "destructive",
+          duration: 10000,
+        });
+        setError("I dati sono troppo grandi per la pagina di dettaglio. Si prega di scaricare il CSV o ridurre il numero di keyword analizzate.");
+      } else {
+        toast({
+          title: "Errore Imprevisto",
+          description: "Si è verificato un errore nell'aprire la pagina di dettaglio.",
+          variant: "destructive",
+        });
+        console.error("Error opening detail page:", e);
+        setError(`Errore imprevisto nell'apertura dei dettagli: ${e.message}`);
+      }
+    }
   };
 
   const competitorUploadZones = Array.from({ length: 5 }, (_, i) => `Competitor ${i + 1}`);
