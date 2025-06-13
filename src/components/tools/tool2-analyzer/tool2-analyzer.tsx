@@ -11,7 +11,7 @@ import { parseCSVTool2, exportToCSV } from '@/lib/csv';
 import type { CsvRowTool2, PertinenceAnalysisResult } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { TablePertinenceResults } from './table-pertinence-results';
-import { PlayIcon, StopCircle, Download, AlertCircle, Loader2 } from 'lucide-react';
+import { PlayIcon, StopCircle, Download, AlertCircle, Loader2, ImportIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const APP_CHUNK_SIZE_TOOL2_OFFLINE = 50;
@@ -29,12 +29,12 @@ const STOP_WORDS_IT = [
 function tokenizeAndClean(text: string, stopWords: string[] = []): string[] {
     if (!text || typeof text !== 'string') return [];
     const cleanedText = text.toLowerCase()
-                           .replace(/[^\w\s'-]/g, '') // Rimuove punteggiatura tranne apostrofi e trattini interni
-                           .replace(/\s+/g, ' ') // Normalizza spazi multipli
+                           .replace(/[^\w\s'-]/g, '') 
+                           .replace(/\s+/g, ' ') 
                            .trim();
 
     const tokens = cleanedText.split(/\s+/)
-        .map(token => token.replace(/^['-]|['-]$/g, '')) // Rimuove apostrofi/trattini all'inizio/fine dei token
+        .map(token => token.replace(/^['-]|['-]$/g, '')) 
         .filter(token => token.length > 1 && token !== '-' && token !== "'" && !stopWords.includes(token.toLowerCase()));
     return tokens;
 }
@@ -186,6 +186,41 @@ export function Tool2Analyzer() {
       motivazioneArr.push(`Dati metriche -> Volume: ${vol ?? 'N/A'}, KD: ${keyDiff ?? 'N/A'}, Opportunity: ${opp ?? 'N/A'}, Posizione: ${pos ?? 'N/A'}.`);
       
       return { priorita: prioritaCat, motivazione: motivazioneArr.join(" ").trim() };
+  };
+
+  const handleImportKeywordsFromTool1 = () => {
+    try {
+      const storedKeywordsString = localStorage.getItem('tool1MioSitoCoreKeywords');
+      if (storedKeywordsString) {
+        const keywordsArray: string[] = JSON.parse(storedKeywordsString);
+        if (keywordsArray && keywordsArray.length > 0) {
+          setIndustryKeywords(keywordsArray.join(', '));
+          toast({
+            title: "Keyword Importate",
+            description: `${keywordsArray.length} keyword principali da 'Mio Sito' (Tool 1) sono state caricate.`,
+          });
+        } else {
+          toast({
+            title: "Nessuna Keyword da Importare",
+            description: "Non sono state trovate keyword principali da 'Mio Sito' (Tool 1) da importare.",
+            variant: "default",
+          });
+        }
+      } else {
+        toast({
+          title: "Dati Tool 1 Non Trovati",
+          description: "Esegui prima un'analisi con 'Mio Sito' nel Tool 1 per poter importare le keyword.",
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      console.error("Errore durante l'importazione delle keyword da localStorage:", error);
+      toast({
+        title: "Errore Importazione",
+        description: "Si è verificato un errore durante l'importazione delle keyword.",
+        variant: "destructive",
+      });
+    }
   };
 
 
@@ -347,6 +382,14 @@ export function Tool2Analyzer() {
                 rows={2}
               />
               <p className="text-xs text-muted-foreground mt-1">Le KW più importanti che definiscono il tuo settore. Essenziali per l'analisi di pertinenza.</p>
+               <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleImportKeywordsFromTool1} 
+                className="mt-2 text-xs"
+              >
+                <ImportIcon className="mr-2 h-3 w-3" /> Importa KW Principali da 'Mio Sito' (Tool 1)
+              </Button>
             </div>
           </div>
           <div>

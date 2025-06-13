@@ -58,7 +58,19 @@ export function Tool1Comparator() {
   }, [dataForDetailPages]); 
 
   const handleFileLoad = useCallback((siteKey: string, content: string, name: string) => {
-    setSiteFiles(prev => ({ ...prev, [siteKey]: { content, name } }));
+    if (content && name) {
+      setSiteFiles(prev => ({ ...prev, [siteKey]: { content, name } }));
+    } else {
+      // File was reset/removed
+      setSiteFiles(prev => {
+        const newFiles = { ...prev };
+        delete newFiles[siteKey];
+        return newFiles;
+      });
+      if (siteKey === 'Mio Sito') {
+        localStorage.removeItem('tool1MioSitoCoreKeywords');
+      }
+    }
   }, []);
 
   const runComparison = async () => {
@@ -69,6 +81,7 @@ export function Tool1Comparator() {
     setComparisonResults([]);
     setActiveCompetitorNames([]);
     setDataForDetailPages(new Map()); 
+    localStorage.removeItem('tool1MioSitoCoreKeywords'); // Clear previous core keywords
 
     if (!siteFiles['Mio Sito']?.content) {
       setError("Carica il CSV per 'Il Mio Sito'.");
@@ -101,6 +114,41 @@ export function Tool1Comparator() {
       }
 
       const mySiteName = 'Mio Sito';
+
+      // --- Save Core Keywords for Tool 2 ---
+      const mySiteKeywordsData = parsedSiteData[mySiteName];
+      if (mySiteKeywordsData && mySiteKeywordsData.length > 0) {
+        let coreKeywords = new Set<string>();
+
+        mySiteKeywordsData
+          .filter(kw => typeof kw.posizione === 'number' && kw.posizione <= 10 && kw.keyword)
+          .sort((a, b) => (a.posizione as number) - (b.posizione as number))
+          .slice(0, 5)
+          .forEach(kw => coreKeywords.add(kw.keyword));
+
+        if (coreKeywords.size < 10) {
+          mySiteKeywordsData
+            .filter(kw => typeof kw.volume === 'number' && kw.volume > 0 && kw.keyword && !coreKeywords.has(kw.keyword))
+            .sort((a, b) => (b.volume as number) - (a.volume as number))
+            .slice(0, 10 - coreKeywords.size)
+            .forEach(kw => coreKeywords.add(kw.keyword));
+        }
+        
+        if (coreKeywords.size < 5 && coreKeywords.size < mySiteKeywordsData.length) {
+           mySiteKeywordsData
+              .filter(kw => kw.keyword && !coreKeywords.has(kw.keyword))
+              .slice(0, Math.min(5, 10 - coreKeywords.size))
+              .forEach(kw => coreKeywords.add(kw.keyword));
+        }
+
+        const coreKeywordsArray = Array.from(coreKeywords);
+        if (coreKeywordsArray.length > 0) {
+          localStorage.setItem('tool1MioSitoCoreKeywords', JSON.stringify(coreKeywordsArray));
+        }
+      }
+      // --- End Save Core Keywords for Tool 2 ---
+
+
       const siteKeywordMaps: Record<string, Map<string, CsvRowTool1>> = {};
       for (const siteName in parsedSiteData) {
         siteKeywordMaps[siteName] = new Map(parsedSiteData[siteName].map(item => [item.keyword, item]));
@@ -158,7 +206,6 @@ export function Tool1Comparator() {
       }
       setComparisonResults(results);
       
-      // Save data for Tool 5 (Master Report)
       if (results.length > 0) {
         try {
             const commonKWs = results.filter(r => r.status === 'common');
@@ -169,7 +216,7 @@ export function Tool1Comparator() {
                 .map(kw => ({ keyword: kw.keyword, position: kw.mySiteInfo.pos }));
 
             const competitorsTopCommon: Record<string, { keyword: string; position: number | string | null }[]> = {};
-            currentActiveCompetitors.slice(0, 2).forEach(compName => { // Max 2 competitors for summary
+            currentActiveCompetitors.slice(0, 2).forEach(compName => { 
                 competitorsTopCommon[compName] = commonKWs
                     .filter(kw => {
                         const compInfo = kw.competitorInfo.find(c => c.name === compName);
@@ -198,7 +245,7 @@ export function Tool1Comparator() {
                     totalUnique: allKeywordsArray.length
                 },
                 mySiteTop5Common,
-                competitorsTopCommon, // Contains top 5 for first 2 competitors
+                competitorsTopCommon, 
                 top5Opportunities
             };
 
@@ -444,4 +491,3 @@ export function Tool1Comparator() {
     </div>
   );
 }
-
