@@ -30,12 +30,10 @@ export function Tool1Comparator() {
   
   const { toast } = useToast();
 
-  // Store data for detail pages in component's state
   const [dataForDetailPages, setDataForDetailPages] = useState<Map<string, Tool1DataPayload>>(new Map());
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
-    // Initialize BroadcastChannel
     channelRef.current = new BroadcastChannel(TOOL1_DATA_CHANNEL_NAME);
 
     const handleMessage = (event: MessageEvent) => {
@@ -57,10 +55,10 @@ export function Tool1Comparator() {
 
     return () => {
       channelRef.current?.close();
-      setDataForDetailPages(new Map()); // Clear data on unmount
+      setDataForDetailPages(new Map()); 
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // dataForDetailPages should not be in dependency array to avoid re-creating channel too often
+  }, []); 
 
   const handleFileLoad = useCallback((siteKey: string, content: string, name: string) => {
     setSiteFiles(prev => ({ ...prev, [siteKey]: { content, name } }));
@@ -73,7 +71,7 @@ export function Tool1Comparator() {
     setError(null);
     setComparisonResults([]);
     setActiveCompetitorNames([]);
-    setDataForDetailPages(new Map()); // Clear previous detail data
+    setDataForDetailPages(new Map()); 
 
     if (!siteFiles['Mio Sito']?.content) {
       setError("Carica il CSV per 'Il Mio Sito'.");
@@ -163,7 +161,6 @@ export function Tool1Comparator() {
       }
       setComparisonResults(results);
       
-      // Store combined results for potential use by Tool 5 (Master Report) via localStorage
       if (results.length > 0) {
         try {
           localStorage.setItem('tool1ResultsForMasterReport', JSON.stringify({comparisonResults: results, activeCompetitorNames: currentActiveCompetitors}));
@@ -206,7 +203,6 @@ export function Tool1Comparator() {
     try {
       const dataId = `tool1-${section}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       
-      // Store data in the component's map for the BroadcastChannel to access
       setDataForDetailPages(prevMap => {
         const newMap = new Map(prevMap);
         newMap.set(dataId, { comparisonResults, activeCompetitorNames });
@@ -314,7 +310,7 @@ export function Tool1Comparator() {
               </Button>
             </CardHeader>
             <CardContent>
-              <CardDescription className="mb-3">Questo grafico illustra come le keyword uniche analizzate si distribuiscono tra le categorie.</CardDescription>
+              <CardDescription className="mb-3">Questo grafico illustra come il totale delle keyword uniche analizzate si suddivide percentualmente tra: quelle Comuni (condivise con i competitor), i Punti di Forza (esclusive del tuo sito) e le Opportunità (keyword dei competitor per cui il tuo sito non si posiziona).</CardDescription>
               <KeywordDistributionChart results={comparisonResults} />
             </CardContent>
           </Card>
