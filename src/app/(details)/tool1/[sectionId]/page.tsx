@@ -9,9 +9,10 @@ import { CommonKeywordsTop10Chart } from '@/components/tools/tool1-comparator/ch
 import { TopOpportunitiesChart } from '@/components/tools/tool1-comparator/chart-top-opportunities';
 import { ComparisonResultsTable } from '@/components/tools/tool1-comparator/table-comparison-results';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TOOL1_DATA_CHANNEL_NAME, type RequestTool1DataMessage, type ResponseTool1DataMessage, type Tool1DataPayload } from '@/lib/tool1-data-channel';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Tool1DetailPage() {
   const params = useParams();
@@ -21,10 +22,19 @@ export default function Tool1DetailPage() {
   const [pageData, setPageData] = useState<DetailPageDataTool1 | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dataLoadError, setDataLoadError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const channelRef = useRef<BroadcastChannel | null>(null);
   const requestingTabIdRef = useRef<string>(`detailTab-${Date.now()}-${Math.random().toString(36).substring(2,7)}`);
   const dataIdRef = useRef<string | null>(null);
+
+  const handleDownloadChart = () => {
+    toast({
+      title: "Funzionalità non implementata",
+      description: "Il download del grafico come immagine richiederebbe una libreria aggiuntiva (es. html2canvas).",
+      variant: "default",
+    });
+  };
 
   useEffect(() => {
     const dataIdFromParams = searchParams.get('dataId');
@@ -60,8 +70,6 @@ export default function Tool1DetailPage() {
             switch (sectionId) {
               case 'commonTop10':
                 let commonTop10AdditionalContent = '';
-
-                // My Site Table
                 commonTop10AdditionalContent += `<h5 class="mt-4 font-semibold text-foreground">Mio Sito - Keyword Comuni in Top 10:</h5>`;
                 const mySiteTop10KWsDetail = commonKWs
                   .filter(kw => kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10)
@@ -93,7 +101,6 @@ export default function Tool1DetailPage() {
                   commonTop10AdditionalContent += '<p class="text-sm text-muted-foreground mt-1 mb-3">Nessuna keyword comune in Top 10 per "Mio Sito".</p>';
                 }
 
-                // Competitor Tables
                 activeCompetitorNames.forEach(compName => {
                   commonTop10AdditionalContent += `<h5 class="mt-6 font-semibold text-foreground">${compName} - Keyword Comuni in Top 10:</h5>`;
                   const competitorKWsDetail = commonKWs
@@ -143,15 +150,53 @@ export default function Tool1DetailPage() {
                 };
                 break;
               case 'topOpportunities':
-                 const topOpportunities = comparisonResults.filter(r => r.status === 'competitorOnly' && typeof r.volume === 'number' && r.volume > 0)
+                 const top10Opportunities = comparisonResults
+                    .filter(r => r.status === 'competitorOnly' && typeof r.volume === 'number' && r.volume > 0)
                     .sort((a, b) => (b.volume as number) - (a.volume as number))
                     .slice(0, 10);
+                
+                let topOpportunitiesTable = `<h5 class="mt-4 font-semibold text-foreground">Top ${top10Opportunities.length} Opportunità (Keyword Gap):</h5>`;
+                if (top10Opportunities.length > 0) {
+                    topOpportunitiesTable += `
+                        <div class="overflow-x-auto rounded-md border mt-2 mb-4 shadow-sm">
+                          <table class="min-w-full divide-y divide-border">
+                            <thead class="bg-muted/50">
+                              <tr>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Keyword</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Volume</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Difficoltà</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Opportunity Score</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Competitor (Pos.)</th>
+                              </tr>
+                            </thead>
+                            <tbody class="bg-card divide-y divide-border">`;
+                    top10Opportunities.forEach(item => {
+                        const competitorsRanking = item.competitorInfo
+                            .filter(c => c.pos !== 'N/P' && activeCompetitorNames.includes(c.name))
+                            .map(c => `${c.name} (${c.pos})`)
+                            .join(', ');
+                        topOpportunitiesTable += `
+                              <tr>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-foreground">${item.keyword}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">${item.volume}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">${item.difficolta ?? 'N/A'}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">${item.opportunity ?? 'N/A'}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">${competitorsRanking || 'N/A'}</td>
+                              </tr>`;
+                    });
+                    topOpportunitiesTable += `
+                            </tbody>
+                          </table>
+                        </div>`;
+                } else {
+                  topOpportunitiesTable += '<p class="text-sm text-muted-foreground mt-1 mb-3">Nessuna opportunità significativa trovata (keyword solo per competitor con volume > 0).</p>';
+                }
+
                 dataForPage = {
                   pageTitle: "Top 10 Opportunità per Volume (Keyword Gap)",
                   description: "Le keyword con il più alto volume di ricerca per cui i competitor si posizionano, ma \"Il Mio Sito\" no.",
                   chartComponent: <TopOpportunitiesChart results={comparisonResults} />,
-                  additionalContent: `<h5 class="mt-4 font-semibold">Top ${topOpportunities.length} Opportunità per Volume:</h5>
-                                       <ul>${topOpportunities.map(item => `<li>${item.keyword} (Volume: ${item.volume})</li>`).join('') || '<li>Nessuna</li>'}</ul>`,
+                  additionalContent: topOpportunitiesTable,
                 };
                 break;
               case 'commonKeywordsSectionTool1':
@@ -211,7 +256,7 @@ export default function Tool1DetailPage() {
     channelRef.current.postMessage(requestMsg);
 
     const timeoutId = setTimeout(() => {
-      if (isLoading) { 
+      if (isLoading && !pageData) { 
         setDataLoadError("Timeout: Nessuna risposta dal tool principale. Assicurati che la scheda del Tool 1 sia aperta e attiva. Potrebbe essere necessario rieseguire l'analisi.");
         setPageData(null);
         setIsLoading(false);
@@ -222,7 +267,7 @@ export default function Tool1DetailPage() {
       channelRef.current?.close();
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [sectionId, searchParams, isLoading]); 
+  }, [sectionId, searchParams, isLoading, pageData]); // Added pageData to dependency array
 
   if (isLoading) {
     return <div className="flex justify-center items-center min-h-screen"><p>Caricamento dettagli in corso... Richiesta dati al tool principale.</p></div>;
@@ -264,8 +309,11 @@ export default function Tool1DetailPage() {
           </CardHeader>
           <CardContent className="pt-4">
             {extendedPageData.chartComponent && (
-              <div className="my-6 min-h-[350px] md:min-h-[450px] flex justify-center items-center">
+              <div className="my-6 min-h-[350px] md:min-h-[450px] flex flex-col justify-center items-center">
                 {extendedPageData.chartComponent}
+                <Button onClick={handleDownloadChart} variant="outline" size="sm" className="mt-4">
+                  <Download className="mr-2 h-4 w-4" /> Scarica Grafico (PNG)
+                </Button>
               </div>
             )}
             {extendedPageData.additionalContent && (
@@ -287,5 +335,4 @@ export default function Tool1DetailPage() {
     </div>
   );
 }
-
     

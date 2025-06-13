@@ -4,15 +4,29 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { InfoIcon, AlertCircle, BarChart3, SearchCode, ClipboardList, Presentation, BarChart2 } from 'lucide-react';
-import type { ComparisonResult, AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType } from '@/lib/types';
+import { InfoIcon, AlertCircle, BarChart3, SearchCode, ClipboardList, Presentation, BarChart2, ListChecks, TrendingUp } from 'lucide-react';
+import type { AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType } from '@/lib/types';
 
-interface Tool1Summary {
+interface Tool1Counts {
   common: number;
   mySiteOnly: number;
   competitorOnly: number;
   totalUnique: number;
 }
+
+interface Tool1KeywordSummary {
+  keyword: string;
+  position?: number | string | null;
+  volume?: number | string | null;
+}
+
+interface Tool1MasterReportData {
+    comparisonResultsCount: Tool1Counts;
+    mySiteTop5Common: Tool1KeywordSummary[];
+    competitorsTopCommon: Record<string, Tool1KeywordSummary[]>; // Key is competitor name
+    top5Opportunities: Tool1KeywordSummary[];
+}
+
 
 interface Tool3Summary {
   processedAdsCount: number;
@@ -30,27 +44,21 @@ interface Tool4SectionSummary {
 
 
 export function Tool5MasterReport() {
-  const [tool1DataSummary, setTool1DataSummary] = useState<Tool1Summary | string | null>(null);
+  const [tool1DataSummary, setTool1DataSummary] = useState<Tool1MasterReportData | string | null>(null);
   const [tool3DataSummary, setTool3DataSummary] = useState<Tool3Summary | string | null>(null);
   const [tool4DataSummary, setTool4DataSummary] = useState<Tool4SectionSummary[] | string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setIsLoading(true);
-    // --- Tool 1 Data ---
-    // Tool 1 data for master report is now read from 'tool1ResultsForMasterReport'
-    // which is set by Tool1Comparator after a successful analysis.
+    
     try {
       const tool1DataString = localStorage.getItem('tool1ResultsForMasterReport');
       if (tool1DataString) {
-        // Type assertion for the stored data structure
-        const tool1Data: { comparisonResults: ComparisonResult[]; activeCompetitorNames: string[] } = JSON.parse(tool1DataString);
-        if (tool1Data.comparisonResults && Array.isArray(tool1Data.comparisonResults)) {
-            const common = tool1Data.comparisonResults.filter(r => r.status === 'common').length;
-            const mySiteOnly = tool1Data.comparisonResults.filter(r => r.status === 'mySiteOnly').length;
-            const competitorOnly = tool1Data.comparisonResults.filter(r => r.status === 'competitorOnly').length;
-            const totalUnique = new Set(tool1Data.comparisonResults.map(r => r.keyword)).size;
-            setTool1DataSummary({ common, mySiteOnly, competitorOnly, totalUnique });
+        const tool1Data: Tool1MasterReportData = JSON.parse(tool1DataString);
+         // Basic validation
+        if (tool1Data.comparisonResultsCount && tool1Data.mySiteTop5Common && tool1Data.competitorsTopCommon && tool1Data.top5Opportunities) {
+            setTool1DataSummary(tool1Data);
         } else {
             setTool1DataSummary("Dati del Tool 1 (Comparatore Keyword) non validi o corrotti in localStorage.");
         }
@@ -62,7 +70,6 @@ export function Tool5MasterReport() {
       setTool1DataSummary("Errore nel caricare i dati del Tool 1.");
     }
 
-    // --- Tool 3 Data ---
     try {
       const tool3DataString = localStorage.getItem('tool3AngleAnalysisData');
       if (tool3DataString) {
@@ -101,7 +108,6 @@ export function Tool5MasterReport() {
       setTool3DataSummary("Errore nel caricare i dati del Tool 3.");
     }
 
-    // --- Tool 4 Data ---
     try {
         const tool4ConsolidatedDataString = localStorage.getItem('tool4ConsolidatedGscData');
         const reportTypes: GscReportType[] = ['queries', 'pages', 'countries', 'devices', 'searchAppearance'];
@@ -150,7 +156,6 @@ export function Tool5MasterReport() {
         </p>
       </header>
 
-      {/* Tool 1 Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center"><BarChart3 className="mr-2 h-6 w-6 text-sky-600" />Sintesi: Analizzatore Comparativo Keyword (Tool 1)</CardTitle>
@@ -163,19 +168,55 @@ export function Tool5MasterReport() {
               <AlertDescription>{tool1DataSummary}</AlertDescription>
             </Alert>
           ) : tool1DataSummary ? (
-            <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-              <li>Keyword Comuni: <span className="font-semibold text-foreground">{tool1DataSummary.common}</span></li>
-              <li>Punti di Forza (Solo Mio Sito): <span className="font-semibold text-foreground">{tool1DataSummary.mySiteOnly}</span></li>
-              <li>Opportunità (Solo Competitor): <span className="font-semibold text-foreground">{tool1DataSummary.competitorOnly}</span></li>
-              <li>Totale Keyword Uniche Analizzate: <span className="font-semibold text-foreground">{tool1DataSummary.totalUnique}</span></li>
-            </ul>
+            <div className="space-y-4">
+                <div>
+                    <h4 className="font-semibold text-lg text-foreground mb-1">Conteggio Keyword</h4>
+                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-sm">
+                      <li>Keyword Comuni: <span className="font-semibold text-foreground">{tool1DataSummary.comparisonResultsCount.common}</span></li>
+                      <li>Punti di Forza (Solo Mio Sito): <span className="font-semibold text-foreground">{tool1DataSummary.comparisonResultsCount.mySiteOnly}</span></li>
+                      <li>Opportunità (Solo Competitor): <span className="font-semibold text-foreground">{tool1DataSummary.comparisonResultsCount.competitorOnly}</span></li>
+                      <li>Totale Keyword Uniche Analizzate: <span className="font-semibold text-foreground">{tool1DataSummary.comparisonResultsCount.totalUnique}</span></li>
+                    </ul>
+                </div>
+                 <div>
+                    <h4 className="font-semibold text-lg text-foreground mb-1 mt-3 flex items-center"><ListChecks className="mr-2 h-5 w-5 text-green-600" />Top Keyword Comuni (Mio Sito - Top 5)</h4>
+                    {tool1DataSummary.mySiteTop5Common.length > 0 ? (
+                        <ul className="list-decimal pl-5 space-y-0.5 text-muted-foreground text-sm">
+                            {tool1DataSummary.mySiteTop5Common.map(kw => (
+                                <li key={`mysite-${kw.keyword}`}>{kw.keyword} (Pos: <span className="font-semibold text-foreground">{kw.position}</span>)</li>
+                            ))}
+                        </ul>
+                    ) : <p className="text-sm text-muted-foreground">Nessuna keyword comune in Top 10 per "Mio Sito".</p>}
+                </div>
+                {Object.entries(tool1DataSummary.competitorsTopCommon).map(([compName, kws]) => (
+                     <div key={compName}>
+                        <h4 className="font-semibold text-lg text-foreground mb-1 mt-3 flex items-center"><ListChecks className="mr-2 h-5 w-5 text-blue-600" />Top Keyword Comuni ({compName} - Top 5)</h4>
+                        {kws.length > 0 ? (
+                            <ul className="list-decimal pl-5 space-y-0.5 text-muted-foreground text-sm">
+                                {kws.map(kw => (
+                                     <li key={`${compName}-${kw.keyword}`}>{kw.keyword} (Pos: <span className="font-semibold text-foreground">{kw.position}</span>)</li>
+                                ))}
+                            </ul>
+                        ) : <p className="text-sm text-muted-foreground">Nessuna keyword comune in Top 10 per {compName}.</p>}
+                    </div>
+                ))}
+                 <div>
+                    <h4 className="font-semibold text-lg text-foreground mb-1 mt-3 flex items-center"><TrendingUp className="mr-2 h-5 w-5 text-orange-600" />Top Opportunità (Keyword Gap - Top 5)</h4>
+                    {tool1DataSummary.top5Opportunities.length > 0 ? (
+                        <ul className="list-decimal pl-5 space-y-0.5 text-muted-foreground text-sm">
+                            {tool1DataSummary.top5Opportunities.map(kw => (
+                                <li key={`opp-${kw.keyword}`}>{kw.keyword} (Volume: <span className="font-semibold text-foreground">{kw.volume}</span>)</li>
+                            ))}
+                        </ul>
+                    ) : <p className="text-sm text-muted-foreground">Nessuna opportunità significativa trovata.</p>}
+                </div>
+            </div>
           ) : (
              <p className="text-muted-foreground">Caricamento sintesi Tool 1...</p>
           )}
         </CardContent>
       </Card>
 
-      {/* Tool 2 Message */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center"><ClipboardList className="mr-2 h-6 w-6 text-sky-600" />Sintesi: Analizzatore Pertinenza & Priorità KW (Tool 2)</CardTitle>
@@ -192,7 +233,6 @@ export function Tool5MasterReport() {
         </CardContent>
       </Card>
 
-      {/* Tool 3 Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center"><SearchCode className="mr-2 h-6 w-6 text-sky-600" />Sintesi: FB Ads Library Scraper & Analisi Angle (Tool 3)</CardTitle>
@@ -226,7 +266,6 @@ export function Tool5MasterReport() {
         </CardContent>
       </Card>
 
-      {/* Tool 4 Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center"><BarChart2 className="mr-2 h-6 w-6 text-sky-600" />Sintesi: Analizzatore Dati GSC (Tool 4)</CardTitle>
@@ -259,3 +298,4 @@ export function Tool5MasterReport() {
     </div>
   );
 }
+

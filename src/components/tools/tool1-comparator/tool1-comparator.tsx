@@ -7,12 +7,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileUploadZone } from '@/components/shared/file-upload-zone';
 import { parseCSVTool1, exportTool1FullReportToXLSX } from '@/lib/csv';
 import type { CsvRowTool1, ComparisonResult, DetailPageSection } from '@/lib/types';
-// import { KeywordDistributionChart } from './chart-keyword-distribution'; // Grafico rimosso
 import { CommonKeywordsTop10Chart } from './chart-common-keywords-top10';
 import { TopOpportunitiesChart } from './chart-top-opportunities';
 import { ComparisonResultsTable } from './table-comparison-results';
 import { useToast } from '@/hooks/use-toast';
-import { BarChart3, Download, AlertCircle, FileText, LineChart, DownloadCloud } from 'lucide-react'; // PieChartIcon rimosso
+import { BarChart3, Download, AlertCircle, FileText, LineChart, DownloadCloud, ImageDown } from 'lucide-react'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { TOOL1_DATA_CHANNEL_NAME, type RequestTool1DataMessage, type ResponseTool1DataMessage, type Tool1DataPayload } from '@/lib/tool1-data-channel';
 
@@ -159,9 +158,51 @@ export function Tool1Comparator() {
       }
       setComparisonResults(results);
       
+      // Save data for Tool 5 (Master Report)
       if (results.length > 0) {
         try {
-          localStorage.setItem('tool1ResultsForMasterReport', JSON.stringify({comparisonResults: results, activeCompetitorNames: currentActiveCompetitors}));
+            const commonKWs = results.filter(r => r.status === 'common');
+            const mySiteTop5Common = commonKWs
+                .filter(kw => kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10)
+                .sort((a, b) => (a.mySiteInfo.pos as number) - (b.mySiteInfo.pos as number))
+                .slice(0, 5)
+                .map(kw => ({ keyword: kw.keyword, position: kw.mySiteInfo.pos }));
+
+            const competitorsTopCommon: Record<string, { keyword: string; position: number | string | null }[]> = {};
+            currentActiveCompetitors.slice(0, 2).forEach(compName => { // Max 2 competitors for summary
+                competitorsTopCommon[compName] = commonKWs
+                    .filter(kw => {
+                        const compInfo = kw.competitorInfo.find(c => c.name === compName);
+                        return compInfo && compInfo.pos !== 'N/P' && typeof compInfo.pos === 'number' && compInfo.pos <= 10;
+                    })
+                    .sort((a, b) => {
+                        const posA = a.competitorInfo.find(c => c.name === compName)?.pos as number;
+                        const posB = b.competitorInfo.find(c => c.name === compName)?.pos as number;
+                        return posA - posB;
+                    })
+                    .slice(0, 5)
+                    .map(kw => ({ keyword: kw.keyword, position: kw.competitorInfo.find(c => c.name === compName)?.pos || 'N/P' }));
+            });
+
+            const top5Opportunities = results
+                .filter(r => r.status === 'competitorOnly' && typeof r.volume === 'number' && r.volume > 0)
+                .sort((a, b) => (b.volume as number) - (a.volume as number))
+                .slice(0, 5)
+                .map(kw => ({ keyword: kw.keyword, volume: kw.volume }));
+            
+            const summaryForMasterReport = {
+                comparisonResultsCount: {
+                    common: commonKWs.length,
+                    mySiteOnly: results.filter(r => r.status === 'mySiteOnly').length,
+                    competitorOnly: results.filter(r => r.status === 'competitorOnly').length,
+                    totalUnique: allKeywordsArray.length
+                },
+                mySiteTop5Common,
+                competitorsTopCommon, // Contains top 5 for first 2 competitors
+                top5Opportunities
+            };
+
+            localStorage.setItem('tool1ResultsForMasterReport', JSON.stringify(summaryForMasterReport));
         } catch (e) {
           console.warn("Tool 1: Non è stato possibile salvare i risultati per il Master Report in localStorage (potrebbe essere troppo grande o API non disponibile).", e);
         }
@@ -239,6 +280,14 @@ export function Tool1Comparator() {
     }
   };
 
+  const handleDownloadChartPlaceholder = () => {
+    toast({
+      title: "Funzionalità non implementata",
+      description: "Il download del grafico come immagine richiederebbe una libreria aggiuntiva (es. html2canvas).",
+      variant: "default",
+    });
+  };
+
   const competitorUploadZones = Array.from({ length: 5 }, (_, i) => `Competitor ${i + 1}`);
 
   return (
@@ -300,8 +349,6 @@ export function Tool1Comparator() {
             </Button>
           </div>
           
-          {/* Sezione Grafico Distribuzione Rimossa */}
-          
           <Card>
             <CardHeader>
               <CardTitle className="text-xl font-semibold">Cos'è la "Keyword Opportunity"?</CardTitle>
@@ -316,12 +363,17 @@ export function Tool1Comparator() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xl font-semibold">Analisi Keyword Comuni: Posizionamento Top 10</CardTitle>
-               <Button variant="link" onClick={() => openDetailPage('commonTop10')} className="detail-button">
-                Visualizza Dettaglio <BarChart3 className="ml-2 h-4 w-4"/>
-              </Button>
+               <div className="flex items-center space-x-2">
+                 <Button variant="outline" size="sm" onClick={handleDownloadChartPlaceholder}>
+                    <ImageDown className="mr-2 h-4 w-4" /> Scarica Grafico
+                 </Button>
+                 <Button variant="link" onClick={() => openDetailPage('commonTop10')} className="detail-button">
+                  Visualizza Dettaglio <BarChart3 className="ml-2 h-4 w-4"/>
+                 </Button>
+               </div>
             </CardHeader>
             <CardContent>
-              <CardDescription className="mb-3">Confronto del numero di keyword comuni per cui "Il Mio Sito" e ciascun competitor si posizionano in Top 10.</CardDescription>
+              <CardDescription className="mb-3">Confronto del numero di keyword comuni per cui "Il Mio Sito" e ciascun competitor (mostrati individualmente) si posizionano in Top 10.</CardDescription>
               <CommonKeywordsTop10Chart results={comparisonResults} activeCompetitorNames={activeCompetitorNames} />
             </CardContent>
           </Card>
@@ -329,9 +381,14 @@ export function Tool1Comparator() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xl font-semibold">Top 10 Opportunità per Volume (Keyword Gap)</CardTitle>
-              <Button variant="link" onClick={() => openDetailPage('topOpportunities')} className="detail-button">
-                Visualizza Dettaglio <LineChart className="ml-2 h-4 w-4"/>
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" onClick={handleDownloadChartPlaceholder}>
+                    <ImageDown className="mr-2 h-4 w-4" /> Scarica Grafico
+                </Button>
+                <Button variant="link" onClick={() => openDetailPage('topOpportunities')} className="detail-button">
+                  Visualizza Dettaglio <LineChart className="ml-2 h-4 w-4"/>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <CardDescription className="mb-3">Le keyword con il più alto volume di ricerca per cui i competitor si posizionano, ma "Il Mio Sito" no.</CardDescription>
@@ -387,3 +444,4 @@ export function Tool1Comparator() {
     </div>
   );
 }
+
