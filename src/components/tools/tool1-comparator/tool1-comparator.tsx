@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -12,9 +12,9 @@ import { CommonKeywordsTop10Chart } from './chart-common-keywords-top10';
 import { TopOpportunitiesChart } from './chart-top-opportunities';
 import { ComparisonResultsTable } from './table-comparison-results';
 import { useToast } from '@/hooks/use-toast';
-import { BarChart3, Download, AlertCircle, Info, FileText, PieChartIcon, LineChart, DownloadCloud } from 'lucide-react';
+import { BarChart3, Download, AlertCircle, FileText, PieChartIcon, LineChart, DownloadCloud } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { storeTool1TempData } from '@/lib/temp-data-store';
+import { TOOL1_DATA_CHANNEL_NAME, type RequestTool1DataMessage, type ResponseTool1DataMessage, type Tool1DataPayload } from '@/lib/tool1-data-channel';
 
 
 const APP_CHUNK_SIZE_TOOL1 = 500;
@@ -30,6 +30,38 @@ export function Tool1Comparator() {
   
   const { toast } = useToast();
 
+  // Store data for detail pages in component's state
+  const [dataForDetailPages, setDataForDetailPages] = useState<Map<string, Tool1DataPayload>>(new Map());
+  const channelRef = useRef<BroadcastChannel | null>(null);
+
+  useEffect(() => {
+    // Initialize BroadcastChannel
+    channelRef.current = new BroadcastChannel(TOOL1_DATA_CHANNEL_NAME);
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'REQUEST_TOOL1_DATA') {
+        const { dataId, requestingTabId } = event.data as RequestTool1DataMessage;
+        const payload = dataForDetailPages.get(dataId) || null;
+        
+        const responseMsg: ResponseTool1DataMessage = {
+          type: 'RESPONSE_TOOL1_DATA',
+          dataId,
+          requestingTabId,
+          payload
+        };
+        channelRef.current?.postMessage(responseMsg);
+      }
+    };
+
+    channelRef.current.onmessage = handleMessage;
+
+    return () => {
+      channelRef.current?.close();
+      setDataForDetailPages(new Map()); // Clear data on unmount
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // dataForDetailPages should not be in dependency array to avoid re-creating channel too often
+
   const handleFileLoad = useCallback((siteKey: string, content: string, name: string) => {
     setSiteFiles(prev => ({ ...prev, [siteKey]: { content, name } }));
   }, []);
@@ -41,6 +73,7 @@ export function Tool1Comparator() {
     setError(null);
     setComparisonResults([]);
     setActiveCompetitorNames([]);
+    setDataForDetailPages(new Map()); // Clear previous detail data
 
     if (!siteFiles['Mio Sito']?.content) {
       setError("Carica il CSV per 'Il Mio Sito'.");
@@ -129,6 +162,18 @@ export function Tool1Comparator() {
         await new Promise(resolve => setTimeout(resolve, 10));
       }
       setComparisonResults(results);
+      
+      // Store combined results for potential use by Tool 5 (Master Report) via localStorage
+      if (results.length > 0) {
+        try {
+          localStorage.setItem('tool1ResultsForMasterReport', JSON.stringify({comparisonResults: results, activeCompetitorNames: currentActiveCompetitors}));
+        } catch (e) {
+          console.warn("Tool 1: Non è stato possibile salvare i risultati per il Master Report in localStorage (potrebbe essere troppo grande o API non disponibile).", e);
+        }
+      } else {
+         localStorage.removeItem('tool1ResultsForMasterReport');
+      }
+
       if (results.length === 0 && Object.values(siteFiles).some(f => f?.content && f.content.trim() !== '')) {
         toast({ title: "Nessun Risultato", description: "Nessuna keyword valida trovata o nessuna corrispondenza/differenza significativa. Controlla le intestazioni dei tuoi file CSV."});
       } else if (results.length > 0) {
@@ -160,12 +205,16 @@ export function Tool1Comparator() {
     }
     try {
       const dataId = `tool1-${section}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      storeTool1TempData(dataId, {
-        comparisonResults,
-        activeCompetitorNames
+      
+      // Store data in the component's map for the BroadcastChannel to access
+      setDataForDetailPages(prevMap => {
+        const newMap = new Map(prevMap);
+        newMap.set(dataId, { comparisonResults, activeCompetitorNames });
+        return newMap;
       });
+
       const url = `/tool1/${section}?dataId=${dataId}`;
-      window.open(url, '_blank'); // Apre in una nuova scheda
+      window.open(url, '_blank'); 
     } catch (e: any) {
         console.error("Errore imprevisto nell'apertura della pagina di dettaglio:", e);
         toast({
@@ -355,5 +404,3 @@ export function Tool1Comparator() {
     </div>
   );
 }
-
-    

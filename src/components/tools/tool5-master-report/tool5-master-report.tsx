@@ -38,9 +38,12 @@ export function Tool5MasterReport() {
   useEffect(() => {
     setIsLoading(true);
     // --- Tool 1 Data ---
+    // Tool 1 data for master report is now read from 'tool1ResultsForMasterReport'
+    // which is set by Tool1Comparator after a successful analysis.
     try {
-      const tool1DataString = localStorage.getItem('tool1DetailData');
+      const tool1DataString = localStorage.getItem('tool1ResultsForMasterReport');
       if (tool1DataString) {
+        // Type assertion for the stored data structure
         const tool1Data: { comparisonResults: ComparisonResult[]; activeCompetitorNames: string[] } = JSON.parse(tool1DataString);
         if (tool1Data.comparisonResults && Array.isArray(tool1Data.comparisonResults)) {
             const common = tool1Data.comparisonResults.filter(r => r.status === 'common').length;
@@ -49,7 +52,7 @@ export function Tool5MasterReport() {
             const totalUnique = new Set(tool1Data.comparisonResults.map(r => r.keyword)).size;
             setTool1DataSummary({ common, mySiteOnly, competitorOnly, totalUnique });
         } else {
-            setTool1DataSummary("Dati del Tool 1 (Comparatore Keyword) non validi o corrotti.");
+            setTool1DataSummary("Dati del Tool 1 (Comparatore Keyword) non validi o corrotti in localStorage.");
         }
       } else {
         setTool1DataSummary("Dati del Tool 1 (Comparatore Keyword) non trovati. Esegui prima l'analisi nel Tool 1.");
