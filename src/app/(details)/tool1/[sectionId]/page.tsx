@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AppHeader } from '@/components/layout/app-header';
-import type { ComparisonResult, DetailPageSection, DetailPageDataTool1, CsvRowTool1 } from '@/lib/types';
+import type { ComparisonResult, DetailPageSection, DetailPageDataTool1 } from '@/lib/types';
 import { KeywordDistributionChart } from '@/components/tools/tool1-comparator/chart-keyword-distribution';
 import { CommonKeywordsTop10Chart } from '@/components/tools/tool1-comparator/chart-common-keywords-top10';
 import { TopOpportunitiesChart } from '@/components/tools/tool1-comparator/chart-top-opportunities';
@@ -11,28 +12,33 @@ import { ComparisonResultsTable } from '@/components/tools/tool1-comparator/tabl
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getTool1TempData, clearTool1TempData } from '@/lib/temp-data-store';
 
 export default function Tool1DetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const sectionId = params.sectionId as DetailPageSection;
   const [pageData, setPageData] = useState<DetailPageDataTool1 | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    const storedDataString = localStorage.getItem('tool1DetailData');
-    if (storedDataString && sectionId) {
-      try {
-        const storedData: { comparisonResults: ComparisonResult[], activeCompetitorNames: string[] } = JSON.parse(storedDataString);
-        const { comparisonResults, activeCompetitorNames } = storedData;
+    setIsLoading(true);
+    setDataLoadError(null);
+    const dataId = searchParams.get('dataId');
 
+    if (dataId && sectionId) {
+      const tempData = getTool1TempData(dataId); // Don't clear immediately, allow back/forward to potentially reuse
+
+      if (tempData) {
+        const { comparisonResults, activeCompetitorNames } = tempData;
         let dataForPage: DetailPageDataTool1 | null = null;
 
         const commonKWs = comparisonResults.filter(r => r.status === 'common');
         const mySiteOnlyKWs = comparisonResults.filter(r => r.status === 'mySiteOnly');
         const competitorOnlyKWs = comparisonResults.filter(r => r.status === 'competitorOnly');
         
-        // Common logic for table headers based on type
         const getTableHeaders = (type: 'common' | 'mySiteOnly' | 'competitorOnly') => {
           if (type === 'common') return ['Keyword', 'Mio Sito Pos.', 'Mio Sito URL', ...activeCompetitorNames.flatMap(name => [`${name} Pos.`, `${name} URL`]), 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
           if (type === 'mySiteOnly') return ['Keyword', 'Mio Sito Pos.', 'Mio Sito URL', 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
@@ -66,7 +72,7 @@ export default function Tool1DetailPage() {
               additionalContent: `<h5>Mio Sito - Top ${Math.min(10, mySiteTop10KWs.length)} KW Comuni in Top 10:</h5>
                                   <ul>${mySiteTop10KWs.slice(0,10).map(item => `<li>${item.keyword} (Pos: ${item.mySiteInfo.pos})</li>`).join('') || '<li>Nessuna</li>'}</ul>
                                   <h5 class="mt-2">Competitors - Prime ${Math.min(10, competitorTop10UniqueKWs.size)} KW Comuni in Top 10 (da almeno un competitor):</h5>
-                                  <ul>${Array.from(competitorTop10UniqueKWs).slice(0,10).map(kw => `<li>${kw}</li>`).join('') || '<li>Nessuna</li>'}</ul>`,
+                                  <ul>${Array.from(competitorTop10UniqueKWs).slice(0,10).map(kw_ => `<li>${kw_}</li>`).join('') || '<li>Nessuna</li>'}</ul>`,
             };
             break;
           case 'topOpportunities':
@@ -113,20 +119,38 @@ export default function Tool1DetailPage() {
             break;
         }
         setPageData(dataForPage as DetailPageDataTool1);
-
-      } catch (error) {
-        console.error("Failed to parse data from localStorage or prepare page data:", error);
-        setPageData(null); // Or set an error state
+      } else {
+        // Data not found for this ID (e.g., page refresh or invalid ID)
+        setDataLoadError("I dati per questa sessione di dettaglio non sono più disponibili. Questo può accadere se hai ricaricato la pagina. Torna al tool principale e riesegui l'analisi per visualizzare nuovamente i dettagli.");
+        setPageData(null);
       }
+    } else {
+      // No dataId in URL, or no sectionId
+      setDataLoadError("Impossibile caricare i dettagli. ID dati o sezione mancante. Torna al tool principale e riprova.");
+      setPageData(null);
     }
     setIsLoading(false);
-  }, [sectionId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionId, searchParams]); // Removed params from dependencies as sectionId covers it
+
+  // Cleanup temporary data when the component unmounts
+  // This is a simple cleanup; more robust cleanup might be needed for SPAs
+  useEffect(() => {
+    return () => {
+      const dataId = searchParams.get('dataId');
+      if (dataId) {
+        // clearTool1TempData(dataId); // Consider if this is too aggressive vs. session-based cleanup
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
 
   if (isLoading) {
     return <div className="flex justify-center items-center min-h-screen"><p>Caricamento dettagli...</p></div>;
   }
 
-  if (!pageData) {
+  if (dataLoadError || !pageData) {
     return (
       <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
         <div className="container mx-auto max-w-5xl bg-card p-6 rounded-lg shadow-xl">
@@ -134,14 +158,13 @@ export default function Tool1DetailPage() {
           <Button onClick={() => router.back()} variant="outline" className="mb-4">
             <ArrowLeft className="mr-2 h-4 w-4" /> Torna Indietro
           </Button>
-          <h1 className="text-2xl font-bold mb-4">Dati non trovati</h1>
-          <p>Impossibile caricare i dettagli per questa sezione. Torna alla pagina principale e riprova.</p>
+          <h1 className="text-2xl font-bold mb-4">Dati non Trovati o Sessione Scaduta</h1>
+          <p className="text-destructive">{dataLoadError || "Impossibile caricare i dettagli per questa sezione. Torna al tool principale e riesegui l'analisi."}</p>
         </div>
       </div>
     );
   }
   
-  // Augmenting DetailPageDataTool1 to include chartComponent
   interface DetailPageDataTool1Extended extends DetailPageDataTool1 {
     chartComponent?: React.ReactNode;
   }

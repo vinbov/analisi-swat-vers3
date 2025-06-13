@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BarChart3, Download, AlertCircle, Info, FileText, PieChartIcon, LineChart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
+import { storeTool1TempData } from '@/lib/temp-data-store';
 
 
 const APP_CHUNK_SIZE_TOOL1 = 500;
@@ -178,30 +179,31 @@ export function Tool1Comparator() {
   };
   
   const openDetailPage = (section: DetailPageSection) => {
+    if (!comparisonResults || comparisonResults.length === 0) {
+        toast({
+            title: "Nessun Dato da Visualizzare",
+            description: "Esegui prima un'analisi per poter visualizzare i dettagli.",
+            variant: "default",
+        });
+        return;
+    }
     try {
-      localStorage.setItem('tool1DetailData', JSON.stringify({
+      const dataId = `tool1-${section}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      storeTool1TempData(dataId, {
         comparisonResults,
         activeCompetitorNames
-      }));
-      router.push(`/tool1/${section}`);
+      });
+      router.push(`/tool1/${section}?dataId=${dataId}`);
     } catch (e: any) {
-      if (e.name === 'QuotaExceededError' || (e.message && e.message.toLowerCase().includes('exceeded the quota'))) {
+        // Questo catch è per errori imprevisti durante la generazione dell'ID o il routing,
+        // non per errori di quota localStorage dato che non lo usiamo più qui.
+        console.error("Errore imprevisto nell'apertura della pagina di dettaglio:", e);
         toast({
-          title: "Dati Troppo Grandi per Dettaglio",
-          description: "I risultati dell'analisi sono troppo grandi per essere visualizzati nella pagina di dettaglio. Prova con un set di dati più piccolo o scarica il report CSV dalla pagina principale.",
-          variant: "destructive",
-          duration: 10000,
+            title: "Errore Imprevisto",
+            description: "Si è verificato un errore nell'aprire la pagina di dettaglio. Controlla la console.",
+            variant: "destructive",
         });
-        setError("I dati sono troppo grandi per la pagina di dettaglio. Si prega di scaricare il CSV o ridurre il numero di keyword analizzate.");
-      } else {
-        toast({
-          title: "Errore Imprevisto",
-          description: "Si è verificato un errore nell'aprire la pagina di dettaglio.",
-          variant: "destructive",
-        });
-        console.error("Error opening detail page:", e);
-        setError(`Errore imprevisto nell'apertura dei dettagli: ${e.message}`);
-      }
+         setError(`Errore imprevisto nell'apertura dei dettagli: ${e.message}`);
     }
   };
 
