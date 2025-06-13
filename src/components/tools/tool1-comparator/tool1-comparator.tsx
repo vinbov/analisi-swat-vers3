@@ -5,16 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileUploadZone } from '@/components/shared/file-upload-zone';
-import { parseCSVTool1, exportToCSV } from '@/lib/csv';
+import { parseCSVTool1, exportTool1FullReportToXLSX } from '@/lib/csv'; // Modified import
 import type { CsvRowTool1, ComparisonResult, DetailPageSection } from '@/lib/types';
 import { KeywordDistributionChart } from './chart-keyword-distribution';
 import { CommonKeywordsTop10Chart } from './chart-common-keywords-top10';
 import { TopOpportunitiesChart } from './chart-top-opportunities';
 import { ComparisonResultsTable } from './table-comparison-results';
 import { useToast } from '@/hooks/use-toast';
-import { BarChart3, Download, AlertCircle, Info, FileText, PieChartIcon, LineChart } from 'lucide-react';
+import { BarChart3, Download, AlertCircle, Info, FileText, PieChartIcon, LineChart, DownloadCloud } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useRouter } from 'next/navigation';
+// useRouter non serve più qui per la navigazione, window.open la gestirà
 import { storeTool1TempData } from '@/lib/temp-data-store';
 
 
@@ -30,7 +30,7 @@ export function Tool1Comparator() {
   const [error, setError] = useState<string | null>(null);
   
   const { toast } = useToast();
-  const router = useRouter();
+  // const router = useRouter(); // Non più necessario per openDetailPage
 
   const handleFileLoad = useCallback((siteKey: string, content: string, name: string) => {
     setSiteFiles(prev => ({ ...prev, [siteKey]: { content, name } }));
@@ -150,33 +150,6 @@ export function Tool1Comparator() {
       setIsLoading(false);
     }
   };
-
-  const handleDownloadCSV = () => {
-    if (comparisonResults.length === 0) {
-      toast({ title: "Nessun dato", description: "Nessun risultato da scaricare.", variant: "destructive" });
-      return;
-    }
-    const headers = ['Keyword', 'Status', 'Mio Sito Pos.', 'Mio Sito URL', ...activeCompetitorNames.flatMap(name => [`${name} Pos.`, `${name} URL`]), 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
-    const dataToExport = comparisonResults.map(item => {
-      const row: Record<string, any> = {
-        Keyword: item.keyword,
-        Status: item.status,
-        'Mio Sito Pos.': item.mySiteInfo.pos,
-        'Mio Sito URL': item.mySiteInfo.url,
-        Volume: item.volume,
-        Difficoltà: item.difficolta,
-        Opportunity: item.opportunity,
-        Intento: item.intento,
-      };
-      activeCompetitorNames.forEach(name => {
-        const compInfo = item.competitorInfo.find(c => c.name === name);
-        row[`${name} Pos.`] = compInfo ? compInfo.pos : 'N/P';
-        row[`${name} URL`] = compInfo ? compInfo.url : 'N/A';
-      });
-      return row;
-    });
-    exportToCSV("report_comparativo_keyword.csv", headers, dataToExport);
-  };
   
   const openDetailPage = (section: DetailPageSection) => {
     if (!comparisonResults || comparisonResults.length === 0) {
@@ -193,10 +166,9 @@ export function Tool1Comparator() {
         comparisonResults,
         activeCompetitorNames
       });
-      router.push(`/tool1/${section}?dataId=${dataId}`);
+      const url = `/tool1/${section}?dataId=${dataId}`;
+      window.open(url, '_blank'); // Apre in una nuova scheda
     } catch (e: any) {
-        // Questo catch è per errori imprevisti durante la generazione dell'ID o il routing,
-        // non per errori di quota localStorage dato che non lo usiamo più qui.
         console.error("Errore imprevisto nell'apertura della pagina di dettaglio:", e);
         toast({
             title: "Errore Imprevisto",
@@ -204,6 +176,25 @@ export function Tool1Comparator() {
             variant: "destructive",
         });
          setError(`Errore imprevisto nell'apertura dei dettagli: ${e.message}`);
+    }
+  };
+
+  const handleDownloadFullReport = () => {
+    if (comparisonResults.length === 0) {
+      toast({ title: "Nessun dato", description: "Nessun risultato da scaricare per il report completo.", variant: "destructive" });
+      return;
+    }
+    try {
+      exportTool1FullReportToXLSX("report_completo_tool1_analisi_seo.xlsx", comparisonResults, activeCompetitorNames);
+      toast({ title: "Download Avviato", description: "Il report completo del Tool 1 è in scaricamento." });
+    } catch (e: any) {
+      console.error("Errore durante la creazione del report Excel completo (Tool1):", e);
+      setError(`Errore creazione report Excel: ${e.message}`);
+      toast({
+        title: "Errore Export Excel",
+        description: e.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -231,7 +222,7 @@ export function Tool1Comparator() {
               key={key}
               siteKey={key}
               label={`Competitor ${index + 1}`}
-              optional={index > 0} // First competitor is not optional if we want to compare
+              optional={index > 0} 
               onFileLoad={(content, name) => handleFileLoad(key, content, name)}
             />
           ))}
@@ -261,10 +252,10 @@ export function Tool1Comparator() {
 
       {comparisonResults.length > 0 && !isLoading && (
         <section className="mt-12 space-y-8">
-          <div className="flex justify-between items-center">
-            <h3 className="text-2xl font-semibold" style={{ color: 'hsl(var(--sky-700))' }}>Report Comparativo SEO</h3>
-            <Button onClick={handleDownloadCSV} variant="outline">
-              Scarica Tutti i Risultati (CSV) <Download className="ml-2 h-4 w-4" />
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <h3 className="text-2xl font-semibold text-center md:text-left" style={{ color: 'hsl(var(--sky-700))' }}>Report Comparativo SEO</h3>
+            <Button onClick={handleDownloadFullReport} variant="outline" className="w-full md:w-auto">
+              Scarica Report Completo (Excel) <DownloadCloud className="ml-2 h-4 w-4" />
             </Button>
           </div>
           

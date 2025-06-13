@@ -1,6 +1,7 @@
 
-import type { CsvRowTool1, CsvRowTool2 } from './types';
+import type { CsvRowTool1, CsvRowTool2, ComparisonResult } from './types';
 import { EXPECTED_COLUMNS_TOOL1, EXPECTED_COLUMNS_TOOL2, COLUMN_ALIASES_TOOL1, COLUMN_ALIASES_TOOL2 } from './types';
+import * as XLSX from 'xlsx';
 
 
 // --- Funzioni di Utilità ---
@@ -255,4 +256,134 @@ export function exportToCSV(filename: string, headers: string[], data: Record<st
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
+}
+
+
+export function exportTool1FullReportToXLSX(
+  filename: string,
+  comparisonResults: ComparisonResult[],
+  activeCompetitorNames: string[]
+) {
+  const wb = XLSX.utils.book_new();
+
+  // --- Foglio 1: Panoramica Distribuzione ---
+  const commonKWsCount = comparisonResults.filter(r => r.status === 'common').length;
+  const mySiteOnlyKWsCount = comparisonResults.filter(r => r.status === 'mySiteOnly').length;
+  const competitorOnlyKWsCount = comparisonResults.filter(r => r.status === 'competitorOnly').length;
+  const totalUniqueKWs = new Set(comparisonResults.map(r => r.keyword)).size;
+
+  const overviewData = [
+    ["Categoria", "Numero Keyword"],
+    ["Keyword Comuni", commonKWsCount],
+    ["Punti di Forza (Solo Mio Sito)", mySiteOnlyKWsCount],
+    ["Opportunità (Solo Competitor)", competitorOnlyKWsCount],
+    ["Totale Keyword Uniche Analizzate", totalUniqueKWs],
+  ];
+  const wsOverview = XLSX.utils.aoa_to_sheet(overviewData);
+  XLSX.utils.book_append_sheet(wb, wsOverview, "Panoramica Distribuzione");
+
+  // --- Foglio 2: Riepilogo Top 10 Comuni ---
+  const commonKWs = comparisonResults.filter(r => r.status === 'common');
+  const mySiteTop10KWs = commonKWs.filter(kw => kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10)
+    .sort((a, b) => (a.mySiteInfo.pos as number) - (b.mySiteInfo.pos as number))
+    .slice(0, 10);
+  
+  const competitorTop10UniqueKWs = new Set<string>();
+  commonKWs.forEach(kw => {
+      kw.competitorInfo.forEach(comp => {
+          if (activeCompetitorNames.includes(comp.name) && comp.pos !== 'N/P' && typeof comp.pos === 'number' && comp.pos <= 10) {
+              competitorTop10UniqueKWs.add(kw.keyword);
+          }
+      });
+  });
+  const competitorTop10List = Array.from(competitorTop10UniqueKWs).slice(0,10);
+
+  const top10CommonSummaryData = [
+      ["Analisi Top 10 Keyword Comuni"],
+      ["Mio Sito - Top 10 KW Comuni in Top 10"],
+      ["Keyword", "Posizione"],
+      ...mySiteTop10KWs.map(item => [item.keyword, item.mySiteInfo.pos]),
+      mySiteTop10KWs.length === 0 ? ["Nessuna"] : [],
+      [], // Riga vuota
+      [`Competitors - Prime ${competitorTop10List.length} KW Comuni in Top 10 (da almeno un competitor)`],
+      ["Keyword"],
+      ...competitorTop10List.map(kw => [kw]),
+      competitorTop10List.length === 0 ? ["Nessuna"] : [],
+  ];
+  const wsTop10Common = XLSX.utils.aoa_to_sheet(top10CommonSummaryData.filter(row => row.length > 0));
+  XLSX.utils.book_append_sheet(wb, wsTop10Common, "Riepilogo Top10 Comuni");
+
+
+  // --- Foglio 3: Riepilogo Top 10 Opportunità ---
+  const topOpportunities = comparisonResults.filter(r => r.status === 'competitorOnly' && typeof r.volume === 'number' && r.volume > 0)
+    .sort((a, b) => (b.volume as number) - (a.volume as number))
+    .slice(0, 10);
+  
+  const topOpportunitiesSummaryData = [
+      [`Top ${topOpportunities.length} Opportunità per Volume (Keyword Gap)`],
+      ["Keyword", "Volume"],
+      ...topOpportunities.map(item => [item.keyword, item.volume]),
+      topOpportunities.length === 0 ? ["Nessuna"] : [],
+  ];
+  const wsTopOpportunities = XLSX.utils.aoa_to_sheet(topOpportunitiesSummaryData.filter(row => row.length > 0));
+  XLSX.utils.book_append_sheet(wb, wsTopOpportunities, "Riepilogo Top10 Opportunità");
+
+
+  // Funzione helper per convertire i dati delle tabelle
+  const mapResultsToSheetData = (results: ComparisonResult[], type: 'common' | 'mySiteOnly' | 'competitorOnly') => {
+    return results.map(item => {
+      const row: Record<string, any> = {
+        Keyword: item.keyword,
+        Volume: item.volume ?? 'N/A',
+        Difficoltà: item.difficolta ?? 'N/A',
+        Opportunity: item.opportunity ?? 'N/A',
+        Intento: item.intento ?? 'N/A',
+      };
+      if (type !== 'competitorOnly') {
+        row['Mio Sito Pos.'] = item.mySiteInfo.pos;
+        row['Mio Sito URL'] = item.mySiteInfo.url;
+      }
+      if (type !== 'mySiteOnly') {
+        activeCompetitorNames.forEach(compName => {
+          const compInfo = item.competitorInfo.find(c => c.name === compName);
+          row[`${compName} Pos.`] = compInfo ? compInfo.pos : 'N/P';
+          row[`${compName} URL`] = compInfo ? compInfo.url : 'N/A';
+        });
+      }
+      return row;
+    });
+  };
+  
+  // --- Foglio 4: Dettaglio Keyword Comuni ---
+  const commonDataDetailed = comparisonResults.filter(r => r.status === 'common');
+  if (commonDataDetailed.length > 0) {
+    const commonSheetData = mapResultsToSheetData(commonDataDetailed, 'common');
+    const wsCommonDetailed = XLSX.utils.json_to_sheet(commonSheetData);
+    XLSX.utils.book_append_sheet(wb, wsCommonDetailed, "Dettaglio Keyword Comuni");
+  } else {
+     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Nessuna Keyword Comune Trovata"]]), "Dettaglio Keyword Comuni");
+  }
+  
+  // --- Foglio 5: Dettaglio Punti di Forza ---
+  const mySiteOnlyDataDetailed = comparisonResults.filter(r => r.status === 'mySiteOnly');
+  if (mySiteOnlyDataDetailed.length > 0) {
+    const mySiteOnlySheetData = mapResultsToSheetData(mySiteOnlyDataDetailed, 'mySiteOnly');
+    const wsMySiteOnlyDetailed = XLSX.utils.json_to_sheet(mySiteOnlySheetData);
+    XLSX.utils.book_append_sheet(wb, wsMySiteOnlyDetailed, "Dettaglio Punti di Forza");
+  } else {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Nessun Punto di Forza Trovato"]]), "Dettaglio Punti di Forza");
+  }
+
+  // --- Foglio 6: Dettaglio Opportunità ---
+  const competitorOnlyDataDetailed = comparisonResults.filter(r => r.status === 'competitorOnly');
+   if (competitorOnlyDataDetailed.length > 0) {
+    const competitorOnlySheetData = mapResultsToSheetData(competitorOnlyDataDetailed, 'competitorOnly');
+    const wsCompetitorOnlyDetailed = XLSX.utils.json_to_sheet(competitorOnlySheetData);
+    XLSX.utils.book_append_sheet(wb, wsCompetitorOnlyDetailed, "Dettaglio Opportunità");
+  } else {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Nessuna Opportunità Trovata"]]), "Dettaglio Opportunità");
+  }
+
+  // Scrittura e download del file
+  XLSX.writeFile(wb, filename);
 }

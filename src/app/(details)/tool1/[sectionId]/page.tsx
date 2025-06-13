@@ -29,7 +29,7 @@ export default function Tool1DetailPage() {
     const dataId = searchParams.get('dataId');
 
     if (dataId && sectionId) {
-      const tempData = getTool1TempData(dataId); // Don't clear immediately, allow back/forward to potentially reuse
+      const tempData = getTool1TempData(dataId); 
 
       if (tempData) {
         const { comparisonResults, activeCompetitorNames } = tempData;
@@ -51,7 +51,12 @@ export default function Tool1DetailPage() {
               pageTitle: "Panoramica Distribuzione Keyword",
               description: "Questo grafico illustra come le keyword uniche analizzate si distribuiscono tra le categorie.",
               chartComponent: <KeywordDistributionChart results={comparisonResults} />,
-              additionalContent: `Totale Keyword Comuni: ${commonKWs.length}<br/>Totale Punti di Forza: ${mySiteOnlyKWs.length}<br/>Totale Opportunità: ${competitorOnlyKWs.length}`,
+              additionalContent: `<h5 class="mt-4 font-semibold">Conteggi Esatti:</h5>
+                                  <ul>
+                                    <li>Totale Keyword Comuni: ${commonKWs.length}</li>
+                                    <li>Totale Punti di Forza (Solo Mio Sito): ${mySiteOnlyKWs.length}</li>
+                                    <li>Totale Opportunità (Solo Competitor): ${competitorOnlyKWs.length}</li>
+                                  </ul>`,
             };
             break;
           case 'commonTop10':
@@ -69,9 +74,9 @@ export default function Tool1DetailPage() {
               pageTitle: "Analisi Keyword Comuni: Posizionamento Top 10",
               description: "Confronto del numero di keyword comuni per cui \"Il Mio Sito\" si posiziona in Top 10 rispetto ai competitor.",
               chartComponent: <CommonKeywordsTop10Chart results={comparisonResults} activeCompetitorNames={activeCompetitorNames} />,
-              additionalContent: `<h5>Mio Sito - Top ${Math.min(10, mySiteTop10KWs.length)} KW Comuni in Top 10:</h5>
+              additionalContent: `<h5 class="mt-4 font-semibold">Mio Sito - Top ${Math.min(10, mySiteTop10KWs.length)} KW Comuni in Top 10:</h5>
                                   <ul>${mySiteTop10KWs.slice(0,10).map(item => `<li>${item.keyword} (Pos: ${item.mySiteInfo.pos})</li>`).join('') || '<li>Nessuna</li>'}</ul>
-                                  <h5 class="mt-2">Competitors - Prime ${Math.min(10, competitorTop10UniqueKWs.size)} KW Comuni in Top 10 (da almeno un competitor):</h5>
+                                  <h5 class="mt-4 font-semibold">Competitors - Prime ${Math.min(10, competitorTop10UniqueKWs.size)} KW Comuni in Top 10 (da almeno un competitor):</h5>
                                   <ul>${Array.from(competitorTop10UniqueKWs).slice(0,10).map(kw_ => `<li>${kw_}</li>`).join('') || '<li>Nessuna</li>'}</ul>`,
             };
             break;
@@ -83,7 +88,7 @@ export default function Tool1DetailPage() {
               pageTitle: "Top 10 Opportunità per Volume (Keyword Gap)",
               description: "Le keyword con il più alto volume di ricerca per cui i competitor si posizionano, ma \"Il Mio Sito\" no.",
               chartComponent: <TopOpportunitiesChart results={comparisonResults} />,
-              additionalContent: `<h5>Top ${topOpportunities.length} Opportunità per Volume:</h5>
+              additionalContent: `<h5 class="mt-4 font-semibold">Top ${topOpportunities.length} Opportunità per Volume:</h5>
                                    <ul>${topOpportunities.map(item => `<li>${item.keyword} (Volume: ${item.volume})</li>`).join('') || '<li>Nessuna</li>'}</ul>`,
             };
             break;
@@ -120,26 +125,22 @@ export default function Tool1DetailPage() {
         }
         setPageData(dataForPage as DetailPageDataTool1);
       } else {
-        // Data not found for this ID (e.g., page refresh or invalid ID)
-        setDataLoadError("I dati per questa sessione di dettaglio non sono più disponibili. Questo può accadere se hai ricaricato la pagina. Torna al tool principale e riesegui l'analisi per visualizzare nuovamente i dettagli.");
+        setDataLoadError("I dati per questa sessione di dettaglio non sono più disponibili. Questo può accadere se hai ricaricato la pagina o chiuso la scheda del tool principale. Torna al tool principale e riesegui l'analisi per visualizzare nuovamente i dettagli.");
         setPageData(null);
       }
     } else {
-      // No dataId in URL, or no sectionId
       setDataLoadError("Impossibile caricare i dettagli. ID dati o sezione mancante. Torna al tool principale e riprova.");
       setPageData(null);
     }
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectionId, searchParams]); // Removed params from dependencies as sectionId covers it
+  }, [sectionId, searchParams]);
 
-  // Cleanup temporary data when the component unmounts
-  // This is a simple cleanup; more robust cleanup might be needed for SPAs
   useEffect(() => {
     return () => {
       const dataId = searchParams.get('dataId');
       if (dataId) {
-        // clearTool1TempData(dataId); // Consider if this is too aggressive vs. session-based cleanup
+        // clearTool1TempData(dataId); // Potremmo voler mantenere i dati più a lungo
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,12 +154,12 @@ export default function Tool1DetailPage() {
   if (dataLoadError || !pageData) {
     return (
       <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
-        <div className="container mx-auto max-w-5xl bg-card p-6 rounded-lg shadow-xl">
+        <div className="container mx-auto max-w-3xl bg-card p-6 rounded-lg shadow-xl text-center">
           <AppHeader />
-          <Button onClick={() => router.back()} variant="outline" className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Torna Indietro
+          <Button onClick={() => window.close()} variant="outline" className="mb-4 mt-6">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Chiudi Scheda
           </Button>
-          <h1 className="text-2xl font-bold mb-4">Dati non Trovati o Sessione Scaduta</h1>
+          <h1 className="text-2xl font-bold mb-4 mt-4">Dati non Trovati o Sessione Scaduta</h1>
           <p className="text-destructive">{dataLoadError || "Impossibile caricare i dettagli per questa sezione. Torna al tool principale e riesegui l'analisi."}</p>
         </div>
       </div>
@@ -173,25 +174,25 @@ export default function Tool1DetailPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
-      <div className="container mx-auto max-w-5xl bg-card p-6 rounded-lg shadow-xl">
+      <div className="container mx-auto max-w-6xl bg-card p-6 rounded-lg shadow-xl">
         <AppHeader />
-        <Button onClick={() => router.back()} variant="outline" className="mb-6">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Torna Indietro
+        <Button onClick={() => window.close()} variant="outline" className="mb-6">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Chiudi Scheda
         </Button>
         
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl">{extendedPageData.pageTitle}</CardTitle>
-            <CardDescription className="mt-1">{extendedPageData.description}</CardDescription>
+            <CardDescription className="mt-1 text-base">{extendedPageData.description}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {extendedPageData.chartComponent && (
-              <div className="my-6 h-[400px] md:h-[500px]">
+              <div className="my-6 min-h-[350px] md:min-h-[450px] flex justify-center items-center">
                 {extendedPageData.chartComponent}
               </div>
             )}
             {extendedPageData.additionalContent && (
-              <div className="mt-4 prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: extendedPageData.additionalContent }} />
+              <div className="mt-6 p-4 bg-muted/50 rounded-md prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: extendedPageData.additionalContent }} />
             )}
             {extendedPageData.tableData && extendedPageData.tableHeaders && extendedPageData.tableType && (
               <div className="mt-6">
