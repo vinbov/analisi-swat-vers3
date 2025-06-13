@@ -7,12 +7,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileUploadZone } from '@/components/shared/file-upload-zone';
 import { parseCSVTool1, exportTool1FullReportToXLSX } from '@/lib/csv';
 import type { CsvRowTool1, ComparisonResult, DetailPageSection } from '@/lib/types';
-import { KeywordDistributionChart } from './chart-keyword-distribution';
+// import { KeywordDistributionChart } from './chart-keyword-distribution'; // Grafico rimosso
 import { CommonKeywordsTop10Chart } from './chart-common-keywords-top10';
 import { TopOpportunitiesChart } from './chart-top-opportunities';
 import { ComparisonResultsTable } from './table-comparison-results';
 import { useToast } from '@/hooks/use-toast';
-import { BarChart3, Download, AlertCircle, FileText, PieChartIcon, LineChart, DownloadCloud } from 'lucide-react';
+import { BarChart3, Download, AlertCircle, FileText, LineChart, DownloadCloud } from 'lucide-react'; // PieChartIcon rimosso
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { TOOL1_DATA_CHANNEL_NAME, type RequestTool1DataMessage, type ResponseTool1DataMessage, type Tool1DataPayload } from '@/lib/tool1-data-channel';
 
@@ -55,9 +55,8 @@ export function Tool1Comparator() {
 
     return () => {
       channelRef.current?.close();
-      // setDataForDetailPages(new Map()); // This would clear data prematurely if effect re-runs
     };
-  }, [dataForDetailPages]); // Ensure this effect re-runs if dataForDetailPages changes
+  }, [dataForDetailPages]); 
 
   const handleFileLoad = useCallback((siteKey: string, content: string, name: string) => {
     setSiteFiles(prev => ({ ...prev, [siteKey]: { content, name } }));
@@ -301,18 +300,7 @@ export function Tool1Comparator() {
             </Button>
           </div>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xl font-semibold">Panoramica Distribuzione Keyword</CardTitle>
-              <Button variant="link" onClick={() => openDetailPage('distribution')} className="detail-button">
-                Visualizza Dettaglio <PieChartIcon className="ml-2 h-4 w-4"/>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <CardDescription className="mb-3">Questo grafico illustra come il totale delle keyword uniche analizzate (cioè ogni keyword contata una sola volta, indipendentemente da quanti siti la contengono) si suddivide percentualmente tra: quelle Comuni (condivise tra "Il Mio Sito" e almeno un competitor), i Punti di Forza (esclusive de "Il Mio Sito" rispetto ai competitor analizzati) e le Opportunità (keyword per cui i competitor si posizionano ma "Il Mio Sito" no).</CardDescription>
-              <KeywordDistributionChart results={comparisonResults} />
-            </CardContent>
-          </Card>
+          {/* Sezione Grafico Distribuzione Rimossa */}
           
           <Card>
             <CardHeader>
@@ -333,7 +321,7 @@ export function Tool1Comparator() {
               </Button>
             </CardHeader>
             <CardContent>
-              <CardDescription className="mb-3">Confronto del numero di keyword comuni per cui "Il Mio Sito" si posiziona in Top 10 rispetto ai competitor.</CardDescription>
+              <CardDescription className="mb-3">Confronto del numero di keyword comuni per cui "Il Mio Sito" e ciascun competitor si posizionano in Top 10.</CardDescription>
               <CommonKeywordsTop10Chart results={comparisonResults} activeCompetitorNames={activeCompetitorNames} />
             </CardContent>
           </Card>

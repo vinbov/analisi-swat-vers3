@@ -1,6 +1,7 @@
+
 "use client"
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import type { ComparisonResult } from '@/lib/types';
 
 interface CommonKeywordsTop10ChartProps {
@@ -8,41 +9,38 @@ interface CommonKeywordsTop10ChartProps {
   activeCompetitorNames: string[];
 }
 
+const CHART_COLORS = [
+  'hsl(var(--chart-1))', // Mio Sito
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(var(--sky-500))', // Un colore aggiuntivo se ci sono più di 4 competitor
+];
+
 export function CommonKeywordsTop10Chart({ results, activeCompetitorNames }: CommonKeywordsTop10ChartProps) {
   const commonKWs = results.filter(r => r.status === 'common');
   
-  let mySiteTop10Count = 0;
-  const competitorTop10KeywordSets: Record<string, Set<string>> = {};
-  activeCompetitorNames.forEach(name => competitorTop10KeywordSets[name] = new Set());
+  const data = [];
 
-  commonKWs.forEach(kw => {
-    if (kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10) {
-      mySiteTop10Count++;
-    }
-    kw.competitorInfo.forEach(comp => {
-      if (activeCompetitorNames.includes(comp.name) && comp.pos !== 'N/P' && typeof comp.pos === 'number' && comp.pos <= 10) {
-        competitorTop10KeywordSets[comp.name].add(kw.keyword);
-      }
-    });
+  // Mio Sito
+  const mySiteTop10Count = commonKWs.filter(kw => 
+    kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10
+  ).length;
+  data.push({ name: 'Mio Sito', count: mySiteTop10Count, fill: CHART_COLORS[0] });
+
+  // Competitors
+  activeCompetitorNames.forEach((compName, index) => {
+    const competitorTop10Count = commonKWs.filter(kw => {
+      const compInfo = kw.competitorInfo.find(c => c.name === compName);
+      return compInfo && compInfo.pos !== 'N/P' && typeof compInfo.pos === 'number' && compInfo.pos <= 10;
+    }).length;
+    data.push({ name: compName, count: competitorTop10Count, fill: CHART_COLORS[(index + 1) % CHART_COLORS.length] });
   });
 
-  let avgCompetitorTop10Count = 0;
-  if (activeCompetitorNames.length > 0) {
-    const totalCompetitorTop10UniqueKeywords = new Set<string>();
-    activeCompetitorNames.forEach(name => {
-        competitorTop10KeywordSets[name].forEach(kw => totalCompetitorTop10UniqueKeywords.add(kw));
-    });
-    avgCompetitorTop10Count = totalCompetitorTop10UniqueKeywords.size; // Show total unique keywords any competitor ranks for in top 10
-  }
 
-
-  const data = [
-    { name: 'Mio Sito', count: mySiteTop10Count, fill: 'hsl(var(--chart-3))' }, // green
-    { name: `Competitors (${activeCompetitorNames.length})`, count: avgCompetitorTop10Count, fill: 'hsl(var(--chart-4))' }, // red
-  ];
-
-  if (mySiteTop10Count === 0 && avgCompetitorTop10Count === 0) {
-     return <p className="text-muted-foreground text-center py-8">Nessuna keyword comune trovata in Top 10.</p>;
+  if (data.every(d => d.count === 0)) {
+     return <p className="text-muted-foreground text-center py-8">Nessuna keyword comune trovata in Top 10 per i siti analizzati.</p>;
   }
 
   return (
@@ -54,7 +52,11 @@ export function CommonKeywordsTop10Chart({ results, activeCompetitorNames }: Com
           <YAxis allowDecimals={false} />
           <Tooltip />
           <Legend />
-          <Bar dataKey="count" name="N. Keyword Comuni in Top 10" />
+          <Bar dataKey="count" name="N. Keyword Comuni in Top 10">
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.fill} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

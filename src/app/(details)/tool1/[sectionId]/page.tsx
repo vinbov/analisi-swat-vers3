@@ -5,7 +5,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AppHeader } from '@/components/layout/app-header';
 import type { ComparisonResult, DetailPageSection, DetailPageDataTool1 } from '@/lib/types';
-import { KeywordDistributionChart } from '@/components/tools/tool1-comparator/chart-keyword-distribution';
+// import { KeywordDistributionChart } from '@/components/tools/tool1-comparator/chart-keyword-distribution'; // Grafico rimosso
 import { CommonKeywordsTop10Chart } from '@/components/tools/tool1-comparator/chart-common-keywords-top10';
 import { TopOpportunitiesChart } from '@/components/tools/tool1-comparator/chart-top-opportunities';
 import { ComparisonResultsTable } from '@/components/tools/tool1-comparator/table-comparison-results';
@@ -59,38 +59,65 @@ export default function Tool1DetailPage() {
             };
 
             switch (sectionId) {
-              case 'distribution':
-                dataForPage = {
-                  pageTitle: "Panoramica Distribuzione Keyword",
-                  description: "Questo grafico illustra come le keyword uniche analizzate si distribuiscono tra le categorie.",
-                  chartComponent: <KeywordDistributionChart results={comparisonResults} />,
-                  additionalContent: `<h5 class="mt-4 font-semibold">Conteggi Esatti:</h5>
-                                      <ul>
-                                        <li>Totale Keyword Comuni: ${commonKWs.length}</li>
-                                        <li>Totale Punti di Forza (Solo Mio Sito): ${mySiteOnlyKWs.length}</li>
-                                        <li>Totale Opportunità (Solo Competitor): ${competitorOnlyKWs.length}</li>
-                                      </ul>`,
-                };
-                break;
+              // case 'distribution': // Sezione rimossa
+              //   dataForPage = {
+              //     pageTitle: "Panoramica Distribuzione Keyword",
+              //     description: "Questo grafico illustra come le keyword uniche analizzate si distribuiscono tra le categorie.",
+              //     chartComponent: <KeywordDistributionChart results={comparisonResults} />,
+              //     additionalContent: `<h5 class="mt-4 font-semibold">Conteggi Esatti:</h5>
+              //                         <ul>
+              //                           <li>Totale Keyword Comuni: ${commonKWs.length}</li>
+              //                           <li>Totale Punti di Forza (Solo Mio Sito): ${mySiteOnlyKWs.length}</li>
+              //                           <li>Totale Opportunità (Solo Competitor): ${competitorOnlyKWs.length}</li>
+              //                         </ul>`,
+              //   };
+              //   break;
               case 'commonTop10':
-                const mySiteTop10KWs = commonKWs.filter(kw => kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10)
-                                          .sort((a, b) => (a.mySiteInfo.pos as number) - (b.mySiteInfo.pos as number));
-                const competitorTop10UniqueKWs = new Set<string>();
-                commonKWs.forEach(kw => {
-                    kw.competitorInfo.forEach(comp => {
-                        if (activeCompetitorNames.includes(comp.name) && comp.pos !== 'N/P' && typeof comp.pos === 'number' && comp.pos <= 10) {
-                            competitorTop10UniqueKWs.add(kw.keyword);
-                        }
+                let commonTop10AdditionalContent = `<h5 class="mt-4 font-semibold">Mio Sito - Keyword Comuni in Top 10:</h5>`;
+                const mySiteTop10KWsDetail = commonKWs
+                  .filter(kw => kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10)
+                  .sort((a, b) => (a.mySiteInfo.pos as number) - (b.mySiteInfo.pos as number));
+                
+                if (mySiteTop10KWsDetail.length > 0) {
+                  commonTop10AdditionalContent += '<ul>';
+                  mySiteTop10KWsDetail.forEach(item => {
+                    commonTop10AdditionalContent += `<li>${item.keyword} (Pos: ${item.mySiteInfo.pos})</li>`;
+                  });
+                  commonTop10AdditionalContent += '</ul>';
+                } else {
+                  commonTop10AdditionalContent += '<p>Nessuna keyword comune in Top 10 per "Mio Sito".</p>';
+                }
+
+                activeCompetitorNames.forEach(compName => {
+                  commonTop10AdditionalContent += `<h5 class="mt-4 font-semibold">${compName} - Keyword Comuni in Top 10:</h5>`;
+                  const competitorKWsDetail = commonKWs
+                    .filter(kw => {
+                      const compInfo = kw.competitorInfo.find(c => c.name === compName);
+                      return compInfo && compInfo.pos !== 'N/P' && typeof compInfo.pos === 'number' && compInfo.pos <= 10;
+                    })
+                    .sort((a, b) => {
+                       const posA = a.competitorInfo.find(c => c.name === compName)?.pos as number;
+                       const posB = b.competitorInfo.find(c => c.name === compName)?.pos as number;
+                       return posA - posB;
                     });
+
+                  if (competitorKWsDetail.length > 0) {
+                    commonTop10AdditionalContent += '<ul>';
+                    competitorKWsDetail.forEach(item => {
+                      const compInfo = item.competitorInfo.find(c => c.name === compName);
+                      commonTop10AdditionalContent += `<li>${item.keyword} (Pos: ${compInfo?.pos})</li>`;
+                    });
+                    commonTop10AdditionalContent += '</ul>';
+                  } else {
+                    commonTop10AdditionalContent += `<p>Nessuna keyword comune in Top 10 per ${compName}.</p>`;
+                  }
                 });
+
                 dataForPage = {
                   pageTitle: "Analisi Keyword Comuni: Posizionamento Top 10",
-                  description: "Confronto del numero di keyword comuni per cui \"Il Mio Sito\" si posiziona in Top 10 rispetto ai competitor.",
+                  description: "Confronto del numero di keyword comuni per cui \"Il Mio Sito\" e ciascun competitor si posizionano in Top 10, con dettaglio delle keyword.",
                   chartComponent: <CommonKeywordsTop10Chart results={comparisonResults} activeCompetitorNames={activeCompetitorNames} />,
-                  additionalContent: `<h5 class="mt-4 font-semibold">Mio Sito - Top ${Math.min(10, mySiteTop10KWs.length)} KW Comuni in Top 10:</h5>
-                                      <ul>${mySiteTop10KWs.slice(0,10).map(item => `<li>${item.keyword} (Pos: ${item.mySiteInfo.pos})</li>`).join('') || '<li>Nessuna</li>'}</ul>
-                                      <h5 class="mt-4 font-semibold">Competitors - Prime ${Math.min(10, competitorTop10UniqueKWs.size)} KW Comuni in Top 10 (da almeno un competitor):</h5>
-                                      <ul>${Array.from(competitorTop10UniqueKWs).slice(0,10).map(kw_ => `<li>${kw_}</li>`).join('') || '<li>Nessuna</li>'}</ul>`,
+                  additionalContent: commonTop10AdditionalContent,
                 };
                 break;
               case 'topOpportunities':
@@ -135,6 +162,10 @@ export default function Tool1DetailPage() {
                   activeCompetitorNames: activeCompetitorNames,
                 };
                 break;
+              default: // Caso di fallback se sectionId non corrisponde
+                setDataLoadError(`La sezione di dettaglio '${sectionId}' non è riconosciuta o è stata rimossa. Torna al tool principale.`);
+                setIsLoading(false);
+                return;
             }
             setPageData(dataForPage as DetailPageDataTool1);
             setDataLoadError(null);
@@ -143,7 +174,7 @@ export default function Tool1DetailPage() {
             setPageData(null);
           }
           setIsLoading(false);
-          if (timeoutId) clearTimeout(timeoutId); // Clear timeout if data received
+          if (timeoutId) clearTimeout(timeoutId); 
         }
       }
     };
@@ -157,21 +188,19 @@ export default function Tool1DetailPage() {
     };
     channelRef.current.postMessage(requestMsg);
 
-    // Timeout for data request
     const timeoutId = setTimeout(() => {
-      if (isLoading) { // Check if still loading (i.e., no response yet)
+      if (isLoading) { 
         setDataLoadError("Timeout: Nessuna risposta dal tool principale. Assicurati che la scheda del Tool 1 sia aperta e attiva. Potrebbe essere necessario rieseguire l'analisi.");
         setPageData(null);
         setIsLoading(false);
       }
-    }, 7000); // 7 seconds timeout
+    }, 7000); 
 
     return () => {
       channelRef.current?.close();
       if (timeoutId) clearTimeout(timeoutId);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectionId, searchParams]); // Removed isLoading from dependencies
+  }, [sectionId, searchParams, isLoading]); // isLoading è ancora qui per il timeout, rimosso da altre parti
 
   if (isLoading) {
     return <div className="flex justify-center items-center min-h-screen"><p>Caricamento dettagli in corso... Richiesta dati al tool principale.</p></div>;
