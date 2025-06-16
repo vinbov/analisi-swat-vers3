@@ -55,18 +55,19 @@ export function Tool4GSCAnalyzer({
         if (arrayBufferContent && arrayBufferContent.byteLength > 0) {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
+            // Clear previous results when a new file is loaded by notifying HomePage
             setParsedGscData(null); 
             setAnalyzedGscData(null); 
             setGscFiltersDisplay("");
         } else {
             setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
-            setGscExcelFile(null);
+            setGscExcelFile(null); // Notify HomePage to clear the file
             toast({ title: "Errore File", description: "Contenuto file non valido o file vuoto.", variant: "destructive" });
         }
     }, [setGscExcelFile, setParsedGscData, setAnalyzedGscData, setGscFiltersDisplay, toast]);
 
     const handleResetFile = () => {
-        setGscExcelFile(null);
+        setGscExcelFile(null); // Notify HomePage to clear the file
         setParsedGscData(null);
         setAnalyzedGscData(null);
         setError(null);
@@ -120,7 +121,6 @@ export function Tool4GSCAnalyzer({
         }
 
         const headerMap: Record<string, keyof GscSheetRow | 'item'> = {
-            // Item identifiers
             "top queries": "item", "top query": "item", "query": "item", "principali query": "item", "query di ricerca": "item",
             "top pages": "item", "pagina": "item", "pagine principali": "item", "principali pagine": "item",
             "country": "item", "paese": "item", "paesi": "item",
@@ -128,85 +128,94 @@ export function Tool4GSCAnalyzer({
             "search appearance": "item", "aspetto nella ricerca": "item", "search appearances": "item", "tipi di risultati multimediali": "item", "aspetto della ricerca": "item",
             "date": "item", "data": "item",
         
-            // Current Period Metrics - Generic English and Italian
             "clicks": "clicks_current", "clic": "clicks_current", 
             "impressions": "impressions_current", "impressioni": "impressions_current",
             "ctr": "ctr_current",
             "position": "position_current", "posizione": "position_current",
         
-            // Current Period Metrics - Specific Italian from GSC UI (e.g., "Clic Attuali")
-            "clic attuali": "clicks_current",
+            "clic attuali": "clicks_current", "clics attuali": "clicks_current", // Added 'clics'
             "impressioni attuali": "impressions_current",
             "ctr attuale": "ctr_current",
             "posizione attuale": "position_current", "pos. attuale": "position_current",
         
-            // Previous Period Metrics - Specific Italian from GSC UI (e.g., "Clic Prec.")
-            "clic prec.": "clicks_previous", "clic precedenti": "clicks_previous",
+            "clic prec.": "clicks_previous", "clic precedenti": "clicks_previous", "clics prec.": "clicks_previous", // Added 'clics'
             "impressioni prec.": "impressions_previous", "impressioni precedenti": "impressions_previous",
             "ctr prec.": "ctr_previous", "ctr precedente": "ctr_previous",
             "posizione prec.": "position_previous", "posizione precedente": "position_previous", "pos. prec.": "position_previous",
         
-            // GSC Export comparison headers with date ranges (English and Italian)
-            "last 3 months clicks": "clicks_current", "clic ultimi 3 mesi": "clicks_current", "clic (ultimi 3 mesi)": "clicks_current",
-            "clicks last 28 days": "clicks_current", "clic ultimi 28 giorni": "clicks_current",
-            "previous 3 months clicks": "clicks_previous", "clic 3 mesi precedenti": "clicks_previous", "clic (3 mesi precedenti)": "clicks_previous",
-            "clicks previous 28 days": "clicks_previous", "clic 28 giorni precedenti": "clicks_previous",
-        
-            "last 3 months impressions": "impressions_current", "impressioni ultimi 3 mesi": "impressions_current", "impressioni (ultimi 3 mesi)": "impressions_current",
-            "impressions last 28 days": "impressions_current", "impressioni ultimi 28 giorni": "impressions_current",
-            "previous 3 months impressions": "impressions_previous", "impressioni 3 mesi precedenti": "impressions_previous", "impressioni (3 mesi precedenti)": "impressions_previous",
-            "impressions previous 28 days": "impressions_previous", "impressioni 28 giorni precedenti": "impressions_previous",
-        
-            "last 3 months ctr": "ctr_current", "ctr ultimi 3 mesi": "ctr_current", "ctr (ultimi 3 mesi)": "ctr_current",
-            "ctr last 28 days": "ctr_current", "ctr ultimi 28 giorni": "ctr_current",
-            "previous 3 months ctr": "ctr_previous", "ctr 3 mesi precedenti": "ctr_previous", "ctr (3 mesi precedenti)": "ctr_previous",
-            "ctr previous 28 days": "ctr_previous", "ctr 28 giorni precedenti": "ctr_previous",
-        
-            "last 3 months position": "position_current", "posizione ultimi 3 mesi": "position_current", "posizione (ultimi 3 mesi)": "position_current",
-            "position last 28 days": "position_current", "posizione ultimi 28 giorni": "position_current",
-            "previous 3 months position": "position_previous", "posizione 3 mesi precedenti": "position_previous", "posizione (3 mesi precedenti)": "position_previous",
-            "position previous 28 days": "position_previous", "posizione 28 giorni precedenti": "position_previous",
-        
-            // Filters sheet specific
+            "clicks last 28 days": "clicks_current", "clicks previous 28 days": "clicks_previous",
+            "impressions last 28 days": "impressions_current", "impressions previous 28 days": "impressions_previous",
+            "ctr last 28 days": "ctr_current", "ctr previous 28 days": "ctr_previous",
+            "position last 28 days": "position_current", "position previous 28 days": "position_previous",
+
+            "clic (ultimi 28 giorni)": "clicks_current", "clic (28 giorni precedenti)": "clicks_previous",
+            "impressioni (ultimi 28 giorni)": "impressions_current", "impressioni (28 giorni precedenti)": "impressions_previous",
+            "ctr (ultimi 28 giorni)": "ctr_current", "ctr (28 giorni precedenti)": "ctr_previous",
+            "posizione (ultimi 28 giorni)": "position_current", "posizione (28 giorni precedenti)": "position_previous",
+            
             "filter": "filterName", "filtro": "filterName",
             "value": "filterValue", "valore": "filterValue"
         };
 
         const headers = headersRaw.map((h, idx) => {
             const trimmedHeader = String(h || '').trim().toLowerCase();
-            if (idx === 0 && reportType !== 'filters') return 'item'; 
+            if (idx === 0 && reportType !== 'filters' && !headerMap[trimmedHeader]) return 'item';
             return headerMap[trimmedHeader] || trimmedHeader.replace(/\s+/g, '_').replace(/[^\w_]/gi, '') || `column_${idx}`;
         });
 
         const parsedRows: GscSheetRow[] = dataRows.map(row => {
             const entry: GscSheetRow = {};
-            headers.forEach((header, index) => {
+            headers.forEach((headerKey, index) => {
                 let value = row[index];
-                const key = header as keyof GscSheetRow;
+                const key = headerKey as keyof GscSheetRow;
 
                 if (key === 'clicks_current' || key === 'clicks_previous' || key === 'impressions_current' || key === 'impressions_previous') {
-                    value = (value === undefined || value === null || String(value).trim() === "" || String(value).trim() === "-") ? 0 : parseInt(String(value).replace(/[^\d]/g, '')) || 0;
+                    let strVal = String(value ?? '').trim();
+                    if (strVal === "" || strVal === "-") {
+                        value = 0;
+                    } else {
+                        const cleanedDigits = strVal.replace(/[^\d]/g, '');
+                        if (cleanedDigits === "") {
+                            value = 0;
+                        } else {
+                            value = parseInt(cleanedDigits, 10);
+                            if (isNaN(value)) value = 0; // Ensure it's 0 if parsing results in NaN
+                        }
+                    }
                 } else if (key === 'ctr_current' || key === 'ctr_previous') {
-                    if (typeof value === 'string') value = parseFloat(value.replace('%', '').replace(',', '.')) / 100;
-                    else if (typeof value === 'number') value = (value > 1 && value <= 100) ? value / 100 : value; // Handles CTR already as percentage
-                    else value = 0;
+                    if (typeof value === 'string') {
+                        value = parseFloat(value.replace('%', '').replace(',', '.')) / 100;
+                    } else if (typeof value === 'number') {
+                        value = (value > 1 && value <= 100) ? value / 100 : value;
+                    } else {
+                        value = 0;
+                    }
                     value = isNaN(value) ? 0 : value;
                 } else if (key === 'position_current' || key === 'position_previous') {
-                    value = (value === undefined || value === null || String(value).trim() === "" || String(value).trim() === "-") ? null : parseFloat(String(value).replace(',', '.')) || null;
+                    let strPosVal = String(value ?? '').trim();
+                     if (strPosVal === "" || strPosVal === "-") {
+                        value = null;
+                    } else {
+                        value = parseFloat(strPosVal.replace(',', '.')) || null;
+                        if (isNaN(value as number)) value = null;
+                    }
                 } else if (key === 'item' || key === 'filterName' || key === 'filterValue') {
                     value = String(value || '').trim();
                 }
                 entry[key] = value;
             });
-            if (!entry.item && reportType !== 'filters' && row[0] !== undefined && row[0] !== null) {
+
+            if (reportType !== 'filters' && !entry.item && row[0] !== undefined && row[0] !== null) {
                 entry.item = String(row[0]).trim();
             }
-            if (reportType === 'filters' && !entry.filterName && row[0]) entry.filterName = String(row[0]).trim();
-            if (reportType === 'filters' && !entry.filterValue && row[1]) entry.filterValue = String(row[1]).trim();
+            if (reportType === 'filters') {
+                if (!entry.filterName && row[0] !== undefined && row[0] !== null) entry.filterName = String(row[0]).trim();
+                if (!entry.filterValue && row[1] !== undefined && row[1] !== null) entry.filterValue = String(row[1]).trim();
+            }
             
             return entry;
-        }).filter(entry => (reportType === 'filters' ? entry.filterName : entry.item) ); 
-
+        }).filter(entry => (reportType === 'filters' ? (entry.filterName && entry.filterName !== "") : (entry.item && entry.item !== "" && entry.item !== "Sommario")) ); // Added "Sommario" filter
+        
         return parsedRows;
     };
 
@@ -252,7 +261,9 @@ export function Tool4GSCAnalyzer({
         });
 
         let summaryText = `Clic totali (periodo corrente): ${totalCurrentClicks.toLocaleString()}. Impressioni totali: ${totalCurrentImpressions.toLocaleString()}.`;
-        if(totalPreviousClicks > 0 || totalPreviousImpressions > 0 || processedItems.some(p => p.clicks_previous > 0 || p.impressions_previous > 0) ) { // Check if there's any previous data
+        const hasPreviousData = processedItems.some(p => p.clicks_previous > 0 || p.impressions_previous > 0 || p.ctr_previous > 0 || p.position_previous !== null);
+
+        if(hasPreviousData) {
             const overallClickDiff = totalCurrentClicks - totalPreviousClicks;
             const overallImpressionDiff = totalCurrentImpressions - totalPreviousImpressions;
             summaryText += ` Variazione clic vs periodo precedente: ${overallClickDiff >= 0 ? '+' : ''}${overallClickDiff.toLocaleString()}.`;
@@ -262,7 +273,7 @@ export function Tool4GSCAnalyzer({
         const topNForChart = 5;
         
         const topItemsByClicks = [...processedItems]
-                                  .filter(it => it.item && it.clicks_current > 0)
+                                  .filter(it => it.item && it.item !== "N/D" && it.clicks_current > 0)
                                   .sort((a, b) => (b.clicks_current || 0) - (a.clicks_current || 0))
                                   .slice(0, topNForChart);
         
@@ -330,7 +341,7 @@ export function Tool4GSCAnalyzer({
                     filtersTextCollector += '<p>Nessun filtro specifico rilevato o foglio "Filters" vuoto.</p>';
                 }
             } else {
-                filtersTextCollector += '<p>Foglio "Filters" non trovato.</p>';
+                filtersTextCollector += '<p>Foglio "Filters" (o varianti nome) non trovato.</p>';
             }
             setGscFiltersDisplay(filtersTextCollector);
 
@@ -350,11 +361,12 @@ export function Tool4GSCAnalyzer({
                         setLoadingMessage(`Analisi dati: ${reportType}...`);
                         newAnalyzedCollector[reportType] = analyzeGSCData(sheetData, reportType);
                     } else {
+                         console.warn(`[Tool4 ProcessGSCData] No data parsed from sheet '${sheetName}' for report type '${reportType}'.`);
                         newAnalyzedCollector[reportType] = undefined;
                     }
                 } else {
-                    console.warn(`[Tool4 ProcessGSCData] Sheet for ${reportType} not found. Expected names:`, GSC_SHEET_MAPPING[reportType]);
-                    newParsedCollector[reportType] = []; 
+                    console.warn(`[Tool4 ProcessGSCData] Sheet for ${reportType} not found. Expected names:`, GSC_SHEET_MAPPING[reportType].join(', '));
+                    newParsedCollector[reportType] = [];
                     newAnalyzedCollector[reportType] = undefined;
                 }
                  currentProgress += progressIncrement;
@@ -365,7 +377,13 @@ export function Tool4GSCAnalyzer({
             setParsedGscData(newParsedCollector);
             setAnalyzedGscData(newAnalyzedCollector);
             
-            toast({ title: "Analisi Completata", description: "Dati GSC processati." });
+            const dataFound = Object.values(newAnalyzedCollector).some(analysis => analysis !== undefined && analysis.detailedDataWithDiffs.length > 0);
+            if (dataFound) {
+                 toast({ title: "Analisi Completata", description: "Dati GSC processati." });
+            } else {
+                 toast({ title: "Analisi Completata", description: "Nessun dato metrico trovato nei fogli attesi (Query, Pagine, ecc.). Controlla i nomi dei fogli e il contenuto del file Excel/ODS.", variant: "default", duration: 7000});
+                 setError("Nessun dato metrico trovato nei fogli GSC attesi. Verifica che il file Excel/ODS contenga i fogli corretti (es. 'Query', 'Pagine', ecc. con i dati).");
+            }
 
         } catch (e: any) {
             console.error("[Tool4 ProcessGSCData DEBUG] CRITICAL ERROR during GSC processing:", e);
@@ -420,7 +438,7 @@ export function Tool4GSCAnalyzer({
     };
 
     const openDetailPage = (reportType: GscReportType) => {
-        if (!analyzedGscData) {
+        if (!analyzedGscData) { 
              toast({ title: "Dati non disponibili", description: "Esegui prima l'analisi.", variant: "destructive" });
             return;
         }
@@ -432,10 +450,10 @@ export function Tool4GSCAnalyzer({
         localStorage.setItem('tool4DetailData', JSON.stringify({
             reportType,
             itemDisplayName: getReportItemDisplayName(reportType),
-            analyzedData: analysis,
+            analyzedData: analysis, 
             chartType: reportType === 'devices' ? 'pie' : 'bar', 
             pageTitle: `Dettaglio GSC: ${getReportItemDisplayName(reportType)}`,
-            description: analysis.summaryText,
+            description: analysis.summaryText, 
         }));
         const url = `/tool4/${reportType}`;
         window.open(url, '_blank'); 
@@ -457,7 +475,7 @@ export function Tool4GSCAnalyzer({
                 </CardHeader>
                 <CardContent>
                     <FileUploadZone
-                        siteKey="gscExcelFileInputTool4" 
+                        siteKey="gscExcelFileInputTool4"
                         label="File GSC (formati .xlsx, .xls, .ods)"
                         onFileLoad={handleFileLoad}
                         acceptedFileTypes={acceptedExcelTypes}
@@ -516,14 +534,18 @@ export function Tool4GSCAnalyzer({
                         const chartTypeToUse = reportType === 'devices' ? 'pie' : 'bar';
                         
                         const hasValidAnalysis = analysis && analysis.detailedDataWithDiffs && analysis.detailedDataWithDiffs.length > 0;
-                        const chartDataForRender = hasValidAnalysis ? analysis.topItemsByClicksChartData : { labels: [], datasets: [{ label: `Clic (Corrente) - ${itemDisplayName}`, data: [], backgroundColor: [] }] };
-                        const pieDataForRender = hasValidAnalysis ? analysis.pieChartData : [];
+                        
+                        const chartDataForRender = (hasValidAnalysis && analysis.topItemsByClicksChartData) 
+                            ? analysis.topItemsByClicksChartData 
+                            : { labels: [], datasets: [{ label: `Clic (Corrente) - ${itemDisplayName}`, data: [], backgroundColor: [] }] };
+                        
+                        const pieDataForRender = (hasValidAnalysis && analysis.pieChartData) ? analysis.pieChartData : [];
 
                         const hasBarChartData = chartTypeToUse === 'bar' && hasValidAnalysis && chartDataForRender.labels.length > 0 && chartDataForRender.datasets[0]?.data.length > 0;
                         const hasPieChartData = chartTypeToUse === 'pie' && hasValidAnalysis && pieDataForRender && pieDataForRender.length > 0;
                         const shouldRenderChart = chartTypeToUse === 'bar' ? hasBarChartData : hasPieChartData;
 
-                        if (!hasValidAnalysis && !isLoading) { 
+                        if (!hasValidAnalysis && !isLoading) {
                              return (
                                 <Card key={reportType}>
                                     <CardHeader>
@@ -536,7 +558,7 @@ export function Tool4GSCAnalyzer({
                             );
                         }
                         
-                        return (
+                        return hasValidAnalysis ? (
                             <Card key={reportType} id={`${reportType}-analysis-section`}>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                     <CardTitle className="text-xl font-semibold">Analisi {itemDisplayName}</CardTitle>
@@ -570,7 +592,7 @@ export function Tool4GSCAnalyzer({
                                     </div>
                                 </CardContent>
                             </Card>
-                        );
+                        ) : null;
                     })}
                 </div>
             )}
