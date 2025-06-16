@@ -1,16 +1,19 @@
 
 import { genkit } from 'genkit';
-// import {openai} from '@genkit-ai/openai'; // Import and enable OpenAI
-
-import {googleAI} from '@genkit-ai/googleai'; // Using GoogleAI as a fallback due to OpenAI plugin install issues
+import { googleAI } from '@genkit-ai/googleai';
 
 export const ai = genkit({
   plugins: [
-    // openai(), // Temporarily disabled due to installation issues for @genkit-ai/openai
-    googleAI() // Using GoogleAI plugin as a fallback. Ensure GOOGLE_API_KEY is in .env
+    googleAI(),
   ],
-  // model: 'gemini-pro', // You can set a default GoogleAI model here if you wish
-  // Se in futuro si volessero usare sia GoogleAI che OpenAI per flow diversi,
-  // sarà necessario specificare il modello desiderato in ogni flow/prompt.
+  // È FONDAMENTALE che la variabile d'ambiente GOOGLE_API_KEY (o GEMINI_API_KEY) sia impostata
+  // (es. nel file .env o nell'ambiente server) affinché il plugin googleAI() funzioni.
 });
 
+// Nota per l'utente:
+// Per far funzionare il plugin Google AI, assicurati di:
+// 1. Aver aggiunto "@genkit-ai/googleai" alle dipendenze nel tuo package.json (GIÀ PRESENTE).
+// 2. Eseguire 'npm install' (o il comando del tuo package manager) - questo dovrebbe avvenire automaticamente.
+// 3. Impostare la tua GOOGLE_API_KEY (o GEMINI_API_KEY) nel file .env o come variabile d'ambiente del server.
+//    Esempio: GOOGLE_API_KEY=AIzaSy...
+//    o GEMINI_API_KEY=AIzaSy...

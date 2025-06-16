@@ -1,8 +1,9 @@
+
 "use client";
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress'; // Not directly used, but could be for Apify polling
+import { Progress } from '@/components/ui/progress'; 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { ScrapedAd, AdWithAngleAnalysis, ApifyRawAdItem } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -21,7 +22,7 @@ export function Tool3Scraper() {
   const [apifyActorId, setApifyActorId] = useState('curious_coder~facebook-ads-library-scraper');
   const [fbAdsUrl, setFbAdsUrl] = useState('');
   const [maxAdsToProcess, setMaxAdsToProcess] = useState(10);
-  const [openAIApiKey, setOpenAIApiKey] = useState(''); // For angle analysis
+  const [googleApiKey, setGoogleApiKey] = useState(''); // Changed from openAIApiKey
 
   const [isLoadingScraping, setIsLoadingScraping] = useState(false);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
@@ -34,21 +35,6 @@ export function Tool3Scraper() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
-
-  // Effect to get OpenAI API key from Tool 2's input field if available
-  useEffect(() => {
-    // This logic might be problematic if Tool 2's input isn't always mounted or accessible
-    // For now, we keep it but prioritize the local input if filled
-    try {
-      const tool2ApiKeyInput = document.getElementById('apiKeyTool2') as HTMLInputElement;
-      if (tool2ApiKeyInput && tool2ApiKeyInput.value && !openAIApiKey) { // only set if local is empty
-        setOpenAIApiKey(tool2ApiKeyInput.value);
-      }
-    } catch (e) {
-      // It's fine if it doesn't exist, just means we rely on local input
-    }
-  }, [openAIApiKey]);
-
 
   const runScraping = async () => {
     if (!apifyToken) { setError("Inserisci il tuo Apify API Token."); return; }
@@ -64,7 +50,7 @@ export function Tool3Scraper() {
 
     const apifyInputPayload = {
       urls: [{ url: fbAdsUrl }],
-      count: 100, // Actor fetches up to 100, we'll limit processing locally
+      count: 100, 
       "scrapePageAds.activeStatus": "all",
       period: ""
     };
@@ -134,7 +120,7 @@ export function Tool3Scraper() {
       }
       
       setScrapedAds(processedAds);
-      setAdsWithAnalysis(processedAds.map(ad => ({...ad}))); // Initialize with scraped ads
+      setAdsWithAnalysis(processedAds.map(ad => ({...ad}))); 
       setLoadingMessage("Scraping completato!");
       setApifyStatus("Stato: Completato.");
       toast({ title: "Scraping Completato", description: `${processedAds.length} annunci recuperati.` });
@@ -154,26 +140,16 @@ export function Tool3Scraper() {
       setError("Nessun annuncio disponibile per l'analisi. Esegui prima lo scraping.");
       return;
     }
-    // Prioritize local input, then check Tool 2's input as fallback
-    let currentOpenAIApiKey = openAIApiKey.trim();
-    if (!currentOpenAIApiKey) {
-        try {
-            const tool2ApiKeyInput = document.getElementById('apiKeyTool2') as HTMLInputElement;
-            if (tool2ApiKeyInput && tool2ApiKeyInput.value) {
-                currentOpenAIApiKey = tool2ApiKeyInput.value.trim();
-            }
-        } catch(e) { /* ignore if not found */ }
-    }
-
-    if (!currentOpenAIApiKey) {
-      setError("Inserisci la tua OpenAI API Key (nel Tool 2 o qui) per l'analisi dell'angle.");
-      toast({ title: "API Key Mancante", description: "Inserisci la OpenAI API Key per l'analisi.", variant: "destructive" });
+    
+    const currentGoogleApiKey = googleApiKey.trim(); // Changed from openAIApiKey
+    if (!currentGoogleApiKey) {
+      setError("Inserisci la tua Google API Key per l'analisi dell'angle con Gemini.");
+      toast({ title: "Google API Key Mancante", description: "Inserisci la Google API Key per l'analisi con Gemini.", variant: "destructive" });
       return;
     }
-    if (!openAIApiKey) setOpenAIApiKey(currentOpenAIApiKey); 
 
     setIsLoadingAnalysis(true);
-    setLoadingMessage("Analisi angle in corso con OpenAI...");
+    setLoadingMessage("Analisi angle in corso con Google AI (Gemini)...");
     setError(null);
 
     const analysisPromises = scrapedAds.map(async (ad) => {
@@ -181,11 +157,11 @@ export function Tool3Scraper() {
         const analysisResult = await analyzeAdAngleAction({
           adText: ad.testo,
           adTitle: ad.titolo,
-        }, currentOpenAIApiKey); 
+        }, currentGoogleApiKey); 
         return { ...ad, angleAnalysis: analysisResult };
       } catch (e: any) {
         console.error(`Errore analisi angle per ad "${ad.titolo}":`, e);
-        return { ...ad, analysisError: e.message || "Errore sconosciuto durante analisi AI" };
+        return { ...ad, analysisError: e.message || "Errore sconosciuto durante analisi AI con Google AI" };
       }
     });
 
@@ -193,10 +169,10 @@ export function Tool3Scraper() {
       const results = await Promise.all(analysisPromises);
       setAdsWithAnalysis(results);
       setLoadingMessage("Analisi angle completata!");
-      toast({ title: "Analisi Angle Completata", description: "L'analisi 7C degli annunci è terminata." });
+      toast({ title: "Analisi Angle Completata", description: "L'analisi 7C degli annunci (Google AI) è terminata." });
     } catch (e: any) {
-      setError(`Errore durante l'analisi degli angle: ${e.message}`);
-      toast({ title: "Errore Analisi Angle", description: e.message, variant: "destructive" });
+      setError(`Errore durante l'analisi degli angle (Google AI): ${e.message}`);
+      toast({ title: "Errore Analisi Angle (Google AI)", description: e.message, variant: "destructive" });
     } finally {
       setIsLoadingAnalysis(false);
     }
@@ -246,11 +222,11 @@ export function Tool3Scraper() {
     <div className="space-y-8">
       <header className="text-center">
         <h2 className="text-3xl font-bold" style={{ color: 'hsl(var(--sky-600))' }}>Facebook Ads Library Scraper (via Apify)</h2>
-        <p className="text-muted-foreground mt-2">Estrai dati dalla Facebook Ads Library e analizza gli angle di marketing.</p>
+        <p className="text-muted-foreground mt-2">Estrai dati dalla Facebook Ads Library e analizza gli angle di marketing con Google AI (Gemini).</p>
       </header>
 
       <Card>
-        <CardHeader><CardTitle>Configurazione Scraping</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Configurazione Scraping & Analisi</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div>
             <label htmlFor="apifyTokenTool3" className="block text-sm font-medium text-foreground mb-1">Apify API Token</label>
@@ -269,15 +245,15 @@ export function Tool3Scraper() {
             <Input type="number" id="maxAdsToProcessTool3" value={maxAdsToProcess} onChange={(e) => setMaxAdsToProcess(Math.min(100, Math.max(1, parseInt(e.target.value))))} min="1" max="100" />
           </div>
            <div>
-            <label htmlFor="openAIApiKeyTool3" className="block text-sm font-medium text-foreground mb-1">OpenAI API Key (per Analisi Angle)</label>
+            <label htmlFor="googleApiKeyTool3" className="block text-sm font-medium text-foreground mb-1">Google API Key (per Genkit/Gemini)</label>
             <Input 
               type="password" 
-              id="openAIApiKeyTool3" 
-              value={openAIApiKey} 
-              onChange={(e) => setOpenAIApiKey(e.target.value)}
-              placeholder="Recuperata dal Tool 2 o inserisci qui" 
+              id="googleApiKeyTool3" 
+              value={googleApiKey} 
+              onChange={(e) => setGoogleApiKey(e.target.value)} // Changed state variable
+              placeholder="La tua chiave API Google (es. AIza...)" 
             />
-            <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C. Se già inserita nel Tool 2 (ora rimosso), inseriscila qui.</p>
+            <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C con i modelli Google AI (Gemini).</p>
           </div>
         </CardContent>
       </Card>
@@ -316,7 +292,7 @@ export function Tool3Scraper() {
             <div className="text-center mt-8">
               <Button onClick={runAngleAnalysis} disabled={isLoadingAnalysis} className="action-button bg-purple-600 hover:bg-purple-700 text-white text-lg">
                 {isLoadingAnalysis ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Bot className="mr-2 h-5 w-5" />}
-                {isLoadingAnalysis ? "Analisi Angle..." : "Analizza Angle Inserzioni (7C)"}
+                {isLoadingAnalysis ? "Analisi Angle (Google AI)..." : "Analizza Angle Inserzioni (7C con Google AI)"}
               </Button>
             </div>
           </CardContent>
@@ -327,14 +303,14 @@ export function Tool3Scraper() {
         <Card className="mt-6">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-xl">Risultati Analisi Angle (Metodo 7C)</CardTitle>
+              <CardTitle className="text-xl">Risultati Analisi Angle (Metodo 7C con Google AI)</CardTitle>
             </div>
             <Button variant="link" onClick={openAngleAnalysisDetailPage} className="detail-button">
                 Visualizza Report Dettagliato <FileText className="ml-2 h-4 w-4"/>
             </Button>
           </CardHeader>
           <CardContent>
-             <TableAngleAnalysis adsWithAnalysis={adsWithAnalysis.slice(0,5)} /> {/* Preview of first 5 */}
+             <TableAngleAnalysis adsWithAnalysis={adsWithAnalysis.slice(0,5)} /> 
              {adsWithAnalysis.length > 5 && <p className="text-sm text-muted-foreground text-center mt-2">Mostrati i primi 5 risultati. Clicca su "Visualizza Report Dettagliato" per vederli tutti.</p>}
           </CardContent>
         </Card>
