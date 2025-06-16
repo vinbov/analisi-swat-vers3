@@ -141,14 +141,21 @@ export default function Tool1DetailPage() {
       setIsLoading(false);
       return;
     }
-
-    channelRef.current = new BroadcastChannel(TOOL1_DATA_CHANNEL_NAME);
+    
+    // Ensure channel is created only once or correctly re-initialized
+    if (!channelRef.current || channelRef.current.name !== TOOL1_DATA_CHANNEL_NAME) {
+      if (channelRef.current) {
+        channelRef.current.close(); // Close if already exists but is wrong one (e.g. HMR)
+      }
+      channelRef.current = new BroadcastChannel(TOOL1_DATA_CHANNEL_NAME);
+    }
     
     const handleMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'RESPONSE_TOOL1_DATA') {
         const { dataId: responseDataId, requestingTabId: responseTabId, payload } = event.data as ResponseTool1DataMessage;
         
         if (responseDataId === dataIdRef.current && responseTabId === requestingTabIdRef.current) {
+          setIsLoading(false); // Stop loading indicator once response (even if null payload) is received for this tab
           if (payload) {
             const { comparisonResults: allResults, activeCompetitorNames: currentActiveCompNames } = payload;
             let dataForPage: DetailPageDataTool1 | null = null;
@@ -243,7 +250,7 @@ export default function Tool1DetailPage() {
                   description: "Confronto del numero di keyword comuni per cui \"Il Mio Sito\" e ciascun competitor si posizionano in Top 10, con dettaglio tabellare delle keyword.",
                   chartComponent: <CommonKeywordsTop10Chart results={allResults} activeCompetitorNames={currentActiveCompNames} />,
                   additionalContent: commonTop10AdditionalContent,
-                  comparisonResults: allResults, // Pass full results for CSV export
+                  comparisonResults: allResults, 
                   activeCompetitorNames: currentActiveCompNames,
                 };
                 break;
@@ -295,7 +302,7 @@ export default function Tool1DetailPage() {
                   description: "Le keyword con il più alto volume di ricerca per cui i competitor si posizionano, ma \"Il Mio Sito\" no.",
                   chartComponent: <TopOpportunitiesChart results={allResults} />,
                   additionalContent: topOpportunitiesTable,
-                  comparisonResults: allResults, // Pass full results for CSV export
+                  comparisonResults: allResults, 
                   activeCompetitorNames: currentActiveCompNames,
                 };
                 break;
@@ -334,7 +341,7 @@ export default function Tool1DetailPage() {
                 break;
               default: 
                 setDataLoadError(`La sezione di dettaglio '${sectionId}' non è riconosciuta o è stata rimossa. Torna al tool principale.`);
-                setIsLoading(false);
+                setPageData(null);
                 return;
             }
             setPageData(dataForPage as DetailPageDataTool1);
@@ -343,20 +350,21 @@ export default function Tool1DetailPage() {
             setDataLoadError("I dati per questa sessione di dettaglio non sono più disponibili. Questo può accadere se la scheda del tool principale è stata chiusa o l'analisi è stata aggiornata. Torna al tool principale e riesegui l'analisi se necessario.");
             setPageData(null);
           }
-          setIsLoading(false);
-          if (timeoutId) clearTimeout(timeoutId); 
         }
       }
     };
     
-    channelRef.current.onmessage = handleMessage;
+    // Attach the handler to the current channel instance
+    if (channelRef.current) {
+        channelRef.current.onmessage = handleMessage;
+    }
 
     const requestMsg: RequestTool1DataMessage = {
       type: 'REQUEST_TOOL1_DATA',
       dataId: dataIdFromParams,
       requestingTabId: requestingTabIdRef.current,
     };
-    channelRef.current.postMessage(requestMsg);
+    channelRef.current?.postMessage(requestMsg);
 
     const timeoutId = setTimeout(() => {
       if (isLoading && !pageData) { 
@@ -367,10 +375,14 @@ export default function Tool1DetailPage() {
     }, 7000); 
 
     return () => {
-      channelRef.current?.close();
+      // Cleanup: remove the message handler specific to this effect instance
+      if (channelRef.current) {
+          channelRef.current.onmessage = null; 
+      }
+      // The channel itself might be closed by a higher-level cleanup effect if the tab is closed.
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [sectionId, searchParams, isLoading, pageData]);
+  }, [sectionId, searchParams]); // Simplified dependencies
 
   if (isLoading) {
     return <div className="flex justify-center items-center min-h-screen"><p>Caricamento dettagli in corso... Richiesta dati al tool principale.</p></div>;

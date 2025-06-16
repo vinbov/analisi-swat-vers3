@@ -30,15 +30,25 @@ export function Tool1Comparator() {
   const { toast } = useToast();
 
   const [dataForDetailPages, setDataForDetailPages] = useState<Map<string, Tool1DataPayload>>(new Map());
+  const dataForDetailPagesRef = useRef(dataForDetailPages); // Ref to hold the latest map
   const channelRef = useRef<BroadcastChannel | null>(null);
 
+  // Keep the ref updated whenever dataForDetailPages state changes
   useEffect(() => {
-    channelRef.current = new BroadcastChannel(TOOL1_DATA_CHANNEL_NAME);
+    dataForDetailPagesRef.current = dataForDetailPages;
+  }, [dataForDetailPages]);
+
+  useEffect(() => {
+    // Initialize BroadcastChannel only once
+    if (!channelRef.current) {
+        channelRef.current = new BroadcastChannel(TOOL1_DATA_CHANNEL_NAME);
+    }
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'REQUEST_TOOL1_DATA') {
+      if (event.data && event.data.type === 'REQUEST_TOOL1_DATA' && channelRef.current) {
         const { dataId, requestingTabId } = event.data as RequestTool1DataMessage;
-        const payload = dataForDetailPages.get(dataId) || null;
+        // Use the ref to get the latest data
+        const payload = dataForDetailPagesRef.current.get(dataId) || null;
         
         const responseMsg: ResponseTool1DataMessage = {
           type: 'RESPONSE_TOOL1_DATA',
@@ -46,16 +56,37 @@ export function Tool1Comparator() {
           requestingTabId,
           payload
         };
-        channelRef.current?.postMessage(responseMsg);
+        channelRef.current.postMessage(responseMsg);
       }
     };
 
     channelRef.current.onmessage = handleMessage;
 
     return () => {
-      channelRef.current?.close();
+      // Detach the message handler, but don't close the channel here
+      // if it's intended to be persistent for the component's lifetime.
+      // However, standard practice is to close it.
+      // For this app, multiple Tool1 tabs are not expected to be primary, so closing is fine.
+      if (channelRef.current) {
+        channelRef.current.onmessage = null; 
+        // Closing the channel on every unmount might be too aggressive if HMR or quick navigations occur.
+        // For a more robust solution in complex scenarios, channel management might need a global context or service.
+        // But for this case, let's ensure it's closed when the component truly unmounts.
+        // A single channel instance should be managed.
+      }
     };
-  }, [dataForDetailPages]); 
+  }, []); // Empty dependency array: setup listener once. Relies on ref for current data.
+
+  // Effect to close the channel when the component unmounts definitively
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        channelRef.current.close();
+        channelRef.current = null;
+      }
+    };
+  }, []);
+
 
   const handleFileLoad = useCallback((siteKey: string, content: string, name: string) => {
     if (content && name) {
@@ -80,8 +111,8 @@ export function Tool1Comparator() {
     setError(null);
     setComparisonResults([]);
     setActiveCompetitorNames([]);
-    setDataForDetailPages(new Map()); 
-    localStorage.removeItem('tool1MioSitoCoreKeywords'); // Clear previous core keywords
+    setDataForDetailPages(new Map()); // Reset map, ref will be updated by its useEffect
+    localStorage.removeItem('tool1MioSitoCoreKeywords'); 
 
     if (!siteFiles['Mio Sito']?.content) {
       setError("Carica il CSV per 'Il Mio Sito'.");
@@ -115,17 +146,14 @@ export function Tool1Comparator() {
 
       const mySiteName = 'Mio Sito';
 
-      // --- Save Core Keywords for Tool 2 ---
       const mySiteKeywordsData = parsedSiteData[mySiteName];
       if (mySiteKeywordsData && mySiteKeywordsData.length > 0) {
         let coreKeywords = new Set<string>();
-
         mySiteKeywordsData
           .filter(kw => typeof kw.posizione === 'number' && kw.posizione <= 10 && kw.keyword)
           .sort((a, b) => (a.posizione as number) - (b.posizione as number))
           .slice(0, 5)
           .forEach(kw => coreKeywords.add(kw.keyword));
-
         if (coreKeywords.size < 10) {
           mySiteKeywordsData
             .filter(kw => typeof kw.volume === 'number' && kw.volume > 0 && kw.keyword && !coreKeywords.has(kw.keyword))
@@ -133,21 +161,17 @@ export function Tool1Comparator() {
             .slice(0, 10 - coreKeywords.size)
             .forEach(kw => coreKeywords.add(kw.keyword));
         }
-        
         if (coreKeywords.size < 5 && coreKeywords.size < mySiteKeywordsData.length) {
            mySiteKeywordsData
               .filter(kw => kw.keyword && !coreKeywords.has(kw.keyword))
               .slice(0, Math.min(5, 10 - coreKeywords.size))
               .forEach(kw => coreKeywords.add(kw.keyword));
         }
-
         const coreKeywordsArray = Array.from(coreKeywords);
         if (coreKeywordsArray.length > 0) {
           localStorage.setItem('tool1MioSitoCoreKeywords', JSON.stringify(coreKeywordsArray));
         }
       }
-      // --- End Save Core Keywords for Tool 2 ---
-
 
       const siteKeywordMaps: Record<string, Map<string, CsvRowTool1>> = {};
       for (const siteName in parsedSiteData) {
@@ -248,7 +272,6 @@ export function Tool1Comparator() {
                 competitorsTopCommon, 
                 top5Opportunities
             };
-
             localStorage.setItem('tool1ResultsForMasterReport', JSON.stringify(summaryForMasterReport));
         } catch (e) {
           console.warn("Tool 1: Non è stato possibile salvare i risultati per il Master Report in localStorage (potrebbe essere troppo grande o API non disponibile).", e);
@@ -262,7 +285,6 @@ export function Tool1Comparator() {
       } else if (results.length > 0) {
         toast({ title: "Analisi Completata", description: `${results.length} keyword analizzate.` });
       }
-
 
     } catch (e: any) {
       console.error("Errore durante l'analisi (Tool1):", e);
@@ -289,6 +311,7 @@ export function Tool1Comparator() {
     try {
       const dataId = `tool1-${section}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       
+      // Update state (which will update dataForDetailPagesRef.current via its useEffect)
       setDataForDetailPages(prevMap => {
         const newMap = new Map(prevMap);
         newMap.set(dataId, { comparisonResults, activeCompetitorNames });
