@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { InfoIcon, AlertCircle, BarChart3, SearchCode, ClipboardList, Presentation, BarChart2, ListChecks, TrendingUp, Download, FileText } from 'lucide-react';
+import { InfoIcon, AlertCircle, BarChart3, SearchCode, ClipboardList, Presentation, BarChart2, ListChecks, TrendingUp, Download, FileText, Image as ImageIcon } from 'lucide-react';
 import type { 
     AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType, GscAnalyzedItem,
     ComparisonResult, ScrapedAd 
@@ -71,7 +71,7 @@ const SimpleTable: React.FC<{headers: string[], data: Record<string, any>[]}> = 
         return <p className="text-sm text-muted-foreground">Nessun dato disponibile per questa tabella.</p>;
     }
     return (
-        <div className="overflow-x-auto rounded-md border my-2 shadow-sm">
+        <div className="overflow-x-auto rounded-md border my-2 shadow-sm bg-card">
             <table className="min-w-full divide-y divide-border text-sm">
                 <thead className="bg-muted/50">
                     <tr>
@@ -100,7 +100,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
   useEffect(() => {
     setIsLoading(true);
     
-    if (tool1Data && tool1Data.rawResults.length > 0) {
+    if (tool1Data && tool1Data.rawResults && tool1Data.rawResults.length > 0) {
         const commonKWsResult = tool1Data.rawResults.filter(r => r.status === 'common');
         const mySiteTop5Common = commonKWsResult
             .filter(kw => kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10)
@@ -109,20 +109,22 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             .map(kw => ({ keyword: kw.keyword, position: kw.mySiteInfo.pos }));
 
         const competitorsTopCommon: Record<string, Tool1KeywordSummary[]> = {};
-        tool1Data.activeCompetitorNames.slice(0, 2).forEach(compName => { 
-            competitorsTopCommon[compName] = commonKWsResult
-                .filter(kw => {
-                    const compInfo = kw.competitorInfo.find(c => c.name === compName);
-                    return compInfo && compInfo.pos !== 'N/P' && typeof compInfo.pos === 'number' && compInfo.pos <= 10;
-                })
-                .sort((a, b) => {
-                    const posA = a.competitorInfo.find(c => c.name === compName)?.pos as number;
-                    const posB = b.competitorInfo.find(c => c.name === compName)?.pos as number;
-                    return posA - posB;
-                })
-                .slice(0, 5)
-                .map(kw => ({ keyword: kw.keyword, position: kw.competitorInfo.find(c => c.name === compName)?.pos || 'N/P' }));
-        });
+        if (tool1Data.activeCompetitorNames) {
+            tool1Data.activeCompetitorNames.slice(0, 2).forEach(compName => { 
+                competitorsTopCommon[compName] = commonKWsResult
+                    .filter(kw => {
+                        const compInfo = kw.competitorInfo.find(c => c.name === compName);
+                        return compInfo && compInfo.pos !== 'N/P' && typeof compInfo.pos === 'number' && compInfo.pos <= 10;
+                    })
+                    .sort((a, b) => {
+                        const posA = a.competitorInfo.find(c => c.name === compName)?.pos as number;
+                        const posB = b.competitorInfo.find(c => c.name === compName)?.pos as number;
+                        return posA - posB;
+                    })
+                    .slice(0, 5)
+                    .map(kw => ({ keyword: kw.keyword, position: kw.competitorInfo.find(c => c.name === compName)?.pos || 'N/P' }));
+            });
+        }
 
         const top5Opportunities = tool1Data.rawResults
             .filter(r => r.status === 'competitorOnly' && typeof r.volume === 'number' && r.volume > 0)
@@ -136,15 +138,14 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             competitorsTopCommon,
             top5Opportunities,
         });
-    } else if (tool1Data && tool1Data.rawResults.length === 0) {
+    } else if (tool1Data && tool1Data.rawResults && tool1Data.rawResults.length === 0) {
         setTool1SummaryForDisplay("Dati del Tool 1 (Comparatore Keyword) presenti ma vuoti. Esegui prima l'analisi nel Tool 1.");
-    }
-     else {
+    } else {
         setTool1SummaryForDisplay("Dati del Tool 1 (Comparatore Keyword) non trovati. Esegui prima l'analisi nel Tool 1.");
     }
 
     if (tool3Data && tool3Data.adsWithAnalysis) {
-        const processedAdsCount = tool3Data.scrapedAds.length;
+        const processedAdsCount = tool3Data.scrapedAds?.length || 0;
         const analyzedAds = tool3Data.adsWithAnalysis.filter(ad => ad.angleAnalysis && !ad.angleAnalysis.error);
         const analyzedAdsCount = analyzedAds.length;
         let summary: Tool3Summary = { processedAdsCount, analyzedAdsCount };
@@ -204,17 +205,17 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     reportContent += "========================================\n\n";
     reportContent += "Data del Report: " + new Date().toLocaleDateString("it-IT", { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + "\n\n";
 
-    reportContent += "--- SINTESI: ANALIZZATORE COMPARATIVO KEYWORD (TOOL 1) ---\n";
+    reportContent += "# ANALIZZATORE COMPARATIVO KEYWORD (TOOL 1)\n";
     if (typeof tool1SummaryForDisplay === 'string') {
-      reportContent += tool1SummaryForDisplay + "\n";
+      reportContent += tool1SummaryForDisplay + "\n\n";
     } else if (tool1SummaryForDisplay) {
-      reportContent += "Conteggio Keyword:\n";
+      reportContent += "## Conteggio Keyword\n";
       reportContent += `  - Keyword Comuni: ${tool1SummaryForDisplay.comparisonResultsCount.common}\n`;
       reportContent += `  - Punti di Forza (Solo Mio Sito): ${tool1SummaryForDisplay.comparisonResultsCount.mySiteOnly}\n`;
       reportContent += `  - Opportunità (Solo Competitor): ${tool1SummaryForDisplay.comparisonResultsCount.competitorOnly}\n`;
       reportContent += `  - Totale Keyword Uniche Analizzate: ${tool1SummaryForDisplay.comparisonResultsCount.totalUnique}\n\n`;
       
-      reportContent += "Mio Sito - Top 5 Keyword Comuni in Top 10:\n";
+      reportContent += "## Mio Sito - Top 5 Keyword Comuni in Top 10\n";
       if (tool1SummaryForDisplay.mySiteTop5Common && tool1SummaryForDisplay.mySiteTop5Common.length > 0) {
         tool1SummaryForDisplay.mySiteTop5Common.forEach(kw => {
           reportContent += `  - "${kw.keyword}" (Posizione: ${kw.position})\n`;
@@ -226,7 +227,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
 
       if (tool1SummaryForDisplay.competitorsTopCommon) {
         Object.entries(tool1SummaryForDisplay.competitorsTopCommon).forEach(([compName, kws]) => {
-          reportContent += `${compName} - Top 5 Keyword Comuni in Top 10:\n`;
+          reportContent += `## ${compName} - Top 5 Keyword Comuni in Top 10\n`;
           if (kws.length > 0) {
             kws.forEach(kw => {
               reportContent += `  - "${kw.keyword}" (Posizione: ${kw.position})\n`;
@@ -238,7 +239,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         });
       }
 
-      reportContent += "Top 5 Opportunità (Keyword Gap per Volume):\n";
+      reportContent += "## Top 5 Opportunità (Keyword Gap per Volume)\n";
       if (tool1SummaryForDisplay.top5Opportunities && tool1SummaryForDisplay.top5Opportunities.length > 0) {
         tool1SummaryForDisplay.top5Opportunities.forEach(kw => {
           reportContent += `  - "${kw.keyword}" (Volume: ${kw.volume})\n`;
@@ -246,25 +247,25 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
       } else {
         reportContent += "  - Nessuna opportunità significativa trovata.\n";
       }
-      reportContent += "\n*Nota: Per i grafici dettagliati (Keyword Comuni Top 10, Top Opportunità Volume), si prega di fare uno screenshot dal Tool 1 e inserirlo nella presentazione.*\n";
+      reportContent += "\nNOTA: Per i grafici (Keyword Comuni Top 10, Top Opportunità Volume), fare screenshot dal Tool 1.\n\n";
     } else {
-      reportContent += "Nessun dato disponibile dal Tool 1.\n";
+      reportContent += "Nessun dato disponibile dal Tool 1.\n\n";
     }
     reportContent += "--------------------------------------------------\n\n";
 
-    reportContent += "--- SINTESI: ANALIZZATORE PERTINENZA & PRIORITÀ KW (TOOL 2) ---\n";
-    reportContent += "I risultati del Tool 2 (analisi di pertinenza e priorità keyword) sono disponibili e scaricabili come CSV direttamente all'interno del tool stesso.\n";
-    reportContent += "Per la presentazione, considera di includere un riassunto dei principali insight o screenshot delle tabelle dei risultati più significativi direttamente dal Tool 2.\n";
+    reportContent += "# ANALIZZATORE PERTINENZA & PRIORITÀ KW (TOOL 2)\n";
+    reportContent += "I risultati del Tool 2 sono disponibili e scaricabili come CSV direttamente all'interno del tool stesso.\n";
+    reportContent += "Considerare di includere screenshot delle tabelle dei risultati più significativi.\n\n";
     reportContent += "-------------------------------------------------------------\n\n";
 
-    reportContent += "--- SINTESI: FB ADS LIBRARY SCRAPER & ANALISI ANGLE (TOOL 3) ---\n";
+    reportContent += "# FB ADS LIBRARY SCRAPER & ANALISI ANGLE (TOOL 3)\n";
     if (typeof tool3SummaryForDisplay === 'string') {
-      reportContent += tool3SummaryForDisplay + "\n";
+      reportContent += tool3SummaryForDisplay + "\n\n";
     } else if (tool3SummaryForDisplay) {
-      reportContent += `Annunci Totali Processati dal Scraper: ${tool3SummaryForDisplay.processedAdsCount}\n`;
+      reportContent += `Annunci Totali Processati: ${tool3SummaryForDisplay.processedAdsCount}\n`;
       reportContent += `Annunci con Analisi Angle (7C) Completata: ${tool3SummaryForDisplay.analyzedAdsCount}\n\n`;
       if (tool3SummaryForDisplay.averageScores && tool3SummaryForDisplay.analyzedAdsCount > 0) {
-        reportContent += "Punteggi Medi 7C (su annunci analizzati):\n";
+        reportContent += "## Punteggi Medi 7C (su annunci analizzati)\n";
         Object.entries(tool3SummaryForDisplay.averageScores).forEach(([key, value]) => {
           const readableKey = key.replace('C1', 'C1 Chiarezza')
                                .replace('C2', 'C2 Coinvolgimento')
@@ -275,41 +276,43 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                                .replace('C7', 'C7 Contesto');
           reportContent += `  - ${readableKey}: ${value.toFixed(2)}\n`;
         });
+         reportContent += "\nNOTA: Per il grafico dei punteggi medi 7C, fare uno screenshot dal Tool 3 (Pagina Dettaglio Analisi Angle).\n";
       } else if (tool3SummaryForDisplay.analyzedAdsCount === 0 && tool3SummaryForDisplay.processedAdsCount > 0) {
         reportContent += "Nessuna analisi dell'angle è stata completata con successo.\n";
       }
       if (tool3SummaryForDisplay.error) {
         reportContent += `\nErrore durante l'analisi del Tool 3: ${tool3SummaryForDisplay.error}\n`;
       }
-       reportContent += "\n*Nota: Per visualizzare gli annunci specifici, le loro immagini e le analisi dettagliate (compresi i testi di valutazione), fare riferimento al Tool 3 e al suo report di dettaglio/CSV.*\n";
+       reportContent += "\nNOTA: Per visualizzare gli annunci specifici e le analisi dettagliate, fare riferimento al Tool 3 e al suo report CSV.\n\n";
     } else {
-      reportContent += "Nessun dato disponibile dal Tool 3.\n";
+      reportContent += "Nessun dato disponibile dal Tool 3.\n\n";
     }
     reportContent += "------------------------------------------------------------------\n\n";
 
-    reportContent += "--- SINTESI: ANALIZZATORE DATI GSC (TOOL 4) ---\n";
+    reportContent += "# ANALIZZATORE DATI GSC (TOOL 4)\n";
     if (tool4Data && tool4Data.gscFiltersDisplay) {
-        reportContent += tool4Data.gscFiltersDisplay.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() + "\n\n";
+        const cleanedFilters = tool4Data.gscFiltersDisplay.replace(/<h4[^>]*>Filtri GSC Applicati all'Export:<\/h4>/i, '## Filtri GSC Applicati all\'Export:\n').replace(/<[^>]*>/g, (match) => match === '<li>' ? '  - ' : match === '</li>' ? '\n' : '').replace(/\s+/g, ' ').trim();
+        reportContent += cleanedFilters + "\n\n";
     }
     if (typeof tool4SummaryForDisplay === 'string') {
-      reportContent += tool4SummaryForDisplay + "\n";
+      reportContent += tool4SummaryForDisplay + "\n\n";
     } else if (Array.isArray(tool4SummaryForDisplay) && tool4SummaryForDisplay.length > 0) {
       tool4SummaryForDisplay.forEach(section => {
-        reportContent += `Report GSC: ${section.displayName}\n`;
+        reportContent += `## Report GSC: ${section.displayName}\n`;
         if (section.dataPresent && section.summaryText) {
           const cleanedSummary = section.summaryText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
           reportContent += `  Sintesi: ${cleanedSummary}\n`;
         } else if (section.dataPresent) {
-           reportContent += "  Dati presenti, ma sintesi testuale non generata per questo report.\n";
+           reportContent += "  Dati presenti, ma sintesi testuale non generata/disponibile per questo report.\n";
         }
         else {
           reportContent += "  Nessun dato analizzato o foglio non trovato.\n";
         }
         reportContent += "\n";
       });
-      reportContent += "*Nota: Per i grafici e le tabelle dettagliate (Top Items, ecc.) per ogni sezione GSC, si prega di fare uno screenshot dal Tool 4 e inserirlo nella presentazione.*\n";
+      reportContent += "NOTA: Per i grafici dettagliati (Top Items, ecc.) per ogni sezione GSC, fare uno screenshot dal Tool 4.\n\n";
     } else {
-      reportContent += "Nessun dato disponibile dal Tool 4.\n";
+      reportContent += "Nessun dato disponibile dal Tool 4.\n\n";
     }
     reportContent += "--------------------------------------------------\n\n";
     
@@ -335,211 +338,218 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
   }
 
   return (
-    <div className="space-y-8 p-4 md:p-6">
-      <header className="text-center">
-        <h2 className="text-3xl font-bold text-sky-700 flex items-center justify-center">
-            <Presentation className="mr-3 h-8 w-8" /> Report Consolidato Dati Analisi
-        </h2>
-        <p className="text-muted-foreground mt-2 max-w-3xl mx-auto">
-          Questa pagina presenta una sintesi dei dati elaborati dai vari tool di analisi. Per un report completo, utilizza la funzione "Stampa" del tuo browser e scegli "Salva come PDF".
-          Per i grafici interattivi dettagliati, visita i tool specifici e considera di fare degli screenshot da integrare manualmente nel tuo documento finale.
+    <div className="space-y-8 p-4 md:p-6 bg-background text-foreground">
+      <header className="text-center py-6">
+        <h1 className="text-3xl md:text-4xl font-bold text-sky-700 flex items-center justify-center">
+            <Presentation className="mr-3 h-8 w-8 md:h-10 md:w-10" /> Report Consolidato Dati Analisi
+        </h1>
+        <p className="text-muted-foreground mt-3 max-w-3xl mx-auto text-sm md:text-base">
+          Questa pagina presenta una sintesi dei dati elaborati dai vari tool. Per un report completo, utilizza la funzione "Stampa" del tuo browser (Ctrl+P o Cmd+P) e scegli "Salva come PDF".
+          Per i grafici dettagliati, visita i tool specifici e fai degli screenshot da integrare manualmente nel tuo documento finale.
         </p>
-         <Button onClick={handleDownloadConsolidatedReport} variant="outline" className="mt-4">
-            <FileText className="mr-2 h-4 w-4" /> Scarica Sintesi Testuale (.txt)
+         <Button onClick={handleDownloadConsolidatedReport} variant="outline" className="mt-6">
+            <Download className="mr-2 h-4 w-4" /> Scarica Sintesi Testuale (.txt)
         </Button>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center"><BarChart3 className="mr-2 h-6 w-6 text-sky-600" />Sintesi: Analizzatore Comparativo Keyword (Tool 1)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {typeof tool1SummaryForDisplay === 'string' ? (
-            <Alert variant={tool1SummaryForDisplay.startsWith("Errore") ? "destructive" : "default"}>
-              {tool1SummaryForDisplay.startsWith("Errore") ? <AlertCircle className="h-4 w-4" /> : <InfoIcon className="h-4 w-4" />}
-              <AlertTitle>{tool1SummaryForDisplay.startsWith("Errore") ? "Errore Dati Tool 1" : "Info Dati Tool 1"}</AlertTitle>
+      {/* Tool 1 Section */}
+      <section className="py-6">
+        <h1 className="text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
+            <BarChart3 className="mr-3 h-7 w-7" />Sintesi: Analizzatore Comparativo Keyword (Tool 1)
+        </h1>
+        {typeof tool1SummaryForDisplay === 'string' ? (
+            <Alert variant={tool1SummaryForDisplay.startsWith("Dati del Tool 1 non trovati") || tool1SummaryForDisplay.startsWith("Errore") ? "destructive" : "default"} className="bg-card p-4 rounded-md shadow">
+              {tool1SummaryForDisplay.startsWith("Dati del Tool 1 non trovati") || tool1SummaryForDisplay.startsWith("Errore") ? <AlertCircle className="h-4 w-4" /> : <InfoIcon className="h-4 w-4" />}
+              <AlertTitle>{tool1SummaryForDisplay.startsWith("Dati del Tool 1 non trovati") || tool1SummaryForDisplay.startsWith("Errore") ? "Errore o Dati Mancanti" : "Info"}</AlertTitle>
               <AlertDescription>{tool1SummaryForDisplay}</AlertDescription>
             </Alert>
-          ) : tool1SummaryForDisplay ? (
-            <div className="space-y-4">
+        ) : tool1SummaryForDisplay ? (
+            <div className="space-y-6 bg-card p-4 md:p-6 rounded-md shadow">
                 <div>
-                    <h4 className="font-semibold text-lg text-foreground mb-1">Conteggio Keyword</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-sm">
-                      <li>Keyword Comuni: <span className="font-semibold text-foreground">{tool1SummaryForDisplay.comparisonResultsCount.common}</span></li>
-                      <li>Punti di Forza (Solo Mio Sito): <span className="font-semibold text-foreground">{tool1SummaryForDisplay.comparisonResultsCount.mySiteOnly}</span></li>
-                      <li>Opportunità (Solo Competitor): <span className="font-semibold text-foreground">{tool1SummaryForDisplay.comparisonResultsCount.competitorOnly}</span></li>
-                      <li>Totale Keyword Uniche Analizzate: <span className="font-semibold text-foreground">{tool1SummaryForDisplay.comparisonResultsCount.totalUnique}</span></li>
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Conteggio Keyword</h3>
+                    <ul className="list-disc pl-6 space-y-1 text-muted-foreground text-sm">
+                      <li>Keyword Comuni: <span className="font-medium text-foreground">{tool1SummaryForDisplay.comparisonResultsCount.common}</span></li>
+                      <li>Punti di Forza (Solo Mio Sito): <span className="font-medium text-foreground">{tool1SummaryForDisplay.comparisonResultsCount.mySiteOnly}</span></li>
+                      <li>Opportunità (Solo Competitor): <span className="font-medium text-foreground">{tool1SummaryForDisplay.comparisonResultsCount.competitorOnly}</span></li>
+                      <li>Totale Keyword Uniche Analizzate: <span className="font-medium text-foreground">{tool1SummaryForDisplay.comparisonResultsCount.totalUnique}</span></li>
                     </ul>
                 </div>
                  <div>
-                    <h4 className="font-semibold text-lg text-foreground mb-1 mt-3 flex items-center"><ListChecks className="mr-2 h-5 w-5 text-green-600" />Mio Sito - Top 5 Keyword Comuni in Top 10</h4>
+                    <h3 className="text-xl font-semibold text-foreground mb-2 mt-4 flex items-center"><ListChecks className="mr-2 h-5 w-5 text-green-600" />Mio Sito - Top 5 Keyword Comuni in Top 10</h3>
                     {tool1SummaryForDisplay.mySiteTop5Common && tool1SummaryForDisplay.mySiteTop5Common.length > 0 ? (
                        <SimpleTable headers={["Keyword", "Posizione"]} data={tool1SummaryForDisplay.mySiteTop5Common.map(kw => ({Keyword: kw.keyword, Posizione: kw.position}))}/>
-                    ) : <p className="text-sm text-muted-foreground">Nessuna keyword comune in Top 10 per "Mio Sito".</p>}
+                    ) : <p className="text-sm text-muted-foreground ml-2">Nessuna keyword comune in Top 10 per "Mio Sito".</p>}
                 </div>
                 {tool1SummaryForDisplay.competitorsTopCommon && Object.entries(tool1SummaryForDisplay.competitorsTopCommon).map(([compName, kws]) => (
                      <div key={compName}>
-                        <h4 className="font-semibold text-lg text-foreground mb-1 mt-3 flex items-center"><ListChecks className="mr-2 h-5 w-5 text-blue-600" />{compName} - Top 5 Keyword Comuni in Top 10</h4>
+                        <h3 className="text-xl font-semibold text-foreground mb-2 mt-4 flex items-center"><ListChecks className="mr-2 h-5 w-5 text-blue-600" />{compName} - Top 5 Keyword Comuni in Top 10</h3>
                         {kws.length > 0 ? (
                             <SimpleTable headers={["Keyword", "Posizione"]} data={kws.map(kw => ({Keyword: kw.keyword, Posizione: kw.position}))}/>
-                        ) : <p className="text-sm text-muted-foreground">Nessuna keyword comune in Top 10 per {compName}.</p>}
+                        ) : <p className="text-sm text-muted-foreground ml-2">Nessuna keyword comune in Top 10 per {compName}.</p>}
                     </div>
                 ))}
                  <div>
-                    <h4 className="font-semibold text-lg text-foreground mb-1 mt-3 flex items-center"><TrendingUp className="mr-2 h-5 w-5 text-orange-600" />Top 5 Opportunità (Keyword Gap per Volume)</h4>
+                    <h3 className="text-xl font-semibold text-foreground mb-2 mt-4 flex items-center"><TrendingUp className="mr-2 h-5 w-5 text-orange-500" />Top 5 Opportunità (Keyword Gap per Volume)</h3>
                     {tool1SummaryForDisplay.top5Opportunities && tool1SummaryForDisplay.top5Opportunities.length > 0 ? (
                        <SimpleTable headers={["Keyword", "Volume"]} data={tool1SummaryForDisplay.top5Opportunities.map(kw => ({Keyword: kw.keyword, Volume: kw.volume}))}/>
-                    ) : <p className="text-sm text-muted-foreground">Nessuna opportunità significativa trovata.</p>}
+                    ) : <p className="text-sm text-muted-foreground ml-2">Nessuna opportunità significativa trovata.</p>}
                 </div>
-                <Alert variant="default" className="mt-4">
-                    <InfoIcon className="h-4 w-4" />
-                    <AlertTitle>Grafici Dettagliati</AlertTitle>
-                    <AlertDescription>
-                        Per visualizzare i grafici completi (es. "Keyword Comuni in Top 10 per Sito" e "Top 10 Opportunità per Volume"), visita il Tool 1. 
-                        Puoi fare uno screenshot di questi grafici per includerli nella tua presentazione.
+                <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200">
+                    <ImageIcon className="h-5 w-5 text-sky-600" />
+                    <AlertTitle className="text-sky-700 font-semibold">[[INSERIRE GRAFICI DAL TOOL 1]]</AlertTitle>
+                    <AlertDescription className="text-sky-600">
+                        Per visualizzare i grafici completi (es. "Keyword Comuni in Top 10 per Sito" e "Top 10 Opportunità per Volume"), visita il <strong>Tool 1</strong>. 
+                        Fai uno screenshot di questi grafici per includerli nel tuo report finale.
                     </AlertDescription>
                 </Alert>
             </div>
-          ) : (
-             <p className="text-muted-foreground">Caricamento sintesi Tool 1...</p>
-          )}
-        </CardContent>
-      </Card>
+        ) : (
+             <p className="text-muted-foreground p-4">Caricamento sintesi Tool 1...</p>
+        )}
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center"><ClipboardList className="mr-2 h-6 w-6 text-sky-600" />Sintesi: Analizzatore Pertinenza & Priorità KW (Tool 2)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Alert>
+      {/* Tool 2 Section */}
+      <section className="py-6">
+        <h1 className="text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
+            <ClipboardList className="mr-3 h-7 w-7" />Sintesi: Analizzatore Pertinenza & Priorità KW (Tool 2)
+        </h1>
+        <Alert className="bg-card p-4 rounded-md shadow">
             <InfoIcon className="h-4 w-4" />
             <AlertTitle>Info Tool 2</AlertTitle>
             <AlertDescription>
-              I risultati dell'Analizzatore di Pertinenza & Priorità Keyword (Tool 2) vengono elaborati e visualizzati direttamente all'interno del tool stesso.
-              Per consultare questi dati, esegui l'analisi nel Tool 2. Il report scaricabile in CSV è disponibile lì. Per la presentazione, considera di includere un riassunto dei principali insight o screenshot delle tabelle dei risultati più significativi direttamente dal Tool 2.
+              I risultati dell'Analizzatore di Pertinenza & Priorità Keyword (Tool 2) vengono elaborati e visualizzati direttamente all'interno del tool.
+              Per consultare questi dati, esegui l'analisi nel Tool 2. Il report scaricabile in CSV è disponibile lì. 
+              <br/><strong>[[INSERIRE SCREENSHOT TABELLA RISULTATI SIGNIFICATIVI DAL TOOL 2]]</strong>
             </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+        </Alert>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center"><SearchCode className="mr-2 h-6 w-6 text-sky-600" />Sintesi: FB Ads Library Scraper & Analisi Angle (Tool 3)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {typeof tool3SummaryForDisplay === 'string' ? (
-             <Alert variant={tool3SummaryForDisplay.startsWith("Errore") ? "destructive" : "default"}>
-              {tool3SummaryForDisplay.startsWith("Errore") ? <AlertCircle className="h-4 w-4" /> : <InfoIcon className="h-4 w-4" />}
-              <AlertTitle>{tool3SummaryForDisplay.startsWith("Errore") ? "Errore Dati Tool 3" : "Info Dati Tool 3"}</AlertTitle>
+      {/* Tool 3 Section */}
+      <section className="py-6">
+        <h1 className="text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
+            <SearchCode className="mr-3 h-7 w-7" />Sintesi: FB Ads Library Scraper & Analisi Angle (Tool 3)
+        </h1>
+        {typeof tool3SummaryForDisplay === 'string' ? (
+             <Alert variant={tool3SummaryForDisplay.startsWith("Dati del Tool 3 non trovati") || tool3SummaryForDisplay.startsWith("Errore") ? "destructive" : "default"} className="bg-card p-4 rounded-md shadow">
+              {tool3SummaryForDisplay.startsWith("Dati del Tool 3 non trovati") || tool3SummaryForDisplay.startsWith("Errore") ? <AlertCircle className="h-4 w-4" /> : <InfoIcon className="h-4 w-4" />}
+              <AlertTitle>{tool3SummaryForDisplay.startsWith("Dati del Tool 3 non trovati") || tool3SummaryForDisplay.startsWith("Errore") ? "Errore o Dati Mancanti" : "Info"}</AlertTitle>
               <AlertDescription>{tool3SummaryForDisplay}</AlertDescription>
             </Alert>
-          ) : tool3SummaryForDisplay ? (
-            <div className="space-y-3">
-                <p className="text-sm">Annunci Totali Processati dal Scraper: <span className="font-semibold text-foreground">{tool3SummaryForDisplay.processedAdsCount}</span></p>
-                <p className="text-sm">Annunci con Analisi Angle (7C) Completata: <span className="font-semibold text-foreground">{tool3SummaryForDisplay.analyzedAdsCount}</span></p>
+        ) : tool3SummaryForDisplay ? (
+            <div className="space-y-4 bg-card p-4 md:p-6 rounded-md shadow">
+                <p className="text-sm">Annunci Totali Processati dal Scraper: <span className="font-medium text-foreground">{tool3SummaryForDisplay.processedAdsCount}</span></p>
+                <p className="text-sm">Annunci con Analisi Angle (7C) Completata: <span className="font-medium text-foreground">{tool3SummaryForDisplay.analyzedAdsCount}</span></p>
                 {tool3SummaryForDisplay.averageScores && tool3SummaryForDisplay.analyzedAdsCount > 0 && (
                     <div>
-                        <h4 className="font-semibold text-lg text-foreground mt-2 mb-1">Punteggi Medi 7C:</h4>
-                        <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                        <h3 className="text-xl font-semibold text-foreground mt-3 mb-2">Punteggi Medi 7C:</h3>
+                        <ul className="list-disc pl-6 text-sm text-muted-foreground">
                             {Object.entries(tool3SummaryForDisplay.averageScores).map(([key, value]) => (
-                                <li key={key}>{key.replace('C1', 'C1 Chiarezza').replace('C2', 'C2 Coinvolgimento').replace('C3', 'C3 Concretezza').replace('C4', 'C4 Coerenza').replace('C5', 'C5 Credibilità').replace('C6', 'C6 CTA').replace('C7', 'C7 Contesto')}: <span className="font-semibold text-foreground">{value.toFixed(2)}</span></li>
+                                <li key={key}>{key.replace('C1', 'C1 Chiarezza').replace('C2', 'C2 Coinvolgimento').replace('C3', 'C3 Concretezza').replace('C4', 'C4 Coerenza').replace('C5', 'C5 Credibilità').replace('C6', 'C6 CTA').replace('C7', 'C7 Contesto')}: <span className="font-medium text-foreground">{value.toFixed(2)}</span></li>
                             ))}
                         </ul>
                     </div>
                 )}
                 {tool3SummaryForDisplay.topAds && tool3SummaryForDisplay.topAds.length > 0 && (
                     <div>
-                        <h4 className="font-semibold text-lg text-foreground mt-3 mb-1">Top 3 Annunci per Punteggio 7C:</h4>
+                        <h3 className="text-xl font-semibold text-foreground mt-4 mb-2">Top 3 Annunci per Punteggio 7C:</h3>
                         <SimpleTable 
                             headers={["Ad (Titolo/Testo)", "Punteggio Totale", "Valutazione"]} 
                             data={tool3SummaryForDisplay.topAds.map(ad => ({
-                                "Ad (Titolo/Testo)": (ad.titolo || ad.testo || 'N/D').substring(0,50) + '...',
-                                "Punteggio Totale": ad.angleAnalysis?.totalScore || 'N/D',
-                                "Valutazione": ad.angleAnalysis?.evaluation || 'N/D'
+                                "Ad (Titolo/Testo)": (ad.titolo || ad.testo || 'N/D').substring(0,50) + ((ad.titolo || ad.testo || '').length > 50 ? '...' : ''),
+                                "Punteggio Totale": ad.angleAnalysis?.totalScore ?? 'N/D',
+                                "Valutazione": ad.angleAnalysis?.evaluation ?? 'N/D'
                             }))}
                         />
                     </div>
                 )}
                 {tool3SummaryForDisplay.error && <p className="text-destructive text-sm mt-2">Nota: {tool3SummaryForDisplay.error}</p>}
-                 <Alert variant="default" className="mt-4">
-                    <InfoIcon className="h-4 w-4" />
-                    <AlertTitle>Dettagli e Grafici Tool 3</AlertTitle>
-                    <AlertDescription>
-                        Per visualizzare gli annunci specifici, le loro immagini e le analisi dettagliate, visita il Tool 3. 
-                        Il report di dettaglio e il grafico dei punteggi medi sono disponibili lì (pagina dettaglio analisi angle). 
-                        Puoi fare screenshot per la tua presentazione.
+                 <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200">
+                    <ImageIcon className="h-5 w-5 text-sky-600" />
+                    <AlertTitle className="text-sky-700 font-semibold">[[INSERIRE GRAFICO PUNTEGGI MEDI 7C DAL TOOL 3]]</AlertTitle>
+                    <AlertDescription className="text-sky-600">
+                        Per visualizzare il grafico dei punteggi medi 7C e le tabelle dettagliate degli annunci, visita il <strong>Tool 3 (Pagina Dettaglio Analisi Angle)</strong>. 
+                        Fai uno screenshot per includerlo nel tuo report.
                     </AlertDescription>
                 </Alert>
             </div>
-          ) : (
-            <p className="text-muted-foreground">Caricamento sintesi Tool 3...</p>
-          )}
-        </CardContent>
-      </Card>
+        ) : (
+            <p className="text-muted-foreground p-4">Caricamento sintesi Tool 3...</p>
+        )}
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center"><BarChart2 className="mr-2 h-6 w-6 text-sky-600" />Sintesi: Analizzatore Dati GSC (Tool 4)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {tool4Data && tool4Data.gscFiltersDisplay && (
-             <div className="mb-4 prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: tool4Data.gscFiltersDisplay }} />
-          )}
-          {typeof tool4SummaryForDisplay === 'string' ? (
-            <Alert variant={tool4SummaryForDisplay.startsWith("Errore") ? "destructive" : "default"}>
-                {tool4SummaryForDisplay.startsWith("Errore") ? <AlertCircle className="h-4 w-4" /> : <InfoIcon className="h-4 w-4" />}
-                <AlertTitle>{tool4SummaryForDisplay.startsWith("Errore") ? "Errore Dati Tool 4" : "Info Dati Tool 4"}</AlertTitle>
-                <AlertDescription>{tool4SummaryForDisplay}</AlertDescription>
-            </Alert>
-          ) : Array.isArray(tool4SummaryForDisplay) && tool4SummaryForDisplay.length > 0 ? (
-            <div className="space-y-6">
-              {tool4SummaryForDisplay.map((section) => (
-                section.dataPresent ? (
+      {/* Tool 4 Section */}
+      <section className="py-6">
+        <h1 className="text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
+            <BarChart2 className="mr-3 h-7 w-7" />Sintesi: Analizzatore Dati GSC (Tool 4)
+        </h1>
+        <div className="bg-card p-4 md:p-6 rounded-md shadow">
+            {tool4Data && tool4Data.gscFiltersDisplay && (
+                <div className="mb-6">
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Filtri GSC Applicati all'Export:</h3>
+                    <div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: tool4Data.gscFiltersDisplay.replace(/<h4[^>]*>/i, '').replace(/<\/?ul>/gi, '').replace(/<li>/gi, '<p class="ml-4 my-0.5">&bull; ').replace(/<\/li>/gi, '</p>') }} />
+                </div>
+            )}
+            {typeof tool4SummaryForDisplay === 'string' ? (
+                <Alert variant={tool4SummaryForDisplay.startsWith("Dati del Tool 4 non trovati") || tool4SummaryForDisplay.startsWith("Errore") ? "destructive" : "default"}>
+                    {tool4SummaryForDisplay.startsWith("Dati del Tool 4 non trovati") || tool4SummaryForDisplay.startsWith("Errore") ? <AlertCircle className="h-4 w-4" /> : <InfoIcon className="h-4 w-4" />}
+                    <AlertTitle>{tool4SummaryForDisplay.startsWith("Dati del Tool 4 non trovati") || tool4SummaryForDisplay.startsWith("Errore") ? "Errore o Dati Mancanti" : "Info"}</AlertTitle>
+                    <AlertDescription>{tool4SummaryForDisplay}</AlertDescription>
+                </Alert>
+            ) : Array.isArray(tool4SummaryForDisplay) && tool4SummaryForDisplay.length > 0 ? (
+                <div className="space-y-8">
+                {tool4SummaryForDisplay.map((section) => (
                     <div key={section.reportType}>
-                    <h4 className="font-semibold text-lg text-foreground mb-1">{section.displayName}</h4>
-                    {section.summaryText && <p className="text-sm text-muted-foreground prose prose-sm max-w-none mb-2" dangerouslySetInnerHTML={{ __html: section.summaryText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() }} />}
-                    {section.topItems && section.topItems.length > 0 && (
-                        <SimpleTable 
-                            headers={[section.displayName, "Clic Attuali", "Diff. Clic", "% Clic", "Impr. Attuali", "Diff. Impr.", "% Impr."]} 
-                            data={section.topItems.map(item => ({
-                                [section.displayName]: String(item.item).substring(0,40) + (String(item.item).length > 40 ? '...' : ''),
-                                "Clic Attuali": item.clicks_current,
-                                "Diff. Clic": item.diff_clicks,
-                                "% Clic": isFinite(item.perc_change_clicks) ? (item.perc_change_clicks * 100).toFixed(1) + '%' : (item.perc_change_clicks === Infinity ? '+Inf%' : 'N/A'),
-                                "Impr. Attuali": item.impressions_current,
-                                "Diff. Impr.": item.diff_impressions,
-                                "% Impr.": isFinite(item.perc_change_impressions) ? (item.perc_change_impressions * 100).toFixed(1) + '%' : (item.perc_change_impressions === Infinity ? '+Inf%' : 'N/A'),
-                            }))}
-                        />
+                    <h3 className="text-xl font-semibold text-foreground mb-2">{section.displayName}</h3>
+                    {section.dataPresent ? (
+                        <>
+                            {section.summaryText && <p className="text-sm text-muted-foreground prose prose-sm max-w-none mb-3" dangerouslySetInnerHTML={{ __html: section.summaryText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() }} />}
+                            {section.topItems && section.topItems.length > 0 && (
+                                <>
+                                    <h4 className="text-md font-medium text-foreground mt-1 mb-1">Top 5 Elementi:</h4>
+                                    <SimpleTable 
+                                        headers={[section.displayName, "Clic Attuali", "Diff. Clic", "% Clic", "Impr. Attuali", "Diff. Impr.", "% Impr."]} 
+                                        data={section.topItems.map(item => ({
+                                            [section.displayName]: String(item.item).substring(0,40) + (String(item.item).length > 40 ? '...' : ''),
+                                            "Clic Attuali": item.clicks_current,
+                                            "Diff. Clic": item.diff_clicks,
+                                            "% Clic": isFinite(item.perc_change_clicks) ? (item.perc_change_clicks * 100).toFixed(1) + '%' : (item.perc_change_clicks === Infinity ? '+Inf%' : 'N/A'),
+                                            "Impr. Attuali": item.impressions_current,
+                                            "Diff. Impr.": item.diff_impressions,
+                                            "% Impr.": isFinite(item.perc_change_impressions) ? (item.perc_change_impressions * 100).toFixed(1) + '%' : (item.perc_change_impressions === Infinity ? '+Inf%' : 'N/A'),
+                                        }))}
+                                    />
+                                </>
+                            )}
+                        </>
+                    ) : (
+                        <p className="text-sm text-muted-foreground ml-2">Nessun dato analizzato o foglio non trovato per {section.displayName}.</p>
                     )}
                     </div>
-                ) : (
-                    <div key={section.reportType}>
-                        <h4 className="font-semibold text-lg text-foreground mb-1">{section.displayName}</h4>
-                        <p className="text-sm text-muted-foreground">Nessun dato analizzato o foglio non trovato per {section.displayName}.</p>
-                    </div>
-                )
-              ))}
-               <Alert variant="default" className="mt-4">
-                    <InfoIcon className="h-4 w-4" />
-                    <AlertTitle>Grafici Dettagliati GSC</AlertTitle>
-                    <AlertDescription>
-                        Per i grafici e le tabelle complete per ogni sezione GSC (Query, Pagine, Dispositivi, ecc.), visita il Tool 4.
-                        Puoi fare uno screenshot di questi grafici per includerli nella tua presentazione.
+                ))}
+                <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200">
+                    <ImageIcon className="h-5 w-5 text-sky-600" />
+                    <AlertTitle className="text-sky-700 font-semibold">[[INSERIRE GRAFICI DAL TOOL 4]]</AlertTitle>
+                    <AlertDescription className="text-sky-600">
+                        Per i grafici dettagliati (Top Items, Distribuzione Dispositivi, ecc.) per ogni sezione GSC, visita il <strong>Tool 4</strong>.
+                        Fai uno screenshot di questi grafici per includerli nel tuo report finale.
                     </AlertDescription>
                 </Alert>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">Caricamento sintesi Tool 4...</p>
-          )}
-        </CardContent>
-      </Card>
-      <div className="mt-8 p-4 bg-sky-50 border border-sky-200 rounded-md text-center">
-        <p className="text-sky-700 font-medium">
-            Per un report completo e formattato di questa pagina, utilizza la funzione "Stampa" del tuo browser (spesso Ctrl+P o Cmd+P) e scegli "Salva come PDF".
-        </p>
-      </div>
+                </div>
+            ) : (
+                <p className="text-muted-foreground p-4">Caricamento sintesi Tool 4...</p>
+            )}
+        </div>
+      </section>
+
+      <footer className="mt-12 py-6 border-t border-border">
+        <div className="p-4 bg-sky-50 border border-sky-200 rounded-md text-center">
+            <p className="text-sky-700 font-medium text-sm md:text-base">
+                Per un report formattato di questa pagina, utilizza la funzione <strong>"Stampa"</strong> del tuo browser (Ctrl+P o Cmd+P) e scegli <strong>"Salva come PDF"</strong>.
+            </p>
+        </div>
+      </footer>
     </div>
   );
 }
 
+    
