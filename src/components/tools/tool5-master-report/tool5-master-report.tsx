@@ -1,13 +1,15 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState }
+from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { InfoIcon, BarChart3, SearchCode, ClipboardList, BarChart2, Presentation, Printer } from 'lucide-react';
-import type { 
-    AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType,
-    ComparisonResult, ScrapedAd 
+import { Button } from '@/components/ui/button';
+import { InfoIcon, BarChart3, SearchCode, ClipboardList, BarChart2, Presentation, Printer, Download } from 'lucide-react';
+import type {
+    AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType, GscSectionAnalysis,
+    ComparisonResult, ScrapedAd
 } from '@/lib/types';
 
 // Importa i componenti di tabella e grafico necessari
@@ -18,6 +20,7 @@ import { TableAngleAnalysis } from '@/components/tools/tool3-scraper/table-angle
 import { TableGSC } from '@/components/tools/tool4-gsc-analyzer/table-gsc';
 import { ChartGSC } from '@/components/tools/tool4-gsc-analyzer/charts-gsc';
 import { ResponsiveContainer, BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend as ReLegend, PieChart, Pie, Cell } from 'recharts';
+import { exportToCSV } from '@/lib/csv';
 
 
 interface Tool1MasterReportData {
@@ -27,7 +30,7 @@ interface Tool1MasterReportData {
       competitorOnly: number;
       totalUnique: number;
     };
-    rawResults: ComparisonResult[]; 
+    rawResults: ComparisonResult[];
     activeCompetitorNames: string[];
 }
 
@@ -48,10 +51,10 @@ interface Tool5MasterReportProps {
 }
 
 const CHART_COLORS_MASTER = [
-  'hsl(var(--chart-1))', 
-  'hsl(var(--chart-2))', 
-  'hsl(var(--chart-3))', 
-  'hsl(var(--chart-4))', 
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
   'hsl(var(--chart-5))',
   'hsl(210, 90%, 50%)',
   'hsl(160, 70%, 40%)',
@@ -66,26 +69,21 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
   const [average7CScores, setAverage7CScores] = useState<AngleAnalysisScores | null>(null);
 
   useEffect(() => {
-    setIsLoading(true); 
+    setIsLoading(true);
     if (tool3Data && tool3Data.adsWithAnalysis) {
         const analyzedAds = tool3Data.adsWithAnalysis.filter(ad => ad.angleAnalysis && !ad.angleAnalysis.error);
         if (analyzedAds.length > 0) {
             const avgScores: AngleAnalysisScores = { C1: 0, C2: 0, C3: 0, C4: 0, C5: 0, C6: 0, C7: 0 };
             analyzedAds.forEach(ad => {
-                const scores = ad.angleAnalysis?.scores; // Access nested scores object
+                const scores = ad.angleAnalysis?.scores ?? ad.angleAnalysis; // Handle old and new structure
                 if (scores) {
-                    Object.keys(avgScores).forEach(keyStr => {
-                        const key = keyStr as keyof AngleAnalysisScores;
-                        avgScores[key] += scores[key] || 0;
-                    });
-                } else if (ad.angleAnalysis) { // Fallback if scores object is not there (old structure)
-                    avgScores.C1 += ad.angleAnalysis.c1Clarity || 0;
-                    avgScores.C2 += ad.angleAnalysis.c2Engagement || 0;
-                    avgScores.C3 += ad.angleAnalysis.c3Concreteness || 0;
-                    avgScores.C4 += ad.angleAnalysis.c4Coherence || 0;
-                    avgScores.C5 += ad.angleAnalysis.c5Credibility || 0;
-                    avgScores.C6 += ad.angleAnalysis.c6CallToAction || 0;
-                    avgScores.C7 += ad.angleAnalysis.c7Context || 0;
+                    avgScores.C1 += (scores as any).c1Clarity ?? scores.C1 ?? 0;
+                    avgScores.C2 += (scores as any).c2Engagement ?? scores.C2 ?? 0;
+                    avgScores.C3 += (scores as any).c3Concreteness ?? scores.C3 ?? 0;
+                    avgScores.C4 += (scores as any).c4Coherence ?? scores.C4 ?? 0;
+                    avgScores.C5 += (scores as any).c5Credibility ?? scores.C5 ?? 0;
+                    avgScores.C6 += (scores as any).c6CallToAction ?? scores.C6 ?? 0;
+                    avgScores.C7 += (scores as any).c7Context ?? scores.C7 ?? 0;
                 }
             });
             Object.keys(avgScores).forEach(keyStr => {
@@ -111,7 +109,132 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
       return map[type] || type;
   };
 
-  if (isLoading) { 
+  const generateTextReport = () => {
+    let report = "REPORT CONSOLIDATO S.W.A.T.\n\n";
+    report += "========================================\n";
+    report += "Sintesi: Analizzatore Comparativo Keyword (Tool 1)\n";
+    report += "========================================\n";
+    if (tool1Data && tool1Data.rawResults && tool1Data.rawResults.length > 0) {
+        report += `Conteggio Generale Keyword:\n`;
+        report += `- Keyword Comuni: ${tool1Data.comparisonResultsCount.common}\n`;
+        report += `- Punti di Forza (Solo Mio Sito): ${tool1Data.comparisonResultsCount.mySiteOnly}\n`;
+        report += `- Opportunità (Solo Competitor): ${tool1Data.comparisonResultsCount.competitorOnly}\n`;
+        report += `- Totale Keyword Uniche Analizzate: ${tool1Data.comparisonResultsCount.totalUnique}\n\n`;
+
+        const mySiteTop10Common = tool1Data.rawResults
+            .filter(r => r.status === 'common' && r.mySiteInfo.pos !== 'N/P' && typeof r.mySiteInfo.pos === 'number' && r.mySiteInfo.pos <= 10)
+            .sort((a, b) => (a.mySiteInfo.pos as number) - (b.mySiteInfo.pos as number))
+            .slice(0, 5);
+        report += "Mio Sito - Top 5 Keyword Comuni in Top 10:\n";
+        if (mySiteTop10Common.length > 0) {
+            mySiteTop10Common.forEach(kw => report += `- ${kw.keyword} (Pos: ${kw.mySiteInfo.pos})\n`);
+        } else {
+            report += "- Nessuna\n";
+        }
+        report += "\n";
+
+        tool1Data.activeCompetitorNames.slice(0, 2).forEach(compName => {
+            report += `${compName} - Top 5 Keyword Comuni in Top 10:\n`;
+            const competitorKWs = tool1Data.rawResults
+                .filter(r => r.status === 'common' && r.competitorInfo.find(c => c.name === compName && c.pos !== 'N/P' && typeof c.pos === 'number' && c.pos <= 10))
+                .sort((a,b) => {
+                    const posA = a.competitorInfo.find(c => c.name === compName)?.pos as number;
+                    const posB = b.competitorInfo.find(c => c.name === compName)?.pos as number;
+                    return posA - posB;
+                })
+                .slice(0, 5);
+            if (competitorKWs.length > 0) {
+                competitorKWs.forEach(kw => report += `- ${kw.keyword} (Pos: ${kw.competitorInfo.find(c => c.name === compName)?.pos})\n`);
+            } else {
+                report += "- Nessuna\n";
+            }
+            report += "\n";
+        });
+
+        const top10Opportunities = tool1Data.rawResults
+            .filter(r => r.status === 'competitorOnly' && typeof r.volume === 'number' && r.volume > 0)
+            .sort((a, b) => (b.volume as number) - (a.volume as number))
+            .slice(0, 5);
+        report += "Top 5 Opportunità per Volume (Keyword Gap):\n";
+        if (top10Opportunities.length > 0) {
+            top10Opportunities.forEach(kw => report += `- ${kw.keyword} (Volume: ${kw.volume})\n`);
+        } else {
+            report += "- Nessuna\n";
+        }
+    } else {
+        report += "Nessun dato disponibile dal Tool 1 o analisi non eseguita.\n";
+    }
+    report += "\n\n";
+
+    report += "========================================\n";
+    report += "Sintesi: Analizzatore Pertinenza & Priorità KW (Tool 2)\n";
+    report += "========================================\n";
+    report += "I risultati dettagliati del Tool 2 sono scaricabili come CSV direttamente dal tool.\n";
+    report += "\n\n";
+
+    report += "========================================\n";
+    report += "Sintesi: FB Ads Library Scraper & Analisi Angle (Tool 3)\n";
+    report += "========================================\n";
+    if (tool3Data) {
+        report += `Annunci Totali Recuperati dallo Scraper: ${tool3Data.scrapedAds?.length || 0}\n`;
+        const analyzedCount = tool3Data.adsWithAnalysis?.filter(ad => ad.angleAnalysis && !ad.analysisError).length || 0;
+        report += `Annunci con Analisi Angle (7C) Completata: ${analyzedCount}\n`;
+        if (average7CScores && analyzedCount > 0) {
+            report += "Punteggi Medi 7C (su annunci analizzati):\n";
+            Object.entries(average7CScores).forEach(([key, value]) => {
+                report += `- ${key}: ${value.toFixed(2)}\n`;
+            });
+        }
+        report += "\n[[FARE RIFERIMENTO ALLA TABELLA DETTAGLIATA PER L'ANALISI 7C DI CIASCUN ANNUNCIO]]\n";
+    } else {
+        report += "Nessun dato disponibile dal Tool 3 o analisi non eseguita.\n";
+    }
+    report += "\n\n";
+
+    report += "========================================\n";
+    report += "Sintesi: Analizzatore Dati GSC (Tool 4)\n";
+    report += "========================================\n";
+    if (tool4Data && tool4Data.analyzedGscData) {
+        if (tool4Data.gscFiltersDisplay) {
+            report += "Filtri GSC Applicati all'Export (come rilevati):\n";
+            const filtersText = tool4Data.gscFiltersDisplay.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            report += filtersText + "\n\n";
+        }
+
+        (['queries', 'pages', 'countries', 'devices', 'searchAppearance'] as GscReportType[]).forEach((reportType) => {
+            const analysis = tool4Data.analyzedGscData![reportType];
+            const itemDisplayName = getGSCReportItemDisplayName(reportType);
+            report += `--- Analisi ${itemDisplayName} ---\n`;
+            if (analysis && analysis.detailedDataWithDiffs && analysis.detailedDataWithDiffs.length > 0) {
+                report += analysis.summaryText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() + "\n";
+                report += `Top 5 ${itemDisplayName} per Clic:\n`;
+                analysis.detailedDataWithDiffs.slice(0, 5).forEach(item => {
+                    report += `- ${item.item}: ${item.clicks_current} clic\n`;
+                });
+            } else {
+                report += `Nessun dato trovato per ${itemDisplayName}.\n`;
+            }
+            report += "\n";
+        });
+    } else {
+        report += "Nessun dato disponibile dal Tool 4 o analisi non eseguita.\n";
+    }
+
+    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "report_consolidato_swat.txt";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  };
+
+  const handleGeneratePdf = () => {
+    window.print();
+  };
+
+  if (isLoading) {
     return <div className="flex justify-center items-center min-h-[300px]"><p>Caricamento dati per il report consolidato...</p></div>;
   }
 
@@ -125,30 +248,39 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
   }
 
   return (
-    <div className="space-y-8 p-4 md:p-6 text-foreground">
-      <header className="text-center py-6">
+    <div className="tool5-master-report space-y-8 p-4 md:p-6 text-foreground">
+      <header className="text-center py-6 no-print">
         <h1 className="text-3xl md:text-4xl font-bold text-sky-700 flex items-center justify-center">
             <Presentation className="mr-3 h-8 w-8 md:h-10 md:w-10" /> Report Consolidato Dettagliato
         </h1>
          <Card className="mt-6 bg-primary/10 border-primary/30">
             <CardHeader>
-                <CardTitle className="text-primary text-xl flex items-center justify-center"><Printer className="mr-2 h-6 w-6"/>Esportazione Report Completo (PDF)</CardTitle>
+                <CardTitle className="text-primary text-xl flex items-center justify-center"><Printer className="mr-2 h-6 w-6"/>Esportazione Report (PDF & Testo)</CardTitle>
             </CardHeader>
-            <CardContent>
-                <p className="text-primary-foreground text-base text-center">
+            <CardContent className="text-center space-y-3">
+                <p className="text-primary-foreground text-base">
                     Questa pagina visualizza il report consolidato con tutti i dati, tabelle e grafici disponibili.
-                    <br />Per esportare l'intero report in un unico file PDF multipagina, utilizza la funzione <strong>"Stampa"</strong> del tuo browser (scorciatoia: Ctrl+P o Cmd+P) e seleziona <strong>"Salva come PDF"</strong> come destinazione.
                 </p>
-                <p className="text-primary-foreground text-sm mt-2 text-center">
-                    Assicurati che nelle opzioni di stampa del browser siano selezionate impostazioni come "Tutte le pagine" e "Layout Verticale" per un risultato ottimale. Il PDF generato catturerà tutto il contenuto di questa pagina, paginandolo automaticamente se necessario.
-                </p>
+                <div>
+                    <Button onClick={handleGeneratePdf} variant="default" size="lg">
+                        <Printer className="mr-2 h-5 w-5"/> Genera PDF Report
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Questo aprirà la finestra di dialogo di stampa del tuo browser. Seleziona "Salva come PDF" come destinazione.
+                    </p>
+                </div>
+                <div>
+                    <Button onClick={generateTextReport} variant="outline" size="lg">
+                        <Download className="mr-2 h-5 w-5"/> Scarica Sintesi Testuale (.txt)
+                    </Button>
+                </div>
             </CardContent>
         </Card>
       </header>
 
       {/* Tool 1 Section */}
-      <section>
-        <h1 className="text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
+      <section className="report-section">
+        <h1 className="report-h1 text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
             <BarChart3 className="mr-3 h-7 w-7" />Sintesi: Analizzatore Comparativo Keyword (Tool 1)
         </h1>
         {(!tool1Data || !tool1Data.rawResults || tool1Data.rawResults.length === 0) ? (
@@ -156,7 +288,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         ) : (
             <div className="space-y-6">
                 <Card>
-                    <CardHeader><h3 className="text-xl font-semibold">Conteggio Generale Keyword</h3></CardHeader>
+                    <CardHeader><h3 className="report-h3 text-xl font-semibold">Conteggio Generale Keyword</h3></CardHeader>
                     <CardContent>
                         <ul className="list-disc pl-6 space-y-1 text-sm">
                           <li>Keyword Comuni: <span className="font-semibold">{tool1Data.comparisonResultsCount.common}</span></li>
@@ -166,48 +298,50 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                         </ul>
                     </CardContent>
                 </Card>
+
                 <Card>
-                    <CardHeader><h3 className="text-xl font-semibold">Analisi Keyword Comuni: Posizionamento Top 10</h3><CardDescription>Confronto del numero di keyword comuni per cui "Il Mio Sito" e ciascun competitor si posizionano in Top 10.</CardDescription></CardHeader>
+                    <CardHeader><h3 className="report-h3 text-xl font-semibold">Analisi Keyword Comuni: Posizionamento Top 10</h3><CardDescription>Confronto del numero di keyword comuni per cui "Il Mio Sito" e ciascun competitor si posizionano in Top 10.</CardDescription></CardHeader>
                     <CardContent><div className="h-[350px] w-full"><CommonKeywordsTop10Chart results={tool1Data.rawResults} activeCompetitorNames={tool1Data.activeCompetitorNames} /></div></CardContent>
                 </Card>
                  <Card>
-                    <CardHeader><h3 className="text-xl font-semibold">Top 10 Opportunità per Volume (Keyword Gap)</h3><CardDescription>Le keyword con il più alto volume di ricerca per cui i competitor si posizionano, ma "Il Mio Sito" no.</CardDescription></CardHeader>
+                    <CardHeader><h3 className="report-h3 text-xl font-semibold">Top 10 Opportunità per Volume (Keyword Gap)</h3><CardDescription>Le keyword con il più alto volume di ricerca per cui i competitor si posizionano, ma "Il Mio Sito" no.</CardDescription></CardHeader>
                     <CardContent><div className="h-[400px] w-full"><TopOpportunitiesChart results={tool1Data.rawResults} /></div></CardContent>
                 </Card>
+
                 <Card>
-                    <CardHeader><h3 className="text-xl font-semibold">Dettaglio Tabella: Keyword Comuni</h3></CardHeader>
+                    <CardHeader><h3 className="report-h3 text-xl font-semibold">Dettaglio Tabella: Keyword Comuni</h3></CardHeader>
                     <CardContent><ComparisonResultsTable results={tool1Data.rawResults.filter(r => r.status === 'common')} type="common" activeCompetitorNames={tool1Data.activeCompetitorNames} isDetailPage={true} /></CardContent>
                 </Card>
                 <Card>
-                    <CardHeader><h3 className="text-xl font-semibold">Dettaglio Tabella: Punti di Forza (Solo Mio Sito)</h3></CardHeader>
+                    <CardHeader><h3 className="report-h3 text-xl font-semibold">Dettaglio Tabella: Punti di Forza (Solo Mio Sito)</h3></CardHeader>
                     <CardContent><ComparisonResultsTable results={tool1Data.rawResults.filter(r => r.status === 'mySiteOnly')} type="mySiteOnly" activeCompetitorNames={tool1Data.activeCompetitorNames} isDetailPage={true} /></CardContent>
                 </Card>
                 <Card>
-                    <CardHeader><h3 className="text-xl font-semibold">Dettaglio Tabella: Opportunità (Solo Competitor)</h3></CardHeader>
+                    <CardHeader><h3 className="report-h3 text-xl font-semibold">Dettaglio Tabella: Opportunità (Solo Competitor)</h3></CardHeader>
                     <CardContent><ComparisonResultsTable results={tool1Data.rawResults.filter(r => r.status === 'competitorOnly')} type="competitorOnly" activeCompetitorNames={tool1Data.activeCompetitorNames} isDetailPage={true} /></CardContent>
                 </Card>
-                <p className="text-sm text-muted-foreground"><i>[[PER GRAFICI AGGIUNTIVI O DETTAGLI NON INCLUSI QUI, FARE RIFERIMENTO ALLA PAGINA DEL TOOL 1 E USARE SCREENSHOT SE NECESSARIO]]</i></p>
             </div>
         )}
       </section>
 
       {/* Tool 2 Section Placeholder */}
-      <section>
-        <h1 className="text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
+      <section className="report-section">
+        <h1 className="report-h1 text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
             <ClipboardList className="mr-3 h-7 w-7" />Sintesi: Analizzatore Pertinenza & Priorità KW (Tool 2)
         </h1>
         <Alert variant="default">
             <InfoIcon className="h-4 w-4" />
             <AlertTitle>Info Tool 2</AlertTitle>
             <AlertDescription>
-              I risultati dettagliati del Tool 2 (Analizzatore Pertinenza & Priorità KW) sono visualizzati e scaricabili come CSV direttamente all'interno della pagina del tool stesso. Includere questi risultati nel report consolidato richiede l'esportazione e l'inserimento manuale.
+              I risultati dettagliati del Tool 2 (Analizzatore Pertinenza & Priorità KW) sono visualizzati e scaricabili come CSV direttamente all'interno della pagina del tool stesso.
+              <br /> <span className="italic font-semibold">[[INSERIRE QUI EVENTUALI SINTESI O SCREENSHOT DEL TOOL 2 SE NECESSARIO PER IL REPORT FINALE]]</span>
             </AlertDescription>
         </Alert>
       </section>
 
       {/* Tool 3 Section */}
-      <section>
-        <h1 className="text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
+      <section className="report-section">
+        <h1 className="report-h1 text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
             <SearchCode className="mr-3 h-7 w-7" />Sintesi: FB Ads Library Scraper & Analisi Angle (Tool 3)
         </h1>
         {(!tool3Data || (!tool3Data.scrapedAds?.length && !tool3Data.adsWithAnalysis?.length)) ? (
@@ -215,7 +349,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         ) : (
             <div className="space-y-6">
                 <Card>
-                    <CardHeader><h3 className="text-xl font-semibold">Riepilogo Scraping e Analisi</h3></CardHeader>
+                    <CardHeader><h3 className="report-h3 text-xl font-semibold">Riepilogo Scraping e Analisi</h3></CardHeader>
                     <CardContent>
                         <p className="text-sm">Annunci Totali Recuperati dallo Scraper: <span className="font-semibold">{tool3Data.scrapedAds?.length || 0}</span></p>
                         <p className="text-sm">Annunci con Analisi Angle (7C) Completata: <span className="font-semibold">{tool3Data.adsWithAnalysis?.filter(ad => ad.angleAnalysis && !ad.analysisError).length || 0}</span></p>
@@ -223,7 +357,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                 </Card>
                 {average7CScores && average7CChartData.length > 0 && (
                     <Card>
-                        <CardHeader><h3 className="text-xl font-semibold">Grafico Punteggi Medi 7C (Annunci Analizzati)</h3></CardHeader>
+                        <CardHeader><h3 className="report-h3 text-xl font-semibold">Grafico Punteggi Medi 7C (Annunci Analizzati)</h3></CardHeader>
                         <CardContent>
                            <div className="h-[300px] md:h-[350px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -245,7 +379,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     </Card>
                 )}
                  <Card>
-                    <CardHeader><h3 className="text-xl font-semibold">Dettaglio Tabella: Analisi Angle Inserzioni (Metodo 7C)</h3></CardHeader>
+                    <CardHeader><h3 className="report-h3 text-xl font-semibold">Dettaglio Tabella: Analisi Angle Inserzioni (Metodo 7C)</h3></CardHeader>
                     <CardContent>
                         {tool3Data.adsWithAnalysis && tool3Data.adsWithAnalysis.length > 0 ? (
                             <TableAngleAnalysis adsWithAnalysis={tool3Data.adsWithAnalysis} isDetailPage={true} />
@@ -254,14 +388,16 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                         )}
                     </CardContent>
                 </Card>
-                 <p className="text-sm text-muted-foreground"><i>[[PER VEDERE L'IMMAGINE ASSOCIATA A CIASCUN ANNUNCIO E ALTRI DETTAGLI VISUALI, FARE RIFERIMENTO ALLA PAGINA DEL TOOL 3 E USARE SCREENSHOT SE NECESSARIO]]</i></p>
+                <p className="text-sm text-muted-foreground italic">
+                    <span className="font-semibold">[[INSERIRE QUI EVENTUALI SCREENSHOT DELLE IMMAGINI DEGLI ANNUNCI PIÙ RILEVANTI DAL TOOL 3, SE NECESSARIO PER IL REPORT FINALE]]</span>
+                </p>
             </div>
         )}
       </section>
 
       {/* Tool 4 Section */}
-      <section>
-        <h1 className="text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
+      <section className="report-section">
+        <h1 className="report-h1 text-2xl font-bold text-sky-600 mb-4 pb-2 border-b-2 border-sky-600 flex items-center">
             <BarChart2 className="mr-3 h-7 w-7" />Sintesi: Analizzatore Dati GSC (Tool 4)
         </h1>
         {(!tool4Data || !tool4Data.analyzedGscData) ? (
@@ -270,7 +406,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             <div className="space-y-8">
                 {tool4Data.gscFiltersDisplay && (
                     <Card>
-                        <CardHeader><h3 className="text-xl font-semibold">Filtri GSC Applicati all'Export</h3></CardHeader>
+                        <CardHeader><h3 className="report-h3 text-xl font-semibold">Filtri GSC Applicati all'Export</h3></CardHeader>
                         <CardContent>
                             <div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: tool4Data.gscFiltersDisplay.replace(/<h1[^>]*>/i, '<strong>').replace(/<\/h1>/i, '</strong><br/>').replace(/<h[2-6][^>]*>/gi, '<strong>').replace(/<\/h[2-6]>/gi, '</strong><br/>').replace(/<ul>/gi, '<ul class="list-disc pl-5">').replace(/<li>/gi, '<li class="my-0.5">') }} />
                         </CardContent>
@@ -278,50 +414,49 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                 )}
 
                 {(['queries', 'pages', 'countries', 'devices', 'searchAppearance'] as GscReportType[]).map((reportType) => {
-                    if (!tool4Data.analyzedGscData) return null;
-                    const analysis = tool4Data.analyzedGscData[reportType];
-                    const itemDisplayName = getGSCReportItemDisplayName(reportType);
-                    const chartTypeToUse: 'bar' | 'pie' = reportType === 'devices' ? 'pie' : 'bar';
-                    
-                    const hasValidAnalysis = analysis && analysis.detailedDataWithDiffs && analysis.detailedDataWithDiffs.length > 0;
-                    
-                    const chartDataForRender = (hasValidAnalysis && analysis.topItemsByClicksChartData) 
-                        ? analysis.topItemsByClicksChartData 
-                        : { labels: [], datasets: [{ label: `Clic (Corrente) - ${itemDisplayName}`, data: [], backgroundColor: [] }] };
-                    const pieDataForRender = (hasValidAnalysis && analysis.pieChartData) ? analysis.pieChartData : [];
-                    const shouldRenderChart = chartTypeToUse === 'bar' ? (hasValidAnalysis && chartDataForRender.labels.length > 0) : (hasValidAnalysis && pieDataForRender && pieDataForRender.length > 0);
-
-                    if (!hasValidAnalysis && isLoading) return null;
-                    if (!hasValidAnalysis && !isLoading) {
+                    if (!tool4Data.analyzedGscData || !tool4Data.analyzedGscData[reportType]) {
                          return (
                             <Card key={reportType}>
-                                <CardHeader><h3 className="text-xl font-semibold">Analisi {itemDisplayName}</h3></CardHeader>
+                                <CardHeader><h3 className="report-h3 text-xl font-semibold">Analisi {getGSCReportItemDisplayName(reportType)}</h3></CardHeader>
                                 <CardContent>
-                                    <p className="text-muted-foreground">Nessun dato trovato per {itemDisplayName} o foglio non presente/vuoto.</p>
+                                    <p className="text-muted-foreground">Nessun dato trovato per {getGSCReportItemDisplayName(reportType)} o foglio non presente/vuoto.</p>
                                 </CardContent>
                             </Card>
                         );
                     }
-                    
+                    const analysis = tool4Data.analyzedGscData[reportType] as GscSectionAnalysis; // Cast sicuro dopo il check
+                    const itemDisplayName = getGSCReportItemDisplayName(reportType);
+                    const chartTypeToUse: 'bar' | 'pie' = reportType === 'devices' ? 'pie' : 'bar';
+
+                    const hasValidAnalysis = analysis && analysis.detailedDataWithDiffs && analysis.detailedDataWithDiffs.length > 0;
+
+                    const chartDataForRender = (hasValidAnalysis && analysis.topItemsByClicksChartData)
+                        ? analysis.topItemsByClicksChartData
+                        : { labels: [], datasets: [{ label: `Clic (Corrente) - ${itemDisplayName}`, data: [], backgroundColor: [] }] };
+                    const pieDataForRender = (hasValidAnalysis && analysis.pieChartData) ? analysis.pieChartData : [];
+                    const shouldRenderChart = chartTypeToUse === 'bar' ? (hasValidAnalysis && chartDataForRender.labels.length > 0) : (hasValidAnalysis && pieDataForRender && pieDataForRender.length > 0);
+
                     return (
                         <Card key={reportType}>
-                            <CardHeader><h3 className="text-xl font-semibold">Analisi {itemDisplayName}</h3></CardHeader>
+                            <CardHeader><h3 className="report-h3 text-xl font-semibold">Analisi {itemDisplayName}</h3></CardHeader>
                             <CardContent>
                                 {analysis.summaryText && <CardDescription className="mb-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: analysis.summaryText}} /> }
-                                
+
                                 {shouldRenderChart ? (
                                     <div className="my-6 h-[350px] md:h-[400px]">
                                         <ChartGSC
                                             data={chartDataForRender}
-                                            pieData={pieDataForRender} 
+                                            pieData={pieDataForRender}
                                             type={chartTypeToUse}
                                             title={`Top Elementi per ${itemDisplayName} per Clic`}
                                         />
                                     </div>
                                 ) : (
-                                    <p className="text-muted-foreground text-center py-4">[[GRAFICO PER ${itemDisplayName.toUpperCase()} NON DISPONIBILE O DATI INSUFFICIENTI. FARE SCREENSHOT DAL TOOL 4 SE NECESSARIO]]</p>
+                                    <p className="text-muted-foreground text-center py-4 italic">
+                                       <span className="font-semibold">[[GRAFICO PER ${itemDisplayName.toUpperCase()} NON DISPONIBILE O DATI INSUFFICIENTI. FARE SCREENSHOT DAL TOOL 4 SE NECESSARIO PER IL REPORT FINALE]]</span>
+                                    </p>
                                 )}
-                                
+
                                 <h4 className="text-md font-semibold text-foreground mt-4 mb-2">Tabella Dati Completa: {itemDisplayName}</h4>
                                 <TableGSC data={analysis.detailedDataWithDiffs} itemDisplayName={itemDisplayName} isDetailPage={true}/>
                             </CardContent>
@@ -332,30 +467,33 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         )}
       </section>
 
-      <footer className="mt-12 py-6 border-t border-border text-center">
+      <footer className="mt-12 py-6 border-t border-border text-center no-print">
           <Card className="bg-primary/10 border-primary/30">
             <CardHeader>
-                <CardTitle className="text-primary text-xl flex items-center justify-center"><Printer className="mr-2 h-6 w-6"/>Esportazione Finale del Report Consolidato in PDF</CardTitle>
+                <CardTitle className="text-primary text-xl flex items-center justify-center"><Printer className="mr-2 h-6 w-6"/>Esportazione Finale del Report Consolidato</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
                 <p className="text-primary-foreground text-base font-medium">
-                    Questa pagina contiene il report consolidato con tutti i dati, tabelle e grafici disponibili.
+                    Questa pagina contiene il report consolidato con tutti i dati, tabelle e grafici disponibili dalle analisi effettuate.
                 </p>
-                <p className="text-primary-foreground text-base mt-2">
-                    Per esportare l'intero contenuto di questa pagina (che potrebbe estendersi su più fogli) in un unico file PDF:
-                </p>
-                <ol className="list-decimal list-inside text-primary-foreground text-base mt-2 space-y-1">
-                    <li>Utilizza la funzione <strong>"Stampa"</strong> del tuo browser (solitamente accessibile con le scorciatoie da tastiera <kbd>Ctrl+P</kbd> su Windows/Linux o <kbd>Cmd+P</kbd> su macOS).</li>
-                    <li>Nella finestra di dialogo di stampa che appare, seleziona <strong>"Salva come PDF"</strong> (o "Stampa su PDF") come destinazione o stampante.</li>
-                    <li>Assicurati che nelle opzioni di stampa siano selezionate impostazioni come "Tutte le pagine" e "Layout Verticale" (Portrait) per un risultato ottimale.</li>
-                    <li>Clicca su "Salva" o "Stampa" per generare il file PDF.</li>
-                </ol>
-                 <p className="text-primary-foreground text-sm mt-3">
-                    Questo metodo catturerà tutto il contenuto visibile e non visibile (che richiede scorrimento) della pagina, impaginandolo automaticamente nel PDF.
-                </p>
+                <div>
+                    <Button onClick={handleGeneratePdf} variant="default" size="lg">
+                        <Printer className="mr-2 h-5 w-5"/> Genera PDF Report
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Questo aprirà la finestra di dialogo di stampa del tuo browser. Seleziona "Salva come PDF" come destinazione.<br/>
+                        Il PDF generato includerà tutto il contenuto di questa pagina, paginato automaticamente se necessario.
+                    </p>
+                </div>
+                 <div>
+                    <Button onClick={generateTextReport} variant="outline" size="lg">
+                        <Download className="mr-2 h-5 w-5"/> Scarica Sintesi Testuale (.txt)
+                    </Button>
+                </div>
             </CardContent>
         </Card>
       </footer>
     </div>
   );
 }
+

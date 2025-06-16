@@ -176,3 +176,66 @@ body {
   @apply px-3 py-1 text-xs;
   @apply rounded transition-colors hover:bg-sky-600;
 }
+
+/* Print styles */
+@media print {
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background-color: white !important; /* Ensure background is white for print */
+    color: black !important; /* Ensure text is black */
+  }
+  
+  /* Hide elements not meant for printing */
+  .no-print, .no-print * {
+    display: none !important;
+  }
+
+  /* Ensure cards and content are visible and flow correctly */
+  .tool5-master-report, .report-section, .card, .card-header, .card-content {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important; /* Light border for card visibility */
+    box-shadow: none !important;
+    page-break-inside: avoid; /* Try to avoid breaking cards across pages */
+  }
+
+  .report-section {
+    page-break-before: auto; /* Allow page breaks before major sections if needed */
+    margin-top: 20px; /* Add some space before sections on new pages */
+  }
+  .report-h1 {
+    color: #1e3a8a !important; /* Dark blue for H1 titles */
+    page-break-after: avoid; /* Try to keep title with content */
+  }
+  .report-h3 {
+    color: #1e40af !important; /* Slightly lighter blue for H3 */
+    page-break-after: avoid;
+  }
+
+  /* Table styling for print */
+  .table-container, .detail-page-table-container {
+    max-height: none !important; /* Remove scrollbars for print */
+    overflow: visible !important;
+    page-break-inside: auto; /* Allow tables to break across pages if long */
+  }
+  table th, table td {
+    border: 1px solid #ddd !important;
+    white-space: normal !important; /* Allow text wrapping in tables */
+    word-break: break-word;
+  }
+  table th {
+    background-color: #f0f0f0 !important; /* Light gray for table headers */
+  }
+  /* Chart containers */
+  .chart-container {
+     page-break-inside: avoid; /* Try to keep chart and its title together */
+  }
+   /* Ensure chart canvas itself is not hidden by other print styles */
+  canvas {
+    display: block !important; /* or inline-block, depending on layout */
+    max-width: 100% !important;
+    height: auto !important;
+  }
+}
+
