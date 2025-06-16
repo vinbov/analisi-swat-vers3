@@ -102,7 +102,10 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
     setError(null);
     setComparisonResults([]);
     setActiveCompetitorNames([]);
-    setDataForDetailPages(new Map()); 
+    
+    // Clear the ref and state for detail pages
+    dataForDetailPagesRef.current.clear();
+    setDataForDetailPages(new Map());
     localStorage.removeItem('tool1MioSitoCoreKeywords'); 
 
     if (!siteFiles['Mio Sito']?.content) {
@@ -223,8 +226,8 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
       
       if (results.length > 0) {
         try {
-            const commonKWs = results.filter(r => r.status === 'common');
-            const mySiteTop5Common = commonKWs
+            const commonKWsResult = results.filter(r => r.status === 'common');
+            const mySiteTop5Common = commonKWsResult
                 .filter(kw => kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10)
                 .sort((a, b) => (a.mySiteInfo.pos as number) - (b.mySiteInfo.pos as number))
                 .slice(0, 5)
@@ -232,7 +235,7 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
 
             const competitorsTopCommon: Record<string, { keyword: string; position: number | string | null }[]> = {};
             currentActiveCompetitors.slice(0, 2).forEach(compName => { 
-                competitorsTopCommon[compName] = commonKWs
+                competitorsTopCommon[compName] = commonKWsResult
                     .filter(kw => {
                         const compInfo = kw.competitorInfo.find(c => c.name === compName);
                         return compInfo && compInfo.pos !== 'N/P' && typeof compInfo.pos === 'number' && compInfo.pos <= 10;
@@ -254,7 +257,7 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
             
             const summaryForMasterReport = {
                 comparisonResultsCount: {
-                    common: commonKWs.length,
+                    common: commonKWsResult.length,
                     mySiteOnly: results.filter(r => r.status === 'mySiteOnly').length,
                     competitorOnly: results.filter(r => r.status === 'competitorOnly').length,
                     totalUnique: allKeywordsArray.length
@@ -301,12 +304,12 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
     }
     try {
       const dataId = `tool1-${section}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const payloadForDetail: Tool1DataPayload = { comparisonResults, activeCompetitorNames };
       
-      setDataForDetailPages(prevMap => {
-        const newMap = new Map(prevMap);
-        newMap.set(dataId, { comparisonResults, activeCompetitorNames });
-        return newMap;
-      });
+      // Directly update the ref's map
+      dataForDetailPagesRef.current.set(dataId, payloadForDetail);
+      // Also update state to ensure consistency if other parts rely on it
+      setDataForDetailPages(new Map(dataForDetailPagesRef.current));
 
       const url = `/tool1/${section}?dataId=${dataId}`;
       window.open(url, '_blank'); 
