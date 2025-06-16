@@ -16,7 +16,7 @@ import { ComparisonResultsTable } from '@/components/tools/tool1-comparator/tabl
 import { CommonKeywordsTop10Chart } from '@/components/tools/tool1-comparator/chart-common-keywords-top10';
 import { TopOpportunitiesChart } from '@/components/tools/tool1-comparator/chart-top-opportunities';
 import { TableAngleAnalysis } from '@/components/tools/tool3-scraper/table-angle-analysis';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'; // Per il grafico 7C live
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'; // Per il grafico 7C live
 import { TableGSC } from '@/components/tools/tool4-gsc-analyzer/table-gsc';
 import { ChartGSC } from '@/components/tools/tool4-gsc-analyzer/charts-gsc';
 
@@ -48,10 +48,21 @@ interface Tool5MasterReportProps {
     tool4Data: Tool4MasterReportData | null;
 }
 
+const chartJsColors = [
+    'rgba(54, 162, 235, 0.8)',  // Blu Primario
+    'rgba(255, 159, 64, 0.8)', // Arancione Accento
+    'rgba(75, 192, 192, 0.8)', // Verde Acqua
+    'rgba(255, 99, 132, 0.8)',  // Rosso
+    'rgba(153, 102, 255, 0.8)',// Viola
+    'rgba(255, 205, 86, 0.8)', // Giallo
+    'rgba(101, 115, 195, 0.8)',// Indaco
+    'rgba(201, 203, 207, 0.8)' // Grigio
+];
+const chartJsBorderColors = chartJsColors.map(color => color.replace('0.8', '1'));
+
+
 export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5MasterReportProps) {
   const [average7CScores, setAverage7CScores] = useState<AngleAnalysisScores | null>(null);
-  const [chartJsReady, setChartJsReady] = useState(false);
-
 
   useEffect(() => {
     if (tool3Data && tool3Data.adsWithAnalysis) {
@@ -104,6 +115,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
 
   const generateTableHtml = (headers: string[], data: Record<string, any>[], title?: string, tableId?: string): string => {
     if (!data || data.length === 0) return title ? `<h3 class="report-h3" id="${tableId}-title">${escapeHtml(title)}</h3><p>Nessun dato disponibile.</p>` : '<p>Nessun dato disponibile per questa tabella.</p>';
+    
     let html = title ? `<h3 class="report-h3" id="${tableId}-title">${escapeHtml(title)}</h3>` : '';
     html += `<div class="table-wrapper"><table ${tableId ? `id="${tableId}"` : ''} border="1">`;
     html += '<thead><tr>';
@@ -123,68 +135,28 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
   };
   
   const generateCompleteHTMLReport = () => {
-    const chartJsColors = [
-        'hsl(207, 80%, 55%)', // chart-1
-        'hsl(30, 100%, 60%)', // chart-2
-        'hsl(145, 60%, 45%)', // chart-3
-        'hsl(0, 75%, 60%)',   // chart-4
-        'hsl(260, 70%, 65%)', // chart-5
-        'hsl(210, 90%, 60%)', // Additional
-        'hsl(50, 100%, 55%)', // Additional
-    ];
-    let chartInitScripts = '';
-    let chartConfigs: any[] = [];
+    
+    let tocHTML = '<div class="toc"><h2>Indice dei Contenuti</h2><ul>';
+    const sections: {id: string; title: string, level: number}[] = [];
 
-    let html = `
-      <!DOCTYPE html>
-      <html lang="it">
-      <head>
-        <meta charset="UTF-8">
-        <title>Report Consolidato S.W.A.T.</title>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; color: #333; background-color: #f8f9fa; }
-          .report-container { max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #fff; box-shadow: 0 0 15px rgba(0,0,0,0.1); border-radius: 8px; }
-          .report-h1 { color: #0056b3; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; font-size: 26px; display: flex; align-items: center; }
-          .report-h3 { color: #007bff; margin-top: 25px; margin-bottom: 12px; border-bottom: 1px solid #ccc; padding-bottom: 6px; font-size: 18px; }
-          .report-h1 .lucide, .report-h3 .lucide { margin-right: 10px; width: 24px; height: 24px; } /* Basic icon styling */
-          .table-wrapper { overflow-x: auto; margin-bottom: 20px; }
-          table { border-collapse: collapse; width: 100%; font-size: 13px; }
-          th, td { border: 1px solid #dee2e6; padding: 9px; text-align: left; vertical-align: top; }
-          th { background-color: #e9ecef; font-weight: bold; }
-          tr:nth-child(even) td { background-color: #f8f9fa; }
-          ul { padding-left: 20px; margin-bottom: 15px; list-style-type: disc; }
-          li { margin-bottom: 6px; }
-          .chart-container-html-report { background-color: #fff; padding: 15px; text-align: center; margin: 20px 0; border: 1px solid #ced4da; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); max-width: 700px; height: 380px; margin-left:auto; margin-right:auto;}
-          .chart-container-html-report-pie { max-width: 450px; height: 450px; }
-          .filters-display { background-color: #e0f2fe; border: 1px solid #7dd3fc; padding: 15px; margin-bottom: 20px; border-radius: 5px; font-size: 0.9em; }
-          .filters-display h4 { margin-top: 0; color: #0c4a6e; font-size: 1.1em; }
-          .print-footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ccc; text-align: center; font-size: 0.8em; color: #777; }
-          @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
-            .report-container { box-shadow: none; border: none; padding:0; }
-            th { background-color: #e9ecef !important; }
-            tr:nth-child(even) td { background-color: #f8f9fa !important; }
-            .chart-container-html-report { border: 1px solid #ccc !important; box-shadow: none; }
-            .no-print { display: none !important; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="report-container">
-        <h1 class="report-h1">📊 Report Consolidato S.W.A.T.</h1>
-    `;
+    let reportHtml = '';
+    let chartConfigs: any[] = []; // Per memorizzare le configurazioni dei grafici Chart.js
+    const addSection = (id: string, title: string, level: number) => {
+        sections.push({id, title, level});
+        if (level === 1) return `<h1 class="report-h1" id="${id}">${escapeHtml(title)}</h1>`;
+        return `<h3 class="report-h3" id="${id}">${escapeHtml(title)}</h3>`;
+    };
 
-    // Tool 1 Section
-    html += `<h1 class="report-h1">📈 Sintesi: Analizzatore Comparativo Keyword (Tool 1)</h1>`;
+    // --- Tool 1 Section ---
+    reportHtml += addSection("tool1-main", "Tool 1: Analizzatore Comparativo Keyword", 1);
     if (tool1Data && tool1Data.rawResults && tool1Data.rawResults.length > 0) {
-        html += `<h3 class="report-h3">Conteggio Generale Keyword</h3>`;
-        html += `<ul>
+        reportHtml += addSection("tool1-summary", "Conteggio Generale Keyword", 3);
+        reportHtml += `<ul>
                   <li>Keyword Comuni: <strong>${tool1Data.comparisonResultsCount.common}</strong></li>
                   <li>Punti di Forza (Solo Mio Sito): <strong>${tool1Data.comparisonResultsCount.mySiteOnly}</strong></li>
                   <li>Opportunità (Solo Competitor): <strong>${tool1Data.comparisonResultsCount.competitorOnly}</strong></li>
                   <li>Totale Keyword Uniche Analizzate: <strong>${tool1Data.comparisonResultsCount.totalUnique}</strong></li>
-                </ul>`;
+                </ul><hr>`;
         
         // Grafico Tool 1: Common Keywords Top 10
         const commonKWsTool1ChartData = [];
@@ -192,43 +164,38 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         tool1Data.activeCompetitorNames.forEach(compName => {
             commonKWsTool1ChartData.push({ name: compName, count: tool1Data.rawResults.filter(kw => kw.status === 'common' && kw.competitorInfo.find(c => c.name === compName && c.pos !== 'N/P' && typeof c.pos === 'number' && c.pos <= 10)).length });
         });
+        
         if (commonKWsTool1ChartData.some(d => d.count > 0)) {
             const chart1Id = `chartTool1CommonTop10`;
-            html += `<h3 class="report-h3">Grafico: Analisi Keyword Comuni in Top 10</h3><div class="chart-container-html-report"><canvas id="${chart1Id}"></canvas></div>`;
+            reportHtml += addSection(chart1Id + "-container", "Grafico: Analisi Keyword Comuni in Top 10", 3);
+            reportHtml += `<div class="chart-container-html-report"><canvas id="${chart1Id}"></canvas></div>`;
             chartConfigs.push({
-                id: chart1Id,
-                type: 'bar',
+                id: chart1Id, type: 'bar',
                 data: {
                     labels: commonKWsTool1ChartData.map(d => d.name),
-                    datasets: [{
-                        label: 'N. Keyword Comuni in Top 10',
-                        data: commonKWsTool1ChartData.map(d => d.count),
-                        backgroundColor: commonKWsTool1ChartData.map((_, i) => chartJsColors[i % chartJsColors.length]),
-                    }]
+                    datasets: [{ label: 'N. Keyword Comuni in Top 10', data: commonKWsTool1ChartData.map(d => d.count), backgroundColor: commonKWsTool1ChartData.map((_, i) => chartJsColors[i % chartJsColors.length]), borderColor: commonKWsTool1ChartData.map((_, i) => chartJsBorderColors[i % chartJsBorderColors.length]), borderWidth: 1 }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: true, position: 'top'} } }
             });
-        } else { html += `<p>Nessuna keyword comune in Top 10 da visualizzare nel grafico.</p>`; }
+        } else { reportHtml += `<p>Nessuna keyword comune in Top 10 da visualizzare nel grafico.</p>`; }
+        reportHtml += '<hr>';
 
         // Grafico Tool 1: Top Opportunities
         const topOppsTool1 = tool1Data.rawResults.filter(r => r.status === 'competitorOnly' && typeof r.volume === 'number' && r.volume > 0).sort((a, b) => (b.volume as number) - (a.volume as number)).slice(0, 10);
         if (topOppsTool1.length > 0) {
             const chart2Id = `chartTool1TopOpps`;
-            html += `<h3 class="report-h3">Grafico: Top 10 Opportunità per Volume (Keyword Gap)</h3><div class="chart-container-html-report"><canvas id="${chart2Id}"></canvas></div>`;
+            reportHtml += addSection(chart2Id + "-container", "Grafico: Top 10 Opportunità per Volume (Keyword Gap)", 3);
+            reportHtml += `<div class="chart-container-html-report"><canvas id="${chart2Id}"></canvas></div>`;
             chartConfigs.push({
-                id: chart2Id,
-                type: 'bar', // Horizontal bar
+                id: chart2Id, type: 'bar',
                 data: {
                     labels: topOppsTool1.map(kw => kw.keyword.length > 25 ? kw.keyword.substring(0, 22) + '...' : kw.keyword),
-                    datasets: [{
-                        label: 'Volume di Ricerca',
-                        data: topOppsTool1.map(kw => kw.volume),
-                        backgroundColor: chartJsColors[1],
-                    }]
+                    datasets: [{ label: 'Volume di Ricerca', data: topOppsTool1.map(kw => kw.volume), backgroundColor: chartJsColors[1], borderColor: chartJsBorderColors[1], borderWidth: 1 }]
                 },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true } }, plugins: { legend: { display: true, position: 'top'} } }
             });
-        } else { html += `<p>Nessuna opportunità significativa per il grafico.</p>`; }
+        } else { reportHtml += `<p>Nessuna opportunità significativa per il grafico.</p>`; }
+        reportHtml += '<hr>';
         
         const commonDataTool1 = tool1Data.rawResults.filter(r => r.status === 'common');
         const commonHeadersTool1 = ['Keyword', 'Mio Sito Pos.', 'Mio Sito URL', ...tool1Data.activeCompetitorNames.flatMap(name => [`${name} Pos.`, `${name} URL`]), 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
@@ -242,12 +209,14 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             row['Volume'] = item.volume ?? 'N/A'; row['Difficoltà'] = item.difficolta ?? 'N/A'; row['Opportunity'] = item.opportunity ?? 'N/A'; row['Intento'] = item.intento ?? 'N/A';
             return row;
         });
-        html += generateTableHtml(commonHeadersTool1, commonTableDataTool1, "Tabella Dettaglio: Keyword Comuni", "tool1-common-table");
+        reportHtml += generateTableHtml(commonHeadersTool1, commonTableDataTool1, "Tabella Dettaglio: Keyword Comuni", "tool1-common-table");
+        reportHtml += '<hr>';
 
         const mySiteOnlyDataTool1 = tool1Data.rawResults.filter(r => r.status === 'mySiteOnly');
         const mySiteOnlyHeadersTool1 = ['Keyword', 'Mio Sito Pos.', 'Mio Sito URL', 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
         const mySiteOnlyTableDataTool1 = mySiteOnlyDataTool1.map(item => ({ Keyword: item.keyword, 'Mio Sito Pos.': item.mySiteInfo.pos, 'Mio Sito URL': item.mySiteInfo.url, Volume: item.volume ?? 'N/A', Difficoltà: item.difficolta ?? 'N/A', Opportunity: item.opportunity ?? 'N/A', Intento: item.intento ?? 'N/A' }));
-        html += generateTableHtml(mySiteOnlyHeadersTool1, mySiteOnlyTableDataTool1, "Tabella Dettaglio: Punti di Forza (Solo Mio Sito)", "tool1-mysiteonly-table");
+        reportHtml += generateTableHtml(mySiteOnlyHeadersTool1, mySiteOnlyTableDataTool1, "Tabella Dettaglio: Punti di Forza (Solo Mio Sito)", "tool1-mysiteonly-table");
+        reportHtml += '<hr>';
         
         const competitorOnlyDataTool1 = tool1Data.rawResults.filter(r => r.status === 'competitorOnly');
         const competitorOnlyHeadersTool1 = ['Keyword', ...tool1Data.activeCompetitorNames.flatMap(name => [`${name} Pos.`, `${name} URL`]), 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
@@ -261,40 +230,37 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
              row['Volume'] = item.volume ?? 'N/A'; row['Difficoltà'] = item.difficolta ?? 'N/A'; row['Opportunity'] = item.opportunity ?? 'N/A'; row['Intento'] = item.intento ?? 'N/A';
             return row;
         });
-        html += generateTableHtml(competitorOnlyHeadersTool1, competitorOnlyTableDataTool1, "Tabella Dettaglio: Opportunità (Solo Competitor)", "tool1-competitoronly-table");
+        reportHtml += generateTableHtml(competitorOnlyHeadersTool1, competitorOnlyTableDataTool1, "Tabella Dettaglio: Opportunità (Solo Competitor)", "tool1-competitoronly-table");
 
-    } else { html += "<p>Nessun dato disponibile dal Tool 1 o analisi non eseguita.</p>"; }
+    } else { reportHtml += "<p>Nessun dato disponibile dal Tool 1 o analisi non eseguita.</p>"; }
 
     // Tool 2 Section Placeholder
-    html += `<h1 class="report-h1">📋 Sintesi: Analizzatore Pertinenza & Priorità KW (Tool 2)</h1>`;
-    html += "<p>I risultati dettagliati del Tool 2 (analisi offline) sono visualizzati e scaricabili come CSV direttamente all'interno della pagina del tool stesso.</p>";
-    html += "<p><em>[[INSERIRE QUI EVENTUALI SINTESI MANUALI O SCREENSHOT DELLE TABELLE PIU' SIGNIFICATIVE DEL TOOL 2 SE NECESSARIO PER IL REPORT FINALE]]</em></p>";
+    reportHtml += addSection("tool2-main", "Tool 2: Analizzatore Pertinenza & Priorità KW (Offline)", 1);
+    reportHtml += "<p>I risultati dettagliati del Tool 2 (analisi offline) sono visualizzati e scaricabili come CSV direttamente all'interno della pagina del tool stesso. Questa sezione del report consolidato serve come promemoria per includerli se necessario.</p>";
+    reportHtml += "<p><em>[[INCLUDERE QUI MANUALMENTE SCREENSHOT/DATI SIGNIFICATIVI DAL TOOL 2 SE RICHIESTO PER IL REPORT FINALE]]</em></p>";
 
     // Tool 3 Section
-    html += `<h1 class="report-h1">📢 Sintesi: FB Ads Library Scraper & Analisi Angle (Tool 3)</h1>`;
+    reportHtml += addSection("tool3-main", "Tool 3: FB Ads Library Scraper & Analisi Angle", 1);
     if (tool3Data && tool3Data.adsWithAnalysis) {
-        html += `<p>Annunci Totali Recuperati dallo Scraper: <strong>${tool3Data.scrapedAds?.length || 0}</strong></p>`;
+        reportHtml += addSection("tool3-summary", "Riepilogo Analisi Facebook Ads", 3);
+        reportHtml += `<p>Annunci Totali Recuperati dallo Scraper: <strong>${tool3Data.scrapedAds?.length || 0}</strong></p>`;
         const analyzedCount = tool3Data.adsWithAnalysis?.filter(ad => ad.angleAnalysis && !ad.angleAnalysis.error).length || 0;
-        html += `<p>Annunci con Analisi Angle (7C) Completata: <strong>${analyzedCount}</strong></p>`;
+        reportHtml += `<p>Annunci con Analisi Angle (7C) Completata: <strong>${analyzedCount}</strong></p>`;
         
         if (average7CScores && analyzedCount > 0) {
-            html += `<h3 class="report-h3">Punteggi Medi 7C (su annunci analizzati)</h3>`;
             const chart3Id = `chartTool3Avg7C`;
-            html += `<div class="chart-container-html-report"><canvas id="${chart3Id}"></canvas></div>`;
+            reportHtml += addSection(chart3Id + "-container", "Grafico: Punteggi Medi 7C (su annunci analizzati)", 3);
+            reportHtml += `<div class="chart-container-html-report"><canvas id="${chart3Id}"></canvas></div>`;
             chartConfigs.push({
-                id: chart3Id,
-                type: 'bar',
+                id: chart3Id, type: 'bar',
                 data: {
                     labels: Object.keys(average7CScores),
-                    datasets: [{
-                        label: 'Punteggio Medio 7C',
-                        data: Object.values(average7CScores),
-                        backgroundColor: chartJsColors[2],
-                    }]
+                    datasets: [{ label: 'Punteggio Medio 7C', data: Object.values(average7CScores), backgroundColor: chartJsColors[2], borderColor: chartJsBorderColors[2], borderWidth: 1 }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 2, ticks: { stepSize: 0.5 } } } }
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 2, ticks: { stepSize: 0.5 } } }, plugins: { legend: { display: true, position: 'top'} } }
             });
-        } else { html += `<p>Nessun dato sui punteggi medi 7C da visualizzare.</p>`;}
+        } else { reportHtml += `<p>Nessun dato sui punteggi medi 7C da visualizzare.</p>`;}
+        reportHtml += '<hr>';
         
         const angleHeadersTool3 = ["Ad (Titolo/Testo)", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "Totale", "Valutazione", "Analisi Approfondita", "Errore"];
         const angleTableDataTool3 = tool3Data.adsWithAnalysis.map(item => ({
@@ -305,29 +271,31 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             "Analisi Approfondita": item.angleAnalysis?.detailedAnalysis?.replace(/\n/g, '<br />') ?? 'N/A',
             "Errore": item.analysisError || item.angleAnalysis?.error || ''
         }));
-        html += generateTableHtml(angleHeadersTool3, angleTableDataTool3, "Tabella Dettaglio: Analisi Angle Inserzioni (Metodo 7C)", "tool3-angle-table");
-    } else { html += "<p>Nessun dato disponibile dal Tool 3 o analisi non eseguita.</p>"; }
+        reportHtml += generateTableHtml(angleHeadersTool3, angleTableDataTool3, "Tabella Dettaglio: Analisi Angle Inserzioni (Metodo 7C)", "tool3-angle-table");
+    } else { reportHtml += "<p>Nessun dato disponibile dal Tool 3 o analisi non eseguita.</p>"; }
 
     // Tool 4 Section
-    html += `<h1 class="report-h1">📊 Sintesi: Analizzatore Dati GSC (Tool 4)</h1>`;
+    reportHtml += addSection("tool4-main", "Tool 4: Analizzatore Dati GSC", 1);
     if (tool4Data && tool4Data.analyzedGscData) {
         if (tool4Data.gscFiltersDisplay) {
             const cleanGscFiltersDisplay = tool4Data.gscFiltersDisplay.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-            html += `<div class="filters-display">${cleanGscFiltersDisplay}</div>`;
+            reportHtml += addSection("tool4-filters", "Filtri GSC Applicati", 3);
+            reportHtml += `<div class="filters-display">${cleanGscFiltersDisplay}</div><hr>`;
         }
         (['queries', 'pages', 'countries', 'devices', 'searchAppearance'] as GscReportType[]).forEach((reportType, idx) => {
             if (!tool4Data.analyzedGscData) return;
             const analysis = tool4Data.analyzedGscData[reportType];
             const itemDisplayName = getGSCReportItemDisplayName(reportType);
-            html += `<h3 class="report-h3">Analisi ${escapeHtml(itemDisplayName)}</h3>`;
+            reportHtml += addSection(`tool4-${reportType}-section`, `Analisi GSC: ${escapeHtml(itemDisplayName)}`, 3);
+            
             if (analysis && analysis.detailedDataWithDiffs && analysis.detailedDataWithDiffs.length > 0) {
                 const cleanSummaryText = (analysis.summaryText || "").replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-                html += `<p>${cleanSummaryText}</p>`;
+                reportHtml += `<p>${cleanSummaryText}</p>`;
                 
                 const chart4Id = `chartTool4_${reportType}`;
                 const isPieChart = reportType === 'devices';
                 const chartContainerClass = isPieChart ? "chart-container-html-report chart-container-html-report-pie" : "chart-container-html-report";
-                html += `<div class="${chartContainerClass}"><canvas id="${chart4Id}"></canvas></div>`;
+                reportHtml += `<div class="${chartContainerClass}"><canvas id="${chart4Id}"></canvas></div>`;
 
                 const chartDataForTool4 = analysis.topItemsByClicksChartData || { labels: [], datasets: [] };
                 let chartJsData;
@@ -338,6 +306,8 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                             label: `Clic per ${itemDisplayName}`,
                             data: analysis.pieChartData.map(d => d.value),
                             backgroundColor: analysis.pieChartData.map((_, i) => chartJsColors[i % chartJsColors.length]),
+                            borderColor: analysis.pieChartData.map((_, i) => chartJsBorderColors[i % chartJsBorderColors.length]),
+                            borderWidth: 1
                         }]
                     };
                 } else if (!isPieChart && chartDataForTool4.labels.length > 0 && chartDataForTool4.datasets[0]?.data.length > 0) {
@@ -347,20 +317,20 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                             label: chartDataForTool4.datasets[0]?.label || `Clic per ${itemDisplayName}`,
                             data: chartDataForTool4.datasets[0]?.data,
                             backgroundColor: chartJsColors[idx % chartJsColors.length],
+                            borderColor: chartJsBorderColors[idx % chartJsBorderColors.length],
+                            borderWidth: 1
                         }]
                     };
                 }
 
                 if (chartJsData) {
                     chartConfigs.push({
-                        id: chart4Id,
-                        type: isPieChart ? 'pie' : 'bar',
-                        data: chartJsData,
-                        options: { responsive: true, maintainAspectRatio: false, scales: (isPieChart ? {} : { y: { beginAtZero: true } }), plugins: { legend: { display: isPieChart }} }
+                        id: chart4Id, type: isPieChart ? 'pie' : 'bar', data: chartJsData,
+                        options: { responsive: true, maintainAspectRatio: false, scales: (isPieChart ? {} : { y: { beginAtZero: true } }), plugins: { legend: { display: true, position: 'top'} } }
                     });
                 } else {
                     const chartContainerDiv = `<div class="${chartContainerClass}"><p>Dati insufficienti per il grafico di ${escapeHtml(itemDisplayName)}.</p></div>`;
-                     html = html.replace(`<div class="${chartContainerClass}"><canvas id="${chart4Id}"></canvas></div>`, chartContainerDiv);
+                    reportHtml = reportHtml.replace(`<div class="${chartContainerClass}"><canvas id="${chart4Id}"></canvas></div>`, chartContainerDiv);
                 }
                 
                 const gscHeaders = [itemDisplayName, "Clic Attuali", "Clic Prec.", "Diff. Clic", "% Clic", "Impr. Attuali", "Impr. Prec.", "Diff. Impr.", "% Impr.", "CTR Attuale", "CTR Prec.", "Diff. CTR", "Pos. Attuale", "Pos. Prec.", "Diff. Pos."];
@@ -375,20 +345,93 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     "Pos. Attuale": d.position_current?.toFixed(1) || 'N/A', "Pos. Prec.": d.position_previous?.toFixed(1) || 'N/A',
                     "Diff. Pos.": d.diff_position?.toFixed(1) || 'N/A',
                 }));
-                html += generateTableHtml(gscHeaders, gscTableData, `Tabella Dati Completa: ${escapeHtml(itemDisplayName)}`, `tool4-${reportType}-table`);
-            } else { html += `<p>Nessun dato trovato per ${escapeHtml(itemDisplayName)}.</p>`; }
+                reportHtml += generateTableHtml(gscHeaders, gscTableData, `Tabella Dati Completa: ${escapeHtml(itemDisplayName)}`, `tool4-${reportType}-table`);
+            } else { reportHtml += `<p>Nessun dato trovato per ${escapeHtml(itemDisplayName)}.</p>`; }
+            if (idx < (['queries', 'pages', 'countries', 'devices', 'searchAppearance'] as GscReportType[]).length -1) {
+                reportHtml += '<hr>';
+            }
         });
-    } else { html += "<p>Nessun dato disponibile dal Tool 4 o analisi non eseguita.</p>"; }
+    } else { reportHtml += "<p>Nessun dato disponibile dal Tool 4 o analisi non eseguita.</p>"; }
 
-    html += `
+    // --- Finalizza TOC ---
+    sections.forEach(section => {
+        tocHTML += `<li class="toc-level-${section.level}"><a href="#${section.id}">${escapeHtml(section.title)}</a></li>`;
+    });
+    tocHTML += '</ul></div><hr class="toc-end-hr">';
+
+
+    let finalHtml = `
+      <!DOCTYPE html>
+      <html lang="it">
+      <head>
+        <meta charset="UTF-8">
+        <title>Report Consolidato S.W.A.T.</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 0; line-height: 1.6; color: #333; background-color: #f4f4f4; }
+          .report-container { max-width: 1200px; margin: 20px auto; padding: 30px; background-color: #fff; box-shadow: 0 0 20px rgba(0,0,0,0.1); border-radius: 8px; }
+          
+          .report-h1 { color: #1e3a8a; /* Dark Blue */ border-bottom: 2px solid #3b82f6; /* Primary Blue */ padding-bottom: 10px; margin-top: 30px; margin-bottom:20px; font-size: 28px; font-weight: 600; }
+          .report-h1:first-of-type { margin-top: 0; }
+          .report-h3 { color: #1d4ed8; /* Medium Blue */ margin-top: 25px; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #93c5fd; /* Lighter Blue */ font-size: 20px; font-weight: 500;}
+          
+          .table-wrapper { overflow-x: auto; margin-bottom: 25px; border: 1px solid #ddd; border-radius: 4px;}
+          table { border-collapse: collapse; width: 100%; font-size: 13px; }
+          th, td { border: 1px solid #e2e8f0; /* Light Gray */ padding: 10px 12px; text-align: left; vertical-align: top; }
+          th { background-color: #f1f5f9; /* Very Light Blue/Gray */ font-weight: 600; color: #0f172a; /* Darker Gray for header text */ }
+          tr:nth-child(even) td { background-color: #f8fafc; /* Slightly off-white for zebra */ }
+          td { color: #334155; /* Slate Gray for table text */ }
+          
+          ul { padding-left: 20px; margin-bottom: 15px; list-style-type: disc; }
+          li { margin-bottom: 8px; }
+          
+          .chart-container-html-report { background-color: #fff; padding: 20px; text-align: center; margin: 25px auto; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 750px; height: 400px; }
+          .chart-container-html-report-pie { max-width: 480px; height: 480px; }
+          
+          .filters-display { background-color: #e0f2fe; border: 1px solid #7dd3fc; padding: 15px; margin-bottom: 20px; border-radius: 5px; font-size: 0.9em; }
+          .filters-display h4 { margin-top: 0; color: #0c4a6e; font-size: 1.1em; }
+
+          hr { border: none; border-top: 1px solid #e2e8f0; margin-top: 30px; margin-bottom: 30px; }
+          hr.toc-end-hr { margin-top: 20px; margin-bottom: 40px; border-top: 2px solid #93c5fd; }
+          
+          .toc { padding: 20px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 30px; }
+          .toc h2 { font-size: 22px; color: #1e3a8a; margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #93c5fd; padding-bottom: 8px; }
+          .toc ul { list-style-type: none; padding-left: 0; }
+          .toc li a { text-decoration: none; color: #1d4ed8; display: block; padding: 6px 0; }
+          .toc li a:hover { text-decoration: underline; color: #3b82f6; }
+          .toc li.toc-level-1 > a { font-weight: 500; font-size: 1.1em; padding-left: 0px; }
+          .toc li.toc-level-3 > a { padding-left: 20px; font-size: 0.95em; }
+
+
+          .print-footer { display: none; } /* Nascondi nel rendering HTML normale */
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; font-size: 10pt; }
+            .report-container { box-shadow: none; border: none; padding:0; margin: 15mm; max-width: none; }
+            th { background-color: #f1f5f9 !important; color: #0f172a !important;}
+            tr:nth-child(even) td { background-color: #f8fafc !important; }
+            .chart-container-html-report { border: 1px solid #ccc !important; box-shadow: none; page-break-inside: avoid; }
+            .table-wrapper { page-break-inside: avoid; }
+            table { page-break-inside: auto; }
+            h1, h3 { page-break-after: avoid; page-break-inside: avoid; }
+            .toc { display: none; } /* Nascondi TOC dalla stampa per ora, può essere lungo */
+            hr { border-color: #ccc !important; }
+            .no-print { display: none !important; }
+            .print-footer { display: block; position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 0.8em; color: #777; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="report-container">
+        ${tocHTML} 
+        ${reportHtml}
         <div class="print-footer no-print">
-          Fine del Report Consolidato S.W.A.T. Per la versione PDF, apri questo file HTML nel browser e utilizza la funzione "File > Stampa > Salva come PDF".
+          Per la versione PDF, apri questo file HTML nel browser e utilizza la funzione "File > Stampa > Salva come PDF".
         </div>
     `;
     
     // Script per inizializzare i grafici Chart.js
     if (chartConfigs.length > 0) {
-        chartInitScripts = `<script>
+        finalHtml += `<script>
             window.addEventListener('DOMContentLoaded', () => {
                 const chartConfigs = ${JSON.stringify(chartConfigs)};
                 chartConfigs.forEach(config => {
@@ -402,7 +445,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                             });
                         } catch (e) {
                             console.error('Errore creazione grafico Chart.js:', config.id, e);
-                            ctx.parentElement.innerHTML = '<p style="color:red; text-align:center;">Errore nel caricamento del grafico.</p>';
+                            if (ctx.parentElement) ctx.parentElement.innerHTML = '<p style="color:red; text-align:center;">Errore nel caricamento del grafico.</p>';
                         }
                     } else {
                         console.warn('Canvas non trovato per grafico:', config.id);
@@ -412,10 +455,9 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         <\/script>`;
     }
 
-    html += chartInitScripts;
-    html += `</div></body></html>`;
+    finalHtml += `</div></body></html>`;
 
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = "report_consolidato_swat_completo.html";
@@ -436,7 +478,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
       
       <Card className="no-print">
         <CardHeader>
-            <CardTitle className="text-primary text-xl flex items-center"><FileCode className="mr-2 h-6 w-6"/>Esportazione Report HTML Completo con Grafici</CardTitle>
+            <CardTitle className="text-primary text-xl flex items-center"><FileCode className="mr-2 h-6 w-6"/>Esportazione Report HTML Completo</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
             <p className="text-primary-foreground text-base">
@@ -472,10 +514,10 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         {tool1Data && tool1Data.rawResults && tool1Data.rawResults.length > 0 && (
             <Card className="my-4 report-section" id="tool1-summary-live">
                 <CardHeader>
-                    <CardTitle className="report-h1 flex items-center"><BarChart3 className="mr-2"/>Tool 1: Analizzatore Comparativo Keyword</CardTitle>
+                    <CardTitle className="report-h1 text-2xl flex items-center"><BarChart3 className="mr-2"/>Tool 1: Analizzatore Comparativo Keyword</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <h3 className="report-h3">Conteggio Generale Keyword</h3>
+                    <h3 className="report-h3 text-lg mt-4">Conteggio Generale Keyword</h3>
                     <ul className="list-disc list-inside text-sm text-muted-foreground">
                         <li>Keyword Comuni: {tool1Data.comparisonResultsCount.common}</li>
                         <li>Punti di Forza: {tool1Data.comparisonResultsCount.mySiteOnly}</li>
@@ -483,17 +525,17 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                         <li>Totale Uniche: {tool1Data.comparisonResultsCount.totalUnique}</li>
                     </ul>
                     
-                    <h3 className="report-h3 mt-4">Grafico: Analisi Keyword Comuni in Top 10 (Live)</h3>
+                    <h3 className="report-h3 text-lg mt-4">Grafico: Analisi Keyword Comuni in Top 10 (Live)</h3>
                     <div className="h-[350px] w-full my-4">
                         <CommonKeywordsTop10Chart results={tool1Data.rawResults} activeCompetitorNames={tool1Data.activeCompetitorNames} />
                     </div>
 
-                    <h3 className="report-h3 mt-4">Grafico: Top 10 Opportunità per Volume (Live)</h3>
+                    <h3 className="report-h3 text-lg mt-4">Grafico: Top 10 Opportunità per Volume (Live)</h3>
                      <div className="h-[400px] w-full my-4">
                         <TopOpportunitiesChart results={tool1Data.rawResults} />
                     </div>
                     
-                    <h3 className="report-h3 mt-4">Anteprima Tabella: Keyword Comuni (Prime 5 righe)</h3>
+                    <h3 className="report-h3 text-lg mt-4">Anteprima Tabella: Keyword Comuni (Prime 5 righe)</h3>
                     <ComparisonResultsTable results={tool1Data.rawResults.filter(r => r.status === 'common').slice(0,5)} type="common" activeCompetitorNames={tool1Data.activeCompetitorNames} />
                 </CardContent>
             </Card>
@@ -501,31 +543,32 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
          {tool3Data && (tool3Data.scrapedAds?.length > 0 || tool3Data.adsWithAnalysis?.length > 0) && (
             <Card className="my-4 report-section" id="tool3-summary-live">
                 <CardHeader>
-                    <CardTitle className="report-h1 flex items-center"><SearchCode className="mr-2"/>Tool 3: FB Ads Library Scraper & Analisi Angle</CardTitle>
+                    <CardTitle className="report-h1 text-2xl flex items-center"><SearchCode className="mr-2"/>Tool 3: FB Ads Library Scraper & Analisi Angle</CardTitle>
                 </CardHeader>
                 <CardContent>
+                     <h3 className="report-h3 text-lg mt-4">Riepilogo Analisi Facebook Ads</h3>
                      <ul className="list-disc list-inside text-sm text-muted-foreground">
                         <li>Annunci Recuperati: {tool3Data.scrapedAds?.length || 0}</li>
                         <li>Annunci Analizzati (7C): {tool3Data.adsWithAnalysis?.filter(ad => ad.angleAnalysis && !ad.angleAnalysis.error).length || 0}</li>
                     </ul>
                     {average7CScores && (
                         <>
-                        <h3 className="report-h3 mt-4">Grafico: Punteggi Medi 7C (Live)</h3>
+                        <h3 className="report-h3 text-lg mt-4">Grafico: Punteggi Medi 7C (Live)</h3>
                         <div className="h-[350px] w-full my-4">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={Object.entries(average7CScores).map(([name, value]) => ({name, value}))}>
+                                <RechartsBarChart data={Object.entries(average7CScores).map(([name, value]) => ({name, value}))}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" />
                                     <YAxis domain={[0, 2]} allowDecimals={false} />
                                     <Tooltip />
                                     <Legend />
                                     <Bar dataKey="value" name="Punteggio Medio" fill="hsl(var(--chart-3))" />
-                                </BarChart>
+                                </RechartsBarChart>
                             </ResponsiveContainer>
                         </div>
                         </>
                     )}
-                    <h3 className="report-h3 mt-4">Anteprima Tabella: Analisi Angle (Prime 3 righe)</h3>
+                    <h3 className="report-h3 text-lg mt-4">Anteprima Tabella: Analisi Angle (Prime 3 righe)</h3>
                     <TableAngleAnalysis adsWithAnalysis={tool3Data.adsWithAnalysis.slice(0,3)} />
                 </CardContent>
             </Card>
@@ -533,7 +576,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         {tool4Data && tool4Data.analyzedGscData && (
              <Card className="my-4 report-section" id="tool4-summary-live">
                 <CardHeader>
-                    <CardTitle className="report-h1 flex items-center"><BarChart2 className="mr-2"/>Tool 4: Analizzatore Dati GSC</CardTitle>
+                    <CardTitle className="report-h1 text-2xl flex items-center"><BarChart2 className="mr-2"/>Tool 4: Analizzatore Dati GSC</CardTitle>
                 </CardHeader>
                 <CardContent>
                 {tool4Data.gscFiltersDisplay && <div className="text-xs text-muted-foreground prose prose-xs max-w-none" dangerouslySetInnerHTML={{__html: tool4Data.gscFiltersDisplay}}/>}
@@ -545,7 +588,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     const chartType = reportType === 'devices' ? 'pie' : 'bar';
                     return (
                         <div key={reportType} className="my-6">
-                            <h3 className="report-h3">{`Sintesi ${itemDisplayName}`}</h3>
+                            <h3 className="report-h3 text-lg">{`Sintesi ${itemDisplayName}`}</h3>
                             {analysis.summaryText && <p className="text-sm text-muted-foreground mb-2" dangerouslySetInnerHTML={{__html: analysis.summaryText}} />}
                             <div className="h-[350px] md:h-[400px] my-4">
                                 <ChartGSC
@@ -555,7 +598,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                                     title={`Top ${itemDisplayName} per Clic (Live)`}
                                 />
                             </div>
-                            <h4 className="font-semibold mt-2">Tabella Dati: {itemDisplayName} (Prime 5 righe)</h4>
+                            <h4 className="font-semibold mt-2 text-base">Tabella Dati: {itemDisplayName} (Prime 5 righe)</h4>
                             <TableGSC data={analysis.detailedDataWithDiffs.slice(0,5)} itemDisplayName={itemDisplayName} />
                         </div>
                     );
@@ -566,21 +609,16 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     </div>
 
       <footer className="mt-12 py-6 border-t border-border text-center no-print">
-          <Card className="bg-primary/10 border-primary/30">
-            <CardHeader>
-                <CardTitle className="text-primary text-xl flex items-center justify-center"><FileCode className="mr-2 h-6 w-6"/>Esportazione Finale del Report HTML</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                <p className="text-primary-foreground text-base font-medium">
-                   Clicca il pulsante "Scarica Report HTML Completo con Grafici" qui sopra per generare il file.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                   Aprilo nel tuo browser (i grafici verranno disegnati). Quindi, utilizza "File &gt; Stampa &gt; Salva come PDF" per generare un PDF multipagina.
-                </p>
-            </CardContent>
-        </Card>
+        <p className="text-muted-foreground">
+            Per generare un report PDF completo, scarica il file HTML (pulsante sopra) e aprilo nel tuo browser.
+            Quindi, utilizza la funzione "File &gt; Stampa" e scegli "Salva come PDF".
+        </p>
+        <p className="text-sm text-muted-foreground mt-2">
+            Questo metodo assicura che tutti i dati, le tabelle formattate e i grafici generati dinamicamente siano inclusi nel tuo PDF finale.
+        </p>
       </footer>
     </div>
   );
 }
 
+    
