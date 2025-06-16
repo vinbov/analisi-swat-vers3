@@ -38,7 +38,7 @@ export default function HomePage() {
   const [tool3ApifyActorId, setTool3ApifyActorId] = useState('curious_coder~facebook-ads-library-scraper');
   const [tool3FbAdsUrl, setTool3FbAdsUrl] = useState('');
   const [tool3MaxAdsToProcess, setTool3MaxAdsToProcess] = useState(10);
-  const [tool3GoogleApiKey, setTool3GoogleApiKey] = useState('');
+  const [tool3OpenAIApiKey, setTool3OpenAIApiKey] = useState(''); // Modificato da googleApiKey
   const [tool3ScrapedAds, setTool3ScrapedAds] = useState<ScrapedAd[]>([]);
   const [tool3AdsWithAnalysis, setTool3AdsWithAnalysis] = useState<AdWithAngleAnalysis[]>([]);
 
@@ -94,8 +94,8 @@ export default function HomePage() {
                 setFbAdsUrl={setTool3FbAdsUrl}
                 maxAdsToProcess={tool3MaxAdsToProcess}
                 setMaxAdsToProcess={setTool3MaxAdsToProcess}
-                googleApiKey={tool3GoogleApiKey}
-                setGoogleApiKey={setTool3GoogleApiKey}
+                openAIApiKey={tool3OpenAIApiKey} // Modificato
+                setOpenAIApiKey={setTool3OpenAIApiKey} // Modificato
                 scrapedAds={tool3ScrapedAds}
                 setScrapedAds={setTool3ScrapedAds}
                 adsWithAnalysis={tool3AdsWithAnalysis}
@@ -127,8 +127,6 @@ export default function HomePage() {
                     competitorOnly: tool1ComparisonResults.filter(r => r.status === 'competitorOnly').length,
                     totalUnique: new Set(tool1ComparisonResults.map(r => r.keyword)).size
                   },
-                  // Potremmo voler passare qui sintesi più dettagliate se necessario,
-                  // per ora il Tool5MasterReport le ricava dai risultati completi o da localStorage (che possiamo eliminare)
                   rawResults: tool1ComparisonResults, 
                   activeCompetitorNames: tool1ActiveCompetitorNames,
                 }}

@@ -26,8 +26,8 @@ interface Tool3ScraperProps {
   setFbAdsUrl: (value: string) => void;
   maxAdsToProcess: number;
   setMaxAdsToProcess: (value: number) => void;
-  googleApiKey: string;
-  setGoogleApiKey: (value: string) => void;
+  openAIApiKey: string; // Modificato da googleApiKey
+  setOpenAIApiKey: (value: string) => void; // Modificato da setGoogleApiKey
   scrapedAds: ScrapedAd[];
   setScrapedAds: React.Dispatch<React.SetStateAction<ScrapedAd[]>>;
   adsWithAnalysis: AdWithAngleAnalysis[];
@@ -43,8 +43,8 @@ export function Tool3Scraper({
   setFbAdsUrl,
   maxAdsToProcess,
   setMaxAdsToProcess,
-  googleApiKey,
-  setGoogleApiKey,
+  openAIApiKey, // Modificato
+  setOpenAIApiKey, // Modificato
   scrapedAds,
   setScrapedAds,
   adsWithAnalysis,
@@ -67,8 +67,8 @@ export function Tool3Scraper({
     setLoadingMessage("Avvio scraping con Apify...");
     setApifyStatus("Stato: Inizializzazione...");
     setError(null);
-    setScrapedAds([]); // Clear previous global state
-    setAdsWithAnalysis([]); // Clear previous global state
+    setScrapedAds([]); 
+    setAdsWithAnalysis([]); 
 
     const apifyInputPayload = {
       urls: [{ url: fbAdsUrl }],
@@ -141,8 +141,8 @@ export function Tool3Scraper({
         if (adsCounter >= maxAdsToProcess) break;
       }
       
-      setScrapedAds(processedAdsCollector); // Update global state
-      setAdsWithAnalysis(processedAdsCollector.map(ad => ({...ad}))); // Prepare for analysis
+      setScrapedAds(processedAdsCollector); 
+      setAdsWithAnalysis(processedAdsCollector.map(ad => ({...ad}))); 
       setLoadingMessage("Scraping completato!");
       setApifyStatus("Stato: Completato.");
       toast({ title: "Scraping Completato", description: `${processedAdsCollector.length} annunci recuperati.` });
@@ -163,43 +163,41 @@ export function Tool3Scraper({
       return;
     }
     
-    const currentGoogleApiKey = googleApiKey.trim(); 
-    if (!currentGoogleApiKey) {
-      setError("Inserisci la tua Google API Key per l'analisi dell'angle con Gemini.");
-      toast({ title: "Google API Key Mancante", description: "Inserisci la Google API Key per l'analisi con Gemini.", variant: "destructive" });
+    const currentOpenAIApiKey = openAIApiKey.trim(); // Modificato
+    if (!currentOpenAIApiKey) {
+      setError("Inserisci la tua OpenAI API Key per l'analisi dell'angle."); // Modificato
+      toast({ title: "OpenAI API Key Mancante", description: "Inserisci la OpenAI API Key per l'analisi.", variant: "destructive" }); // Modificato
       return;
     }
 
     setIsLoadingAnalysis(true);
-    setLoadingMessage("Analisi angle in corso con Google AI (Gemini)...");
+    setLoadingMessage("Analisi angle in corso con OpenAI..."); // Modificato
     setError(null);
 
-    // Use adsWithAnalysis which was initialized with scrapedAds
     const currentAdsForAnalysis = [...adsWithAnalysis]; 
 
     const analysisPromises = currentAdsForAnalysis.map(async (ad) => {
-      // Skip if already analyzed (e.g., if user clicks multiple times)
       if (ad.angleAnalysis || ad.analysisError) return ad; 
       try {
         const analysisResult = await analyzeAdAngleAction({
           adText: ad.testo,
           adTitle: ad.titolo,
-        }, currentGoogleApiKey); 
+        }, currentOpenAIApiKey); // Modificato
         return { ...ad, angleAnalysis: analysisResult };
       } catch (e: any) {
         console.error(`Errore analisi angle per ad "${ad.titolo}":`, e);
-        return { ...ad, analysisError: e.message || "Errore sconosciuto durante analisi AI con Google AI" };
+        return { ...ad, analysisError: e.message || "Errore sconosciuto durante analisi AI con OpenAI" }; // Modificato
       }
     });
 
     try {
       const results = await Promise.all(analysisPromises);
-      setAdsWithAnalysis(results); // Update global state
+      setAdsWithAnalysis(results); 
       setLoadingMessage("Analisi angle completata!");
-      toast({ title: "Analisi Angle Completata", description: "L'analisi 7C degli annunci (Google AI) è terminata." });
+      toast({ title: "Analisi Angle Completata", description: "L'analisi 7C degli annunci (OpenAI) è terminata." }); // Modificato
     } catch (e: any) {
-      setError(`Errore durante l'analisi degli angle (Google AI): ${e.message}`);
-      toast({ title: "Errore Analisi Angle (Google AI)", description: e.message, variant: "destructive" });
+      setError(`Errore durante l'analisi degli angle (OpenAI): ${e.message}`); // Modificato
+      toast({ title: "Errore Analisi Angle (OpenAI)", description: e.message, variant: "destructive" }); // Modificato
     } finally {
       setIsLoadingAnalysis(false);
     }
@@ -241,8 +239,6 @@ export function Tool3Scraper({
       toast({ title: "Dati Insufficienti", description: "Esegui prima lo scraping e l'analisi degli angle.", variant: "destructive"});
       return;
     }
-    // Data is now passed via HomePage state to Tool5, localStorage might not be needed here
-    // For detail page, if it still uses localStorage:
     localStorage.setItem('tool3AngleAnalysisData', JSON.stringify(adsWithAnalysis));
     router.push('/tool3/angle-analysis');
   };
@@ -251,7 +247,7 @@ export function Tool3Scraper({
     <div className="space-y-8">
       <header className="text-center">
         <h2 className="text-3xl font-bold" style={{ color: 'hsl(var(--sky-600))' }}>Facebook Ads Library Scraper (via Apify)</h2>
-        <p className="text-muted-foreground mt-2">Estrai dati dalla Facebook Ads Library e analizza gli angle di marketing con Google AI (Gemini).</p>
+        <p className="text-muted-foreground mt-2">Estrai dati dalla Facebook Ads Library e analizza gli angle di marketing con OpenAI.</p>
       </header>
 
       <Card>
@@ -274,15 +270,15 @@ export function Tool3Scraper({
             <Input type="number" id="maxAdsToProcessTool3" value={maxAdsToProcess} onChange={(e) => setMaxAdsToProcess(Math.min(100, Math.max(1, parseInt(e.target.value))))} min="1" max="100" />
           </div>
            <div>
-            <label htmlFor="googleApiKeyTool3" className="block text-sm font-medium text-foreground mb-1">Google API Key (per Genkit/Gemini)</label>
+            <label htmlFor="openAIApiKeyTool3" className="block text-sm font-medium text-foreground mb-1">OpenAI API Key</label> 
             <Input 
               type="password" 
-              id="googleApiKeyTool3" 
-              value={googleApiKey} 
-              onChange={(e) => setGoogleApiKey(e.target.value)} 
-              placeholder="La tua chiave API Google (es. AIza...)" 
+              id="openAIApiKeyTool3" // Modificato
+              value={openAIApiKey} // Modificato
+              onChange={(e) => setOpenAIApiKey(e.target.value)} // Modificato
+              placeholder="La tua chiave API OpenAI (es. sk-...)" 
             />
-            <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C con i modelli Google AI (Gemini).</p>
+            <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C con i modelli OpenAI.</p>
           </div>
         </CardContent>
       </Card>
@@ -321,7 +317,7 @@ export function Tool3Scraper({
             <div className="text-center mt-8">
               <Button onClick={runAngleAnalysis} disabled={isLoadingAnalysis} className="action-button bg-purple-600 hover:bg-purple-700 text-white text-lg">
                 {isLoadingAnalysis ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Bot className="mr-2 h-5 w-5" />}
-                {isLoadingAnalysis ? "Analisi Angle (Google AI)..." : "Analizza Angle Inserzioni (7C con Google AI)"}
+                {isLoadingAnalysis ? "Analisi Angle (OpenAI)..." : "Analizza Angle Inserzioni (7C con OpenAI)"} 
               </Button>
             </div>
           </CardContent>
@@ -332,7 +328,7 @@ export function Tool3Scraper({
         <Card className="mt-6">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-xl">Risultati Analisi Angle (Metodo 7C con Google AI)</CardTitle>
+              <CardTitle className="text-xl">Risultati Analisi Angle (Metodo 7C con OpenAI)</CardTitle>
             </div>
             <Button variant="link" onClick={openAngleAnalysisDetailPage} className="detail-button">
                 Visualizza Report Dettagliato <FileText className="ml-2 h-4 w-4"/>

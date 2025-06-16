@@ -1,8 +1,6 @@
 
-// 'use server' // Questa direttiva è già in cima al file.
-
 /**
- * @fileOverview A Facebook Ad marketing angle analyzer flow, using Google AI (Gemini).
+ * @fileOverview A Facebook Ad marketing angle analyzer flow, using OpenAI.
  *
  * - analyzeFacebookAdMarketingAngle - A function that handles the Facebook Ad marketing angle analysis process.
  * - AnalyzeFacebookAdMarketingAngleInput - The input type for the analyzeFacebookAdMarketingAngle function.
@@ -41,10 +39,10 @@ export async function analyzeFacebookAdMarketingAngle(
 }
 
 const analyzeFacebookAdMarketingAnglePrompt = ai.definePrompt({
-  name: 'analyzeFacebookAdMarketingAnglePromptGoogleAI',
+  name: 'analyzeFacebookAdMarketingAnglePrompt', // Rimosso GoogleAI dal nome
   input: {schema: AnalyzeFacebookAdMarketingAngleInputSchema},
   output: {schema: AnalyzeFacebookAdMarketingAngleOutputSchema},
-  model: 'googleai/gemini-1.5-flash-latest', // Using a Google AI model
+  model: ai.model('openai/gpt-4o-mini'), // Modello OpenAI (es. gpt-4o-mini o gpt-3.5-turbo)
   prompt: `Analyze the following text and title (if available) using the \"Metodo 7C\" framework.
 
 Text: {{{adText}}}
@@ -72,10 +70,8 @@ Assicurati che i punteggi per C1-C7 siano sempre numeri tra 0 e 2.
 L'intero output DEVE essere un oggetto JSON valido. Non includere testo prima o dopo l'oggetto JSON.
 `,
   config: {
-    temperature: 0.3,
-    // Gemini specific config if needed, e.g., safetySettings
-    // Forcing JSON output is generally handled by Genkit and the model's capabilities.
-    // For Gemini, explicitly asking for JSON in the prompt is good practice.
+    temperature: 0.5, // Temperatura appropriata per OpenAI
+    // Per OpenAI, la richiesta di formato JSON è implicita con output: {schema: ...} in Genkit.
   },
 });
 
@@ -95,7 +91,7 @@ const AnalyzeFacebookAdMarketingAngleOutputSchemaSanitized = z.object({
 
 const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
   {
-    name: 'analyzeFacebookAdMarketingAngleFlowGoogleAI',
+    name: 'analyzeFacebookAdMarketingAngleFlow', // Rimosso GoogleAI dal nome
     inputSchema: AnalyzeFacebookAdMarketingAngleInputSchema,
     outputSchema: AnalyzeFacebookAdMarketingAngleOutputSchema,
   },

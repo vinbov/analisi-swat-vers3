@@ -114,7 +114,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
   };
 
   const generateTableHtml = (headers: string[], data: Record<string, any>[], title?: string, tableId?: string): string => {
-    if (!data || data.length === 0) return title ? `<h3 class="report-h3" id="${tableId}-title">${escapeHtml(title)}</h3><p>Nessun dato disponibile.</p>` : '<p>Nessun dato disponibile per questa tabella.</p>';
+    if (!data || data.length === 0) return title ? `<h3 class="report-h3" id="${tableId}-title">${escapeHtml(title)}</h3><p class="no-data-message">Nessun dato disponibile per questa tabella.</p>` : '<p class="no-data-message">Nessun dato disponibile per questa tabella.</p>';
     
     let html = title ? `<h3 class="report-h3" id="${tableId}-title">${escapeHtml(title)}</h3>` : '';
     html += `<div class="table-wrapper"><table ${tableId ? `id="${tableId}"` : ''}>`;
@@ -125,7 +125,6 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
       html += '<tr>';
       headers.forEach(header => {
         const cellValue = row[header] !== undefined && row[header] !== null ? String(row[header]) : '';
-        // Per 'Analisi Approfondita', non fare l'escape di <br />
         const escapedCellValue = (header === 'Analisi Approfondita' && cellValue.includes('<br />')) 
                                  ? cellValue 
                                  : escapeHtml(cellValue);
@@ -176,11 +175,11 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                 id: chart1Id, type: 'bar',
                 data: {
                     labels: commonKWsTool1ChartData.map(d => d.name),
-                    datasets: [{ label: 'N. Keyword Comuni in Top 10', data: commonKWsTool1ChartData.map(d => d.count), backgroundColor: commonKWsTool1ChartData.map((_, i) => chartJsColors[i % chartJsColors.length]), borderColor: commonKWsTool1ChartData.map((_, i) => chartJsBorderColors[i % chartJsBorderColors.length]), borderWidth: 1 }]
+                    datasets: [{ label: 'N. Keyword Comuni in Top 10', data: commonKWsTool1ChartData.map(d => d.count), backgroundColor: commonKWsTool1ChartData.map((_, i) => chartJsColors[i % chartJsColors.length]), borderColor: commonKWsTool1ChartData.map((_, i) => chartJsBorderColors[i % chartJsColors.length]), borderWidth: 1 }]
                 },
                 options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: true, position: 'top'} } }
             });
-        } else { reportHtml += `<p>Nessuna keyword comune in Top 10 da visualizzare nel grafico.</p>`; }
+        } else { reportHtml += `<p class="no-data-message">Nessuna keyword comune in Top 10 da visualizzare nel grafico.</p>`; }
         reportHtml += '<hr class="subsection-separator">';
 
         const topOppsTool1 = tool1Data.rawResults.filter(r => r.status === 'competitorOnly' && typeof r.volume === 'number' && r.volume > 0).sort((a, b) => (b.volume as number) - (a.volume as number)).slice(0, 10);
@@ -196,7 +195,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                 },
                 options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true } }, plugins: { legend: { display: true, position: 'top'} } }
             });
-        } else { reportHtml += `<p>Nessuna opportunità significativa per il grafico.</p>`; }
+        } else { reportHtml += `<p class="no-data-message">Nessuna opportunità significativa per il grafico.</p>`; }
         reportHtml += '<hr class="subsection-separator">';
         
         const commonDataTool1 = tool1Data.rawResults.filter(r => r.status === 'common');
@@ -234,7 +233,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         });
         reportHtml += generateTableHtml(competitorOnlyHeadersTool1, competitorOnlyTableDataTool1, "Dettaglio: Opportunità (Solo Competitor)", "tool1-competitoronly-table");
 
-    } else { reportHtml += "<p>Nessun dato disponibile dal Tool 1 o analisi non eseguita.</p>"; }
+    } else { reportHtml += "<p class='no-data-message'>Nessun dato disponibile dal Tool 1 o analisi non eseguita.</p>"; }
     reportHtml += '<hr class="tool-section-separator">';
 
     // Tool 2 Section Placeholder
@@ -266,7 +265,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                 },
                 options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 2, ticks: { stepSize: 0.5 } } }, plugins: { legend: { display: true, position: 'top'} } }
             });
-        } else { reportHtml += `<p>Nessun dato sui punteggi medi 7C da visualizzare.</p>`;}
+        } else { reportHtml += `<p class="no-data-message">Nessun dato sui punteggi medi 7C da visualizzare.</p>`;}
         reportHtml += '<hr class="subsection-separator">';
         
         const angleHeadersTool3 = ["Ad (Titolo/Testo)", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "Totale", "Valutazione", "Analisi Approfondita", "Errore"];
@@ -279,7 +278,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             "Errore": item.analysisError || item.angleAnalysis?.error || ''
         }));
         reportHtml += generateTableHtml(angleHeadersTool3, angleTableDataTool3, "Dettaglio: Analisi Angle Inserzioni (Metodo 7C)", "tool3-angle-table");
-    } else { reportHtml += "<p>Nessun dato disponibile dal Tool 3 o analisi non eseguita.</p>"; }
+    } else { reportHtml += "<p class='no-data-message'>Nessun dato disponibile dal Tool 3 o analisi non eseguita.</p>"; }
     reportHtml += '<hr class="tool-section-separator">';
 
     // Tool 4 Section
@@ -338,7 +337,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                         options: { responsive: true, maintainAspectRatio: false, scales: (isPieChart ? {} : { y: { beginAtZero: true } }), plugins: { legend: { display: true, position: 'top'} } }
                     });
                 } else {
-                    const chartPlaceholderDiv = `<div class="${chartContainerClass}" style="height:auto; padding: 20px 0;"><p>Dati insufficienti per il grafico di ${escapeHtml(itemDisplayName)}.</p></div>`;
+                    const chartPlaceholderDiv = `<div class="${chartContainerClass}" style="height:auto; padding: 20px 0;"><p class="no-data-message">Dati insufficienti per il grafico di ${escapeHtml(itemDisplayName)}.</p></div>`;
                     reportHtml = reportHtml.replace(`<div class="${chartContainerClass}"><canvas id="${chart4Id}"></canvas></div>`, chartPlaceholderDiv);
                 }
                 
@@ -355,12 +354,12 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     "Diff. Pos.": d.diff_position?.toFixed(1) || 'N/A',
                 }));
                 reportHtml += generateTableHtml(gscHeaders, gscTableData, `Dettaglio: ${escapeHtml(itemDisplayName)}`, `tool4-${reportType}-table`);
-            } else { reportHtml += `<p>Nessun dato trovato per ${escapeHtml(itemDisplayName)}.</p>`; }
+            } else { reportHtml += `<p class="no-data-message">Nessun dato trovato per ${escapeHtml(itemDisplayName)}.</p>`; }
             if (idx < (['queries', 'pages', 'countries', 'devices', 'searchAppearance'] as GscReportType[]).length -1) {
                 reportHtml += '<hr class="subsection-separator">';
             }
         });
-    } else { reportHtml += "<p>Nessun dato disponibile dal Tool 4 o analisi non eseguita.</p>"; }
+    } else { reportHtml += "<p class='no-data-message'>Nessun dato disponibile dal Tool 4 o analisi non eseguita.</p>"; }
     reportHtml += '<hr class="tool-section-separator">';
 
     // --- Finalizza TOC ---
@@ -392,6 +391,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
           .summary-list { list-style-type: disc; padding-left: 25px; }
           .summary-list li { margin-bottom: 8px; }
           .summary-list strong { color: #1e40af; }
+          p.no-data-message { color: #64748b; font-style: italic; text-align: center; padding: 20px 0; }
 
 
           /* Separators */
@@ -651,5 +651,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     </div>
   );
 }
+
+    
 
     
