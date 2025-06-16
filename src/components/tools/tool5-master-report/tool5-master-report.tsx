@@ -4,7 +4,8 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { InfoIcon, AlertCircle, BarChart3, SearchCode, ClipboardList, Presentation, BarChart2, ListChecks, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { InfoIcon, AlertCircle, BarChart3, SearchCode, ClipboardList, Presentation, BarChart2, ListChecks, TrendingUp, Download } from 'lucide-react';
 import type { AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType } from '@/lib/types';
 
 interface Tool1Counts {
@@ -49,6 +50,167 @@ export function Tool5MasterReport() {
   const [tool4DataSummary, setTool4DataSummary] = useState<Tool4SectionSummary[] | string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const formatForTextReport = (data: any, indentLevel = 0): string => {
+    let text = "";
+    const indent = "  ".repeat(indentLevel);
+
+    if (typeof data === 'string') {
+      return `${indent}- ${data}\n`;
+    }
+
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        if (typeof item === 'object' && item !== null) {
+          Object.entries(item).forEach(([key, value]) => {
+             if (typeof value !== 'object' || value === null) { // Non andare troppo in profondità per array di oggetti semplici
+                text += `${indent}  - ${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${value}\n`;
+             }
+          });
+        } else {
+          text += `${indent}- ${item}\n`;
+        }
+      });
+    } else if (typeof data === 'object' && data !== null) {
+      for (const key in data) {
+        const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        if (typeof data[key] === 'object' && data[key] !== null) {
+          text += `${indent}${formattedKey}:\n`;
+          text += formatForTextReport(data[key], indentLevel + 1);
+        } else {
+          text += `${indent}${formattedKey}: ${data[key]}\n`;
+        }
+      }
+    }
+    return text;
+  };
+  
+  const handleDownloadConsolidatedReport = () => {
+    let reportContent = "REPORT CONSOLIDATO ANALISI S.W.A.T.\n";
+    reportContent += "========================================\n\n";
+    reportContent += "Data del Report: " + new Date().toLocaleDateString("it-IT", { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + "\n\n";
+
+    reportContent += "--- SINTESI: ANALIZZATORE COMPARATIVO KEYWORD (TOOL 1) ---\n";
+    if (typeof tool1DataSummary === 'string') {
+      reportContent += tool1DataSummary + "\n";
+    } else if (tool1DataSummary) {
+      reportContent += "Conteggio Keyword:\n";
+      reportContent += `  - Keyword Comuni: ${tool1DataSummary.comparisonResultsCount.common}\n`;
+      reportContent += `  - Punti di Forza (Solo Mio Sito): ${tool1DataSummary.comparisonResultsCount.mySiteOnly}\n`;
+      reportContent += `  - Opportunità (Solo Competitor): ${tool1DataSummary.comparisonResultsCount.competitorOnly}\n`;
+      reportContent += `  - Totale Keyword Uniche Analizzate: ${tool1DataSummary.comparisonResultsCount.totalUnique}\n\n`;
+      
+      reportContent += "Mio Sito - Top 5 Keyword Comuni in Top 10:\n";
+      if (tool1DataSummary.mySiteTop5Common.length > 0) {
+        tool1DataSummary.mySiteTop5Common.forEach(kw => {
+          reportContent += `  - "${kw.keyword}" (Posizione: ${kw.position})\n`;
+        });
+      } else {
+        reportContent += "  - Nessuna keyword comune in Top 10 per Mio Sito.\n";
+      }
+      reportContent += "\n";
+
+      Object.entries(tool1DataSummary.competitorsTopCommon).forEach(([compName, kws]) => {
+        reportContent += `${compName} - Top 5 Keyword Comuni in Top 10:\n`;
+        if (kws.length > 0) {
+          kws.forEach(kw => {
+            reportContent += `  - "${kw.keyword}" (Posizione: ${kw.position})\n`;
+          });
+        } else {
+          reportContent += `  - Nessuna keyword comune in Top 10 per ${compName}.\n`;
+        }
+        reportContent += "\n";
+      });
+
+      reportContent += "Top 5 Opportunità (Keyword Gap per Volume):\n";
+      if (tool1DataSummary.top5Opportunities.length > 0) {
+        tool1DataSummary.top5Opportunities.forEach(kw => {
+          reportContent += `  - "${kw.keyword}" (Volume: ${kw.volume})\n`;
+        });
+      } else {
+        reportContent += "  - Nessuna opportunità significativa trovata.\n";
+      }
+      reportContent += "\n*Nota: Per i grafici dettagliati (Keyword Comuni Top 10, Top Opportunità Volume), si prega di fare uno screenshot dal Tool 1 e inserirlo nella presentazione.*\n";
+    } else {
+      reportContent += "Nessun dato disponibile dal Tool 1.\n";
+    }
+    reportContent += "--------------------------------------------------\n\n";
+
+    reportContent += "--- SINTESI: ANALIZZATORE PERTINENZA & PRIORITÀ KW (TOOL 2) ---\n";
+    reportContent += "I risultati del Tool 2 (analisi di pertinenza e priorità keyword) sono disponibili e scaricabili come CSV direttamente all'interno del tool stesso.\n";
+    reportContent += "Per la presentazione, considera di includere un riassunto dei principali insight o screenshot delle tabelle dei risultati più significativi direttamente dal Tool 2.\n";
+    reportContent += "-------------------------------------------------------------\n\n";
+
+    reportContent += "--- SINTESI: FB ADS LIBRARY SCRAPER & ANALISI ANGLE (TOOL 3) ---\n";
+    if (typeof tool3DataSummary === 'string') {
+      reportContent += tool3DataSummary + "\n";
+    } else if (tool3DataSummary) {
+      reportContent += `Annunci Totali Processati dal Scraper: ${tool3DataSummary.processedAdsCount}\n`;
+      reportContent += `Annunci con Analisi Angle (7C) Completata: ${tool3DataSummary.analyzedAdsCount}\n\n`;
+      if (tool3DataSummary.averageScores && tool3DataSummary.analyzedAdsCount > 0) {
+        reportContent += "Punteggi Medi 7C (su annunci analizzati):\n";
+        Object.entries(tool3DataSummary.averageScores).forEach(([key, value]) => {
+          const readableKey = key.replace('C1', 'C1 Chiarezza')
+                               .replace('C2', 'C2 Coinvolgimento')
+                               .replace('C3', 'C3 Concretezza')
+                               .replace('C4', 'C4 Coerenza')
+                               .replace('C5', 'C5 Credibilità')
+                               .replace('C6', 'C6 Call To Action')
+                               .replace('C7', 'C7 Contesto');
+          reportContent += `  - ${readableKey}: ${value.toFixed(2)}\n`;
+        });
+      } else if (tool3DataSummary.analyzedAdsCount === 0 && tool3DataSummary.processedAdsCount > 0) {
+        reportContent += "Nessuna analisi dell'angle è stata completata con successo.\n";
+      }
+      if (tool3DataSummary.error) {
+        reportContent += `\nErrore durante l'analisi del Tool 3: ${tool3DataSummary.error}\n`;
+      }
+       reportContent += "\n*Nota: Per visualizzare gli annunci specifici, le loro immagini e le analisi dettagliate (compresi i testi di valutazione), fare riferimento al Tool 3 e al suo report di dettaglio/CSV.*\n";
+    } else {
+      reportContent += "Nessun dato disponibile dal Tool 3.\n";
+    }
+    reportContent += "------------------------------------------------------------------\n\n";
+
+    reportContent += "--- SINTESI: ANALIZZATORE DATI GSC (TOOL 4) ---\n";
+    if (typeof tool4DataSummary === 'string') {
+      reportContent += tool4DataSummary + "\n";
+    } else if (Array.isArray(tool4DataSummary) && tool4DataSummary.length > 0) {
+      tool4DataSummary.forEach(section => {
+        reportContent += `Report GSC: ${section.displayName}\n`;
+        if (section.dataPresent && section.summaryText) {
+          // Clean up HTML tags from summaryText for a text report
+          const cleanedSummary = section.summaryText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+          reportContent += `  Sintesi: ${cleanedSummary}\n`;
+        } else if (section.dataPresent) {
+           reportContent += "  Dati presenti, ma sintesi testuale non generata per questo report.\n";
+        }
+        else {
+          reportContent += "  Nessun dato analizzato o foglio non trovato.\n";
+        }
+        reportContent += "\n";
+      });
+      reportContent += "*Nota: Per i grafici e le tabelle dettagliate (Top Items, ecc.) per ogni sezione GSC, si prega di fare uno screenshot dal Tool 4 e inserirlo nella presentazione.*\n";
+    } else {
+      reportContent += "Nessun dato disponibile dal Tool 4.\n";
+    }
+    reportContent += "--------------------------------------------------\n\n";
+    
+    reportContent += "FINE DEL REPORT CONSOLIDATO\n";
+
+    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", "report_consolidato_analisi_swat.txt");
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  };
+
+
   useEffect(() => {
     setIsLoading(true);
     
@@ -56,7 +218,6 @@ export function Tool5MasterReport() {
       const tool1DataString = localStorage.getItem('tool1ResultsForMasterReport');
       if (tool1DataString) {
         const tool1Data: Tool1MasterReportData = JSON.parse(tool1DataString);
-         // Basic validation
         if (tool1Data.comparisonResultsCount && tool1Data.mySiteTop5Common && tool1Data.competitorsTopCommon && tool1Data.top5Opportunities) {
             setTool1DataSummary(tool1Data);
         } else {
@@ -135,8 +296,8 @@ export function Tool5MasterReport() {
             setTool4DataSummary("Dati del Tool 4 (Analizzatore GSC) non trovati. Esegui prima l'analisi nel Tool 4.");
         }
     } catch (e) {
-        console.error("Errore nel caricare/processare i dati del Tool 4:", e);
-        setTool4DataSummary("Errore nel caricare i dati del Tool 4.");
+      console.error("Errore nel caricare/processare i dati del Tool 4:", e);
+      setTool4DataSummary("Errore nel caricare i dati del Tool 4.");
     }
     setIsLoading(false);
   }, []);
@@ -151,9 +312,13 @@ export function Tool5MasterReport() {
         <h2 className="text-3xl font-bold text-sky-700 flex items-center justify-center">
             <Presentation className="mr-3 h-8 w-8" /> Report Consolidato Dati Analisi
         </h2>
-        <p className="text-muted-foreground mt-2">
+        <p className="text-muted-foreground mt-2 max-w-3xl mx-auto">
           Una sintesi dei dati elaborati dai vari tool di analisi. Assicurati di aver eseguito le analisi nei tool specifici per visualizzare i dati qui.
+          Per i grafici specifici o i report CSV dettagliati di ogni tool, visita il tool corrispondente.
         </p>
+         <Button onClick={handleDownloadConsolidatedReport} variant="outline" className="mt-4">
+            <Download className="mr-2 h-4 w-4" /> Scarica Report Testuale Consolidato (.txt)
+        </Button>
       </header>
 
       <Card>
@@ -227,7 +392,7 @@ export function Tool5MasterReport() {
             <AlertTitle>Info Tool 2</AlertTitle>
             <AlertDescription>
               I risultati dell'Analizzatore di Pertinenza & Priorità Keyword (Tool 2) vengono elaborati e visualizzati direttamente all'interno del tool stesso.
-              Per consultare questi dati, esegui l'analisi nel Tool 2.
+              Per consultare questi dati, esegui l'analisi nel Tool 2. Il report scaricabile in CSV è disponibile lì.
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -253,7 +418,7 @@ export function Tool5MasterReport() {
                         <h4 className="font-medium text-foreground mt-2">Punteggi Medi 7C:</h4>
                         <ul className="list-disc pl-5 text-sm text-muted-foreground">
                             {Object.entries(tool3DataSummary.averageScores).map(([key, value]) => (
-                                <li key={key}>{key}: <span className="font-semibold text-foreground">{value}</span></li>
+                                <li key={key}>{key.replace('C1', 'C1 Chiarezza').replace('C2', 'C2 Coinvolgimento').replace('C3', 'C3 Concretezza').replace('C4', 'C4 Coerenza').replace('C5', 'C5 Credibilità').replace('C6', 'C6 CTA').replace('C7', 'C7 Contesto')}: <span className="font-semibold text-foreground">{value.toFixed(2)}</span></li>
                             ))}
                         </ul>
                     </div>
@@ -283,7 +448,7 @@ export function Tool5MasterReport() {
                 <div key={section.reportType}>
                   <h4 className="font-medium text-foreground">Report GSC: {section.displayName}</h4>
                   {section.dataPresent ? (
-                    <p className="text-sm text-muted-foreground prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: section.summaryText ? section.summaryText : "Dati presenti, sintesi non disponibile." }} />
+                    <p className="text-sm text-muted-foreground prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: section.summaryText ? section.summaryText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : "Dati presenti, sintesi non disponibile." }} />
                   ) : (
                     <p className="text-sm text-muted-foreground">Nessun dato analizzato o foglio non trovato per {section.displayName}.</p>
                   )}
@@ -298,4 +463,3 @@ export function Tool5MasterReport() {
     </div>
   );
 }
-
