@@ -14,7 +14,7 @@ import { TableGSC } from './table-gsc';
 import { ChartGSC } from './charts-gsc';
 import { Loader2, BarChart2, PieChartIcon, Download, AlertCircle, Eye } from 'lucide-react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation'; // Non più necessario se usiamo window.open
 
 const GSC_SHEET_MAPPING: Record<GscReportType, string[]> = {
     filters: ["Filters", "Filtri", "Panoramica"],
@@ -51,17 +51,16 @@ export function Tool4GSCAnalyzer({
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
-    const router = useRouter();
-
-    // Removed useEffect for localStorage, as data is passed via props to Tool5
+    // const router = useRouter(); // Non più necessario se usiamo window.open
 
     const handleFileLoad = useCallback((content: string, name: string, arrayBufferContent?: ArrayBuffer) => {
         if (arrayBufferContent && arrayBufferContent.byteLength > 0) {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
-            setParsedGscData(null); // Clear previous results from global state
-            setAnalyzedGscData(null); // Clear previous results from global state
-            setGscFiltersDisplay(""); // Clear previous results from global state
+            // Clear previous results from global state when a new file is loaded
+            setParsedGscData(null); 
+            setAnalyzedGscData(null); 
+            setGscFiltersDisplay("");
         } else {
             setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
             setGscExcelFile(null);
@@ -122,8 +121,6 @@ export function Tool4GSCAnalyzer({
                 return [];
             }
         }
-        console.log(`[Tool4 ParseSheetData] Headers for ${sheetName}:`, headersRaw);
-
 
         const headerMap: Record<string, keyof GscSheetRow | 'item'> = {
             "top queries": "item", "top query": "item", "query": "item", "principali query": "item",
@@ -197,13 +194,11 @@ export function Tool4GSCAnalyzer({
             return entry;
         }).filter(entry => (reportType === 'filters' ? entry.filterName : entry.item) ); 
 
-        console.log(`[Tool4 ParseSheetData] Parsed ${parsedRows.length} rows for ${reportType}. First row:`, parsedRows[0]);
         return parsedRows;
     };
 
     const analyzeGSCData = (data: GscSheetRow[], itemKeyType: GscReportType): GscSectionAnalysis | null => {
         if (!data || data.length === 0) {
-            console.warn(`[Tool4 AnalyzeGSCData] No data to analyze for ${itemKeyType}.`);
             return null;
         }
 
@@ -281,7 +276,6 @@ export function Tool4GSCAnalyzer({
                 .sort((a,b) => b.value - a.value);
         }
         
-        console.log(`[Tool4 AnalyzeGSCData] For ${itemKeyType}: chartDataForBar:`, topItemsByClicksChartData, "pieChartData:", pieChartData);
         return { summaryText, detailedDataWithDiffs: processedItems, topItemsByClicksChartData, pieChartData };
     };
 
@@ -325,7 +319,7 @@ export function Tool4GSCAnalyzer({
             } else {
                 filtersTextCollector += '<p>Foglio "Filters" non trovato.</p>';
             }
-            setGscFiltersDisplay(filtersTextCollector); // Update global state
+            setGscFiltersDisplay(filtersTextCollector);
 
             let currentProgress = 0;
             const reportTypesToProcess = GSC_SHEET_DISPLAY_ORDER.filter(type => type !== 'filters');
@@ -355,8 +349,8 @@ export function Tool4GSCAnalyzer({
                  await new Promise(resolve => setTimeout(resolve, 10));
             }
 
-            setParsedGscData(newParsedCollector); // Update global state
-            setAnalyzedGscData(newAnalyzedCollector); // Update global state
+            setParsedGscData(newParsedCollector);
+            setAnalyzedGscData(newAnalyzedCollector);
             
             toast({ title: "Analisi Completata", description: "Dati GSC processati." });
 
@@ -422,7 +416,8 @@ export function Tool4GSCAnalyzer({
             pageTitle: `Dettaglio GSC: ${getReportItemDisplayName(reportType)}`,
             description: analysis.summaryText,
         }));
-        router.push(`/tool4/${reportType}`);
+        const url = `/tool4/${reportType}`;
+        window.open(url, '_blank'); // Apre in una nuova scheda
     };
 
     const acceptedExcelTypes = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.ods,application/vnd.oasis.opendocument.spreadsheet";
@@ -560,3 +555,5 @@ export function Tool4GSCAnalyzer({
         </div>
     );
 }
+
+    
