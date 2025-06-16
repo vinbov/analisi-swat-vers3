@@ -55,19 +55,18 @@ export function Tool4GSCAnalyzer({
         if (arrayBufferContent && arrayBufferContent.byteLength > 0) {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
-            // Clear previous results when a new file is loaded by notifying HomePage
             setParsedGscData(null); 
             setAnalyzedGscData(null); 
             setGscFiltersDisplay("");
         } else {
             setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
-            setGscExcelFile(null); // Notify HomePage to clear the file
+            setGscExcelFile(null);
             toast({ title: "Errore File", description: "Contenuto file non valido o file vuoto.", variant: "destructive" });
         }
     }, [setGscExcelFile, setParsedGscData, setAnalyzedGscData, setGscFiltersDisplay, toast]);
 
     const handleResetFile = () => {
-        setGscExcelFile(null); // Notify HomePage to clear the file
+        setGscExcelFile(null);
         setParsedGscData(null);
         setAnalyzedGscData(null);
         setError(null);
@@ -107,7 +106,7 @@ export function Tool4GSCAnalyzer({
             }
         }
         
-        if (headerRowIndex === -1) {
+        if (headerRowIndex === -1) { // Fallback if specific keywords aren't found but data exists
             if (jsonData.length > 0 && reportType === 'filters') {
                 headersRaw = jsonData[0] as any[]; 
                 dataRows = jsonData.slice(1) as any[][];
@@ -119,47 +118,68 @@ export function Tool4GSCAnalyzer({
                 return [];
             }
         }
-
-        const headerMap: Record<string, keyof GscSheetRow | 'item'> = {
-            "top queries": "item", "top query": "item", "query": "item", "principali query": "item", "query di ricerca": "item",
-            "top pages": "item", "pagina": "item", "pagine principali": "item", "principali pagine": "item",
-            "country": "item", "paese": "item", "paesi": "item",
-            "device": "item", "dispositivo": "item", "dispositivi": "item",
-            "search appearance": "item", "aspetto nella ricerca": "item", "search appearances": "item", "tipi di risultati multimediali": "item", "aspetto della ricerca": "item",
-            "date": "item", "data": "item",
         
-            "clicks": "clicks_current", "clic": "clicks_current", 
+        const headerMap: Record<string, keyof GscSheetRow | 'item'> = {
+            "top queries": "item", "top query": "item", "query": "item", "principali query":"item", "query di ricerca": "item",
+            "top pages": "item", "pagina": "item", "pagine principali":"item", "principali pagine":"item",
+            "country": "item", "paese": "item", "paesi":"item",
+            "device": "item", "dispositivo": "item", "dispositivi":"item",
+            "search appearance": "item", "aspetto nella ricerca": "item", "search appearances":"item", "tipi di risultati multimediali":"item", "aspetto della ricerca":"item",
+            "date": "item", "data":"item", 
+
+            "clicks": "clicks_current", "clic": "clicks_current",
             "impressions": "impressions_current", "impressioni": "impressions_current",
             "ctr": "ctr_current",
-            "position": "position_current", "posizione": "position_current",
-        
-            "clic attuali": "clicks_current", "clics attuali": "clicks_current", // Added 'clics'
+            "position": "position_current", "posizione":"position_current",
+
+            "clic attuali": "clicks_current", "clics attuali": "clicks_current", 
             "impressioni attuali": "impressions_current",
             "ctr attuale": "ctr_current",
             "posizione attuale": "position_current", "pos. attuale": "position_current",
         
-            "clic prec.": "clicks_previous", "clic precedenti": "clicks_previous", "clics prec.": "clicks_previous", // Added 'clics'
+            "clic prec.": "clicks_previous", "clic precedenti": "clicks_previous", "clics prec.": "clicks_previous",
             "impressioni prec.": "impressions_previous", "impressioni precedenti": "impressions_previous",
             "ctr prec.": "ctr_previous", "ctr precedente": "ctr_previous",
             "posizione prec.": "position_previous", "posizione precedente": "position_previous", "pos. prec.": "position_previous",
         
-            "clicks last 28 days": "clicks_current", "clicks previous 28 days": "clicks_previous",
-            "impressions last 28 days": "impressions_current", "impressions previous 28 days": "impressions_previous",
-            "ctr last 28 days": "ctr_current", "ctr previous 28 days": "ctr_previous",
-            "position last 28 days": "position_current", "position previous 28 days": "position_previous",
-
-            "clic (ultimi 28 giorni)": "clicks_current", "clic (28 giorni precedenti)": "clicks_previous",
-            "impressioni (ultimi 28 giorni)": "impressions_current", "impressioni (28 giorni precedenti)": "impressions_previous",
-            "ctr (ultimi 28 giorni)": "ctr_current", "ctr (28 giorni precedenti)": "ctr_previous",
-            "posizione (ultimi 28 giorni)": "position_current", "posizione (28 giorni precedenti)": "position_previous",
+            "clicks last 28 days": "clicks_current", "clic ultimi 28 giorni": "clicks_current", "clic (ultimi 28 giorni)": "clicks_current",
+            "clicks previous 28 days": "clicks_previous", "clic 28 giorni precedenti": "clicks_previous", "clic (28 giorni precedenti)": "clicks_previous",
             
+            "impressions last 28 days": "impressions_current", "impressioni ultimi 28 giorni": "impressions_current", "impressioni (ultimi 28 giorni)": "impressions_current",
+            "impressions previous 28 days": "impressions_previous", "impressioni 28 giorni precedenti": "impressions_previous", "impressioni (28 giorni precedenti)": "impressions_previous",
+            
+            "ctr last 28 days": "ctr_current", "ctr ultimi 28 giorni": "ctr_current", "ctr (ultimi 28 giorni)": "ctr_current",
+            "ctr previous 28 days": "ctr_previous", "ctr 28 giorni precedenti": "ctr_previous", "ctr (28 giorni precedenti)": "ctr_previous",
+            
+            "position last 28 days": "position_current", "posizione ultimi 28 giorni": "position_current", "posizione (ultimi 28 giorni)": "position_current",
+            "position previous 28 days": "position_previous", "posizione 28 giorni precedenti": "position_previous", "posizione (28 giorni precedenti)": "position_previous",
+            
+            // Common variations for 3 months period
+            "last 3 months clicks": "clicks_current", "clic ultimi 3 mesi": "clicks_current", "clic (ultimi 3 mesi)": "clicks_current",
+            "previous 3 months clicks": "clicks_previous", "clic 3 mesi precedenti": "clicks_previous", "clic (3 mesi precedenti)": "clicks_previous",
+            "last 3 months impressions": "impressions_current", "impressioni ultimi 3 mesi": "impressions_current", "impressioni (ultimi 3 mesi)": "impressions_current",
+            "previous 3 months impressions": "impressions_previous", "impressioni 3 mesi precedenti": "impressions_previous", "impressioni (3 mesi precedenti)": "impressions_previous",
+            "last 3 months ctr": "ctr_current", "ctr ultimi 3 mesi": "ctr_current", "ctr (ultimi 3 mesi)": "ctr_current",
+            "previous 3 months ctr": "ctr_previous", "ctr 3 mesi precedenti": "ctr_previous", "ctr (3 mesi precedenti)": "ctr_previous",
+            "last 3 months position": "position_current", "posizione ultimi 3 mesi": "position_current", "posizione (ultimi 3 mesi)": "position_current",
+            "previous 3 months position": "position_previous", "posizione 3 mesi precedenti": "position_previous", "posizione (3 mesi precedenti)": "position_previous",
+
             "filter": "filterName", "filtro": "filterName",
             "value": "filterValue", "valore": "filterValue"
         };
+        
+        let primaryItemKey : keyof GscSheetRow | 'item' = 'item';
+        if (reportType === 'queries') primaryItemKey = 'item'; 
+        else if (reportType === 'pages') primaryItemKey = 'item';
+        else if (reportType === 'countries') primaryItemKey = 'item';
+        else if (reportType === 'devices') primaryItemKey = 'item';
+        else if (reportType === 'searchAppearance') primaryItemKey = 'item';
+        else if (reportType === 'filters') primaryItemKey = 'filterName';
+
 
         const headers = headersRaw.map((h, idx) => {
             const trimmedHeader = String(h || '').trim().toLowerCase();
-            if (idx === 0 && reportType !== 'filters' && !headerMap[trimmedHeader]) return 'item';
+            if (idx === 0 && reportType !== 'filters' && !headerMap[trimmedHeader]) return primaryItemKey;
             return headerMap[trimmedHeader] || trimmedHeader.replace(/\s+/g, '_').replace(/[^\w_]/gi, '') || `column_${idx}`;
         });
 
@@ -174,12 +194,12 @@ export function Tool4GSCAnalyzer({
                     if (strVal === "" || strVal === "-") {
                         value = 0;
                     } else {
-                        const cleanedDigits = strVal.replace(/[^\d]/g, '');
+                        const cleanedDigits = strVal.replace(/[^\d]/g, ''); // Remove non-digits (handles ".")
                         if (cleanedDigits === "") {
                             value = 0;
                         } else {
                             value = parseInt(cleanedDigits, 10);
-                            if (isNaN(value)) value = 0; // Ensure it's 0 if parsing results in NaN
+                            if (isNaN(value)) value = 0;
                         }
                     }
                 } else if (key === 'ctr_current' || key === 'ctr_previous') {
@@ -199,14 +219,14 @@ export function Tool4GSCAnalyzer({
                         value = parseFloat(strPosVal.replace(',', '.')) || null;
                         if (isNaN(value as number)) value = null;
                     }
-                } else if (key === 'item' || key === 'filterName' || key === 'filterValue') {
+                } else if (key === primaryItemKey || key === 'filterName' || key === 'filterValue') {
                     value = String(value || '').trim();
                 }
                 entry[key] = value;
             });
 
-            if (reportType !== 'filters' && !entry.item && row[0] !== undefined && row[0] !== null) {
-                entry.item = String(row[0]).trim();
+            if (reportType !== 'filters' && !entry[primaryItemKey] && row[0] !== undefined && row[0] !== null) {
+                entry[primaryItemKey] = String(row[0]).trim();
             }
             if (reportType === 'filters') {
                 if (!entry.filterName && row[0] !== undefined && row[0] !== null) entry.filterName = String(row[0]).trim();
@@ -214,7 +234,7 @@ export function Tool4GSCAnalyzer({
             }
             
             return entry;
-        }).filter(entry => (reportType === 'filters' ? (entry.filterName && entry.filterName !== "") : (entry.item && entry.item !== "" && entry.item !== "Sommario")) ); // Added "Sommario" filter
+        }).filter(entry => (reportType === 'filters' ? (entry.filterName && entry.filterName !== "") : (entry[primaryItemKey] && String(entry[primaryItemKey]).trim() !== "" && String(entry[primaryItemKey]).trim().toLowerCase() !== "sommario")) );
         
         return parsedRows;
     };
@@ -250,9 +270,14 @@ export function Tool4GSCAnalyzer({
             if (currentPosition !== null && previousPosition !== null) {
                 diffPosition = previousPosition - currentPosition; 
             }
+            
+            let itemIdentifier = "N/D";
+            if (itemKeyType === 'filters') itemIdentifier = `${d.filterName}: ${d.filterValue}`;
+            else itemIdentifier = d.item || "N/D";
+
 
             return {
-                item: d.item || (d[itemKeyType as keyof GscSheetRow] as string) || "N/D",
+                item: itemIdentifier,
                 clicks_current: currentClicks, clicks_previous: previousClicks, diff_clicks: diffClicks, perc_change_clicks: percChangeClicks,
                 impressions_current: currentImpressions, impressions_previous: previousImpressions, diff_impressions: diffImpressions, perc_change_impressions: percChangeImpressions,
                 ctr_current: currentCTR, ctr_previous: previousCTR, diff_ctr: diffCTR,
