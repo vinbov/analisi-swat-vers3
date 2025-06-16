@@ -46,6 +46,8 @@ interface Tool2AnalyzerProps {
   setIndustryKeywords: (value: string) => void;
   csvFile: { content: string; name: string } | null;
   setCsvFile: (file: { content: string; name: string } | null) => void;
+  analysisResults: PertinenceAnalysisResult[];
+  setAnalysisResults: React.Dispatch<React.SetStateAction<PertinenceAnalysisResult[]>>;
 }
 
 export function Tool2Analyzer({
@@ -55,11 +57,12 @@ export function Tool2Analyzer({
   setIndustryKeywords,
   csvFile,
   setCsvFile,
+  analysisResults,
+  setAnalysisResults,
 }: Tool2AnalyzerProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [progress, setProgress] = useState(0);
-  const [analysisResults, setAnalysisResults] = useState<PertinenceAnalysisResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const isAnalysisStoppedRef = useRef(false);
 
@@ -250,7 +253,7 @@ export function Tool2Analyzer({
     setLoadingMessage("Preparazione analisi offline...");
     setProgress(0);
     setError(null);
-    setAnalysisResults([]);
+    setAnalysisResults([]); 
     isAnalysisStoppedRef.current = false;
 
     try {
@@ -262,7 +265,7 @@ export function Tool2Analyzer({
       }
 
       const totalKeywords = keywordData.length;
-      const results: PertinenceAnalysisResult[] = [];
+      const resultsCollector: PertinenceAnalysisResult[] = [];
       
       for (let i = 0; i < totalKeywords; i += APP_CHUNK_SIZE_TOOL2_OFFLINE) {
         if (isAnalysisStoppedRef.current) break;
@@ -308,8 +311,8 @@ export function Tool2Analyzer({
         });
 
         const chunkResults = (await Promise.all(chunkPromises)).filter(r => r !== null) as PertinenceAnalysisResult[];
-        results.push(...chunkResults);
-        setAnalysisResults(prev => [...prev, ...chunkResults]);
+        resultsCollector.push(...chunkResults);
+        setAnalysisResults(prev => [...prev, ...chunkResults]); 
         
         setProgress(((i + chunk.length) / totalKeywords) * 100);
         
@@ -319,10 +322,10 @@ export function Tool2Analyzer({
       }
 
       if (isAnalysisStoppedRef.current) {
-        setLoadingMessage(`Analisi interrotta. ${results.length} keyword processate.`);
+        setLoadingMessage(`Analisi interrotta. ${resultsCollector.length} keyword processate.`);
       } else {
         setLoadingMessage("Analisi completata!");
-        toast({ title: "Analisi Completata", description: `${results.length} keyword analizzate.` });
+        toast({ title: "Analisi Completata", description: `${resultsCollector.length} keyword analizzate.` });
       }
 
     } catch (e: any) {

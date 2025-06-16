@@ -32,42 +32,42 @@ const chartColors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--ch
 interface Tool4GSCAnalyzerProps {
   gscExcelFile: { content: ArrayBuffer; name: string } | null;
   setGscExcelFile: (file: { content: ArrayBuffer; name: string } | null) => void;
+  parsedGscData: GscParsedData | null;
+  setParsedGscData: React.Dispatch<React.SetStateAction<GscParsedData | null>>;
+  analyzedGscData: GscAnalyzedData | null;
+  setAnalyzedGscData: React.Dispatch<React.SetStateAction<GscAnalyzedData | null>>;
+  gscFiltersDisplay: string;
+  setGscFiltersDisplay: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export function Tool4GSCAnalyzer({ gscExcelFile, setGscExcelFile }: Tool4GSCAnalyzerProps) {
+export function Tool4GSCAnalyzer({ 
+    gscExcelFile, setGscExcelFile,
+    parsedGscData, setParsedGscData,
+    analyzedGscData, setAnalyzedGscData,
+    gscFiltersDisplay, setGscFiltersDisplay
+}: Tool4GSCAnalyzerProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("");
     const [progress, setProgress] = useState(0);
-
-    const [parsedGscData, setParsedGscData] = useState<GscParsedData | null>(null);
-    const [analyzedGscData, setAnalyzedGscData] = useState<GscAnalyzedData | null>(null);
-    const [gscFiltersDisplay, setGscFiltersDisplay] = useState<string>("");
-
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
     const router = useRouter();
 
-    useEffect(() => {
-      console.log("[Tool4 Effect] analyzedGscData state updated:", analyzedGscData);
-      if (analyzedGscData) {
-        localStorage.setItem('tool4ConsolidatedGscData', JSON.stringify(analyzedGscData));
-      }
-    }, [analyzedGscData]);
+    // Removed useEffect for localStorage, as data is passed via props to Tool5
 
     const handleFileLoad = useCallback((content: string, name: string, arrayBufferContent?: ArrayBuffer) => {
         if (arrayBufferContent && arrayBufferContent.byteLength > 0) {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
-            setParsedGscData(null);
-            setAnalyzedGscData(null);
-            setGscFiltersDisplay("");
-            localStorage.removeItem('tool4ConsolidatedGscData'); 
+            setParsedGscData(null); // Clear previous results from global state
+            setAnalyzedGscData(null); // Clear previous results from global state
+            setGscFiltersDisplay(""); // Clear previous results from global state
         } else {
             setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
             setGscExcelFile(null);
             toast({ title: "Errore File", description: "Contenuto file non valido o file vuoto.", variant: "destructive" });
         }
-    }, [setGscExcelFile, toast]);
+    }, [setGscExcelFile, setParsedGscData, setAnalyzedGscData, setGscFiltersDisplay, toast]);
 
     const handleResetFile = () => {
         setGscExcelFile(null);
@@ -75,7 +75,6 @@ export function Tool4GSCAnalyzer({ gscExcelFile, setGscExcelFile }: Tool4GSCAnal
         setAnalyzedGscData(null);
         setError(null);
         setGscFiltersDisplay("");
-        localStorage.removeItem('tool4ConsolidatedGscData');
         const fileInput = document.getElementById('gscExcelFileInputTool4') as HTMLInputElement;
         if (fileInput) fileInput.value = "";
     };
@@ -287,14 +286,11 @@ export function Tool4GSCAnalyzer({ gscExcelFile, setGscExcelFile }: Tool4GSCAnal
     };
 
     const processGSCData = async () => {
-        console.log("[Tool4 ProcessGSCData DEBUG] Function called.");
         if (!gscExcelFile || !gscExcelFile.content) {
-            console.error("[Tool4 ProcessGSCData DEBUG] ERROR: No gscExcelFile or no content. File:", gscExcelFile);
             setError("Nessun file Excel/ODS caricato o contenuto non valido.");
             setIsLoading(false);
             return;
         }
-        console.log("[Tool4 ProcessGSCData DEBUG] gscExcelFile and content exist. Name:", gscExcelFile.name, "Size:", gscExcelFile.content.byteLength);
 
         setIsLoading(true);
         setLoadingMessage("Lettura file...");
@@ -307,32 +303,29 @@ export function Tool4GSCAnalyzer({ gscExcelFile, setGscExcelFile }: Tool4GSCAnal
         await new Promise(resolve => setTimeout(resolve, 50));
 
         try {
-            console.log("[Tool4 ProcessGSCData DEBUG] Attempting XLSX.read. File name:", gscExcelFile.name);
             const workbook = XLSX.read(gscExcelFile.content, { type: 'array', cellDates: true });
-            console.log("[Tool4 ProcessGSCData DEBUG] Workbook read. Sheet names:", workbook.SheetNames);
             
-            const newParsedData: GscParsedData = { filters: [], queries: [], pages: [], countries: [], devices: [], searchAppearance: [] };
-            const newAnalyzedData: GscAnalyzedData = { queries: undefined, pages: undefined, countries: undefined, devices: undefined, searchAppearance: undefined };
+            const newParsedCollector: GscParsedData = { filters: [], queries: [], pages: [], countries: [], devices: [], searchAppearance: [] };
+            const newAnalyzedCollector: GscAnalyzedData = { queries: undefined, pages: undefined, countries: undefined, devices: undefined, searchAppearance: undefined };
 
-
-            let filtersText = '<h4 class="font-semibold text-sky-700 mb-1">Filtri GSC Applicati all\'Export:</h4>';
+            let filtersTextCollector = '<h4 class="font-semibold text-sky-700 mb-1">Filtri GSC Applicati all\'Export:</h4>';
             const filtersSheetName = workbook.SheetNames.find(name => GSC_SHEET_MAPPING.filters.some(pn => name.toLowerCase().trim() === pn.toLowerCase().trim()));
             
             if (filtersSheetName) {
-                newParsedData.filters = parseSheetData(workbook, filtersSheetName, 'filters');
-                if (newParsedData.filters && newParsedData.filters.length > 0) {
-                    filtersText += '<ul>';
-                    newParsedData.filters.forEach(filter => {
-                         filtersText += `<li class="ml-4 list-disc">${filter.filterName || 'Filtro Sconosciuto'}: ${filter.filterValue || 'N/D'}</li>`;
+                newParsedCollector.filters = parseSheetData(workbook, filtersSheetName, 'filters');
+                if (newParsedCollector.filters && newParsedCollector.filters.length > 0) {
+                    filtersTextCollector += '<ul>';
+                    newParsedCollector.filters.forEach(filter => {
+                         filtersTextCollector += `<li class="ml-4 list-disc">${filter.filterName || 'Filtro Sconosciuto'}: ${filter.filterValue || 'N/D'}</li>`;
                     });
-                    filtersText += '</ul>';
+                    filtersTextCollector += '</ul>';
                 } else {
-                    filtersText += '<p>Nessun filtro specifico rilevato o foglio "Filters" vuoto.</p>';
+                    filtersTextCollector += '<p>Nessun filtro specifico rilevato o foglio "Filters" vuoto.</p>';
                 }
             } else {
-                filtersText += '<p>Foglio "Filters" non trovato.</p>';
+                filtersTextCollector += '<p>Foglio "Filters" non trovato.</p>';
             }
-            setGscFiltersDisplay(filtersText);
+            setGscFiltersDisplay(filtersTextCollector); // Update global state
 
             let currentProgress = 0;
             const reportTypesToProcess = GSC_SHEET_DISPLAY_ORDER.filter(type => type !== 'filters');
@@ -344,29 +337,26 @@ export function Tool4GSCAnalyzer({ gscExcelFile, setGscExcelFile }: Tool4GSCAnal
 
                 if (sheetName) {
                     const sheetData = parseSheetData(workbook, sheetName, reportType);
-                    newParsedData[reportType] = sheetData;
+                    newParsedCollector[reportType] = sheetData;
                     
                     if (sheetData.length > 0) {
                         setLoadingMessage(`Analisi dati: ${reportType}...`);
-                        newAnalyzedData[reportType] = analyzeGSCData(sheetData, reportType);
+                        newAnalyzedCollector[reportType] = analyzeGSCData(sheetData, reportType);
                     } else {
-                        newAnalyzedData[reportType] = undefined;
+                        newAnalyzedCollector[reportType] = undefined;
                     }
                 } else {
                     console.warn(`[Tool4 ProcessGSCData] Sheet for ${reportType} not found. Expected names:`, GSC_SHEET_MAPPING[reportType]);
-                    newParsedData[reportType] = []; 
-                    newAnalyzedData[reportType] = undefined;
+                    newParsedCollector[reportType] = []; 
+                    newAnalyzedCollector[reportType] = undefined;
                 }
                  currentProgress += progressIncrement;
                  setProgress(Math.min(currentProgress, 100)); 
                  await new Promise(resolve => setTimeout(resolve, 10));
             }
 
-            console.log("[Tool4 ProcessGSCData DEBUG] FINAL newParsedData before setState:", newParsedData);
-            console.log("[Tool4 ProcessGSCData DEBUG] FINAL newAnalyzedData before setState:", newAnalyzedData);
-
-            setParsedGscData(newParsedData);
-            setAnalyzedGscData(newAnalyzedData); 
+            setParsedGscData(newParsedCollector); // Update global state
+            setAnalyzedGscData(newAnalyzedCollector); // Update global state
             
             toast({ title: "Analisi Completata", description: "Dati GSC processati." });
 
@@ -468,10 +458,7 @@ export function Tool4GSCAnalyzer({ gscExcelFile, setGscExcelFile }: Tool4GSCAnal
             {gscExcelFile && (
                 <div className="text-center">
                     <Button 
-                        onClick={() => {
-                            console.log("[Tool4 Button Click] 'Analizza Dati GSC' clicked. About to call processGSCData.");
-                            processGSCData();
-                        }}
+                        onClick={processGSCData}
                         disabled={isLoading} 
                         className="action-button bg-sky-600 hover:bg-sky-700 text-white text-lg"
                     >
@@ -509,15 +496,15 @@ export function Tool4GSCAnalyzer({ gscExcelFile, setGscExcelFile }: Tool4GSCAnal
                     {GSC_SHEET_DISPLAY_ORDER.filter(type => type !== 'filters').map((reportType) => {
                         const analysis = analyzedGscData[reportType];
                         const itemDisplayName = getReportItemDisplayName(reportType);
-                        const chartType = reportType === 'devices' ? 'pie' : 'bar';
+                        const chartTypeToUse = reportType === 'devices' ? 'pie' : 'bar';
                         
                         const hasValidAnalysis = analysis && analysis.detailedDataWithDiffs && analysis.detailedDataWithDiffs.length > 0;
                         const chartDataForRender = hasValidAnalysis ? analysis.topItemsByClicksChartData : { labels: [], datasets: [{ label: `Clic (Corrente) - ${itemDisplayName}`, data: [], backgroundColor: [] }] };
                         const pieDataForRender = hasValidAnalysis ? analysis.pieChartData : [];
 
-                        const hasBarChartData = chartType === 'bar' && hasValidAnalysis && chartDataForRender.labels.length > 0 && chartDataForRender.datasets[0]?.data.length > 0;
-                        const hasPieChartData = chartType === 'pie' && hasValidAnalysis && pieDataForRender && pieDataForRender.length > 0;
-                        const shouldRenderChart = chartType === 'bar' ? hasBarChartData : hasPieChartData;
+                        const hasBarChartData = chartTypeToUse === 'bar' && hasValidAnalysis && chartDataForRender.labels.length > 0 && chartDataForRender.datasets[0]?.data.length > 0;
+                        const hasPieChartData = chartTypeToUse === 'pie' && hasValidAnalysis && pieDataForRender && pieDataForRender.length > 0;
+                        const shouldRenderChart = chartTypeToUse === 'bar' ? hasBarChartData : hasPieChartData;
 
                         if (!hasValidAnalysis && !isLoading) { 
                              return (
@@ -548,7 +535,7 @@ export function Tool4GSCAnalyzer({ gscExcelFile, setGscExcelFile }: Tool4GSCAnal
                                             <ChartGSC
                                                 data={chartDataForRender}
                                                 pieData={pieDataForRender}
-                                                type={chartType}
+                                                type={chartTypeToUse}
                                                 title={`Top 5 ${itemDisplayName} per Clic`}
                                             />
                                         </div>

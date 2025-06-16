@@ -28,6 +28,10 @@ interface Tool3ScraperProps {
   setMaxAdsToProcess: (value: number) => void;
   googleApiKey: string;
   setGoogleApiKey: (value: string) => void;
+  scrapedAds: ScrapedAd[];
+  setScrapedAds: React.Dispatch<React.SetStateAction<ScrapedAd[]>>;
+  adsWithAnalysis: AdWithAngleAnalysis[];
+  setAdsWithAnalysis: React.Dispatch<React.SetStateAction<AdWithAngleAnalysis[]>>;
 }
 
 export function Tool3Scraper({
@@ -41,15 +45,15 @@ export function Tool3Scraper({
   setMaxAdsToProcess,
   googleApiKey,
   setGoogleApiKey,
+  scrapedAds,
+  setScrapedAds,
+  adsWithAnalysis,
+  setAdsWithAnalysis,
 }: Tool3ScraperProps) {
   const [isLoadingScraping, setIsLoadingScraping] = useState(false);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [apifyStatus, setApifyStatus] = useState("");
-  
-  const [scrapedAds, setScrapedAds] = useState<ScrapedAd[]>([]);
-  const [adsWithAnalysis, setAdsWithAnalysis] = useState<AdWithAngleAnalysis[]>([]);
-  
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
@@ -63,8 +67,8 @@ export function Tool3Scraper({
     setLoadingMessage("Avvio scraping con Apify...");
     setApifyStatus("Stato: Inizializzazione...");
     setError(null);
-    setScrapedAds([]);
-    setAdsWithAnalysis([]);
+    setScrapedAds([]); // Clear previous global state
+    setAdsWithAnalysis([]); // Clear previous global state
 
     const apifyInputPayload = {
       urls: [{ url: fbAdsUrl }],
@@ -106,14 +110,14 @@ export function Tool3Scraper({
       setLoadingMessage("Processazione risultati...");
       setApifyStatus("Stato: Processazione dati...");
 
-      const processedAds: ScrapedAd[] = [];
+      const processedAdsCollector: ScrapedAd[] = [];
       let adsCounter = 0;
       for (const item of items) {
         const snapshotCards = item.snapshot?.cards;
         if (snapshotCards && snapshotCards.length > 0) {
           for (const card of snapshotCards) {
             if (adsCounter >= maxAdsToProcess) break;
-            processedAds.push({
+            processedAdsCollector.push({
               id: generateId(),
               testo: card.body || "",
               titolo: card.title || "",
@@ -124,7 +128,7 @@ export function Tool3Scraper({
           }
         } else if (item.snapshot && (item.snapshot.body?.text || item.snapshot.videos?.length > 0 || item.snapshot.images?.length > 0)) {
           if (adsCounter < maxAdsToProcess) {
-            processedAds.push({
+            processedAdsCollector.push({
               id: generateId(),
               testo: item.snapshot.body?.text || "",
               titolo: item.snapshot.title || item.snapshot.page_name || "N/D",
@@ -137,11 +141,11 @@ export function Tool3Scraper({
         if (adsCounter >= maxAdsToProcess) break;
       }
       
-      setScrapedAds(processedAds);
-      setAdsWithAnalysis(processedAds.map(ad => ({...ad}))); 
+      setScrapedAds(processedAdsCollector); // Update global state
+      setAdsWithAnalysis(processedAdsCollector.map(ad => ({...ad}))); // Prepare for analysis
       setLoadingMessage("Scraping completato!");
       setApifyStatus("Stato: Completato.");
-      toast({ title: "Scraping Completato", description: `${processedAds.length} annunci recuperati.` });
+      toast({ title: "Scraping Completato", description: `${processedAdsCollector.length} annunci recuperati.` });
 
     } catch (e: any) {
       console.error("Errore durante lo scraping (Tool 3):", e);
@@ -170,7 +174,12 @@ export function Tool3Scraper({
     setLoadingMessage("Analisi angle in corso con Google AI (Gemini)...");
     setError(null);
 
-    const analysisPromises = scrapedAds.map(async (ad) => {
+    // Use adsWithAnalysis which was initialized with scrapedAds
+    const currentAdsForAnalysis = [...adsWithAnalysis]; 
+
+    const analysisPromises = currentAdsForAnalysis.map(async (ad) => {
+      // Skip if already analyzed (e.g., if user clicks multiple times)
+      if (ad.angleAnalysis || ad.analysisError) return ad; 
       try {
         const analysisResult = await analyzeAdAngleAction({
           adText: ad.testo,
@@ -185,7 +194,7 @@ export function Tool3Scraper({
 
     try {
       const results = await Promise.all(analysisPromises);
-      setAdsWithAnalysis(results);
+      setAdsWithAnalysis(results); // Update global state
       setLoadingMessage("Analisi angle completata!");
       toast({ title: "Analisi Angle Completata", description: "L'analisi 7C degli annunci (Google AI) è terminata." });
     } catch (e: any) {
@@ -232,6 +241,8 @@ export function Tool3Scraper({
       toast({ title: "Dati Insufficienti", description: "Esegui prima lo scraping e l'analisi degli angle.", variant: "destructive"});
       return;
     }
+    // Data is now passed via HomePage state to Tool5, localStorage might not be needed here
+    // For detail page, if it still uses localStorage:
     localStorage.setItem('tool3AngleAnalysisData', JSON.stringify(adsWithAnalysis));
     router.push('/tool3/angle-analysis');
   };

@@ -9,6 +9,7 @@ import { Tool2Analyzer } from '@/components/tools/tool2-analyzer/tool2-analyzer'
 import { Tool3Scraper } from '@/components/tools/tool3-scraper/tool3-scraper';
 import { Tool4GSCAnalyzer } from '@/components/tools/tool4-gsc-analyzer/tool4-gsc-analyzer';
 import { Tool5MasterReport } from '@/components/tools/tool5-master-report/tool5-master-report';
+import type { ComparisonResult, PertinenceAnalysisResult, ScrapedAd, AdWithAngleAnalysis, GscParsedData, GscAnalyzedData } from '@/lib/types';
 
 const tools = [
   { id: 'tool1', label: 'Analizzatore Comparativo KW' },
@@ -23,11 +24,14 @@ export default function HomePage() {
 
   // --- State for Tool 1 ---
   const [tool1SiteFiles, setTool1SiteFiles] = useState<Record<string, { content: string; name: string }>>({});
+  const [tool1ComparisonResults, setTool1ComparisonResults] = useState<ComparisonResult[]>([]);
+  const [tool1ActiveCompetitorNames, setTool1ActiveCompetitorNames] = useState<string[]>([]);
 
   // --- State for Tool 2 ---
   const [tool2Industry, setTool2Industry] = useState('');
   const [tool2IndustryKeywords, setTool2IndustryKeywords] = useState('');
   const [tool2CsvFile, setTool2CsvFile] = useState<{ content: string; name: string } | null>(null);
+  const [tool2AnalysisResults, setTool2AnalysisResults] = useState<PertinenceAnalysisResult[]>([]);
   
   // --- State for Tool 3 ---
   const [tool3ApifyToken, setTool3ApifyToken] = useState('');
@@ -35,9 +39,15 @@ export default function HomePage() {
   const [tool3FbAdsUrl, setTool3FbAdsUrl] = useState('');
   const [tool3MaxAdsToProcess, setTool3MaxAdsToProcess] = useState(10);
   const [tool3GoogleApiKey, setTool3GoogleApiKey] = useState('');
+  const [tool3ScrapedAds, setTool3ScrapedAds] = useState<ScrapedAd[]>([]);
+  const [tool3AdsWithAnalysis, setTool3AdsWithAnalysis] = useState<AdWithAngleAnalysis[]>([]);
+
 
   // --- State for Tool 4 ---
   const [tool4GscExcelFile, setTool4GscExcelFile] = useState<{ content: ArrayBuffer; name: string } | null>(null);
+  const [tool4ParsedGscData, setTool4ParsedGscData] = useState<GscParsedData | null>(null);
+  const [tool4AnalyzedGscData, setTool4AnalyzedGscData] = useState<GscAnalyzedData | null>(null);
+  const [tool4GscFiltersDisplay, setTool4GscFiltersDisplay] = useState<string>("");
 
 
   return (
@@ -52,6 +62,10 @@ export default function HomePage() {
               <Tool1Comparator
                 siteFiles={tool1SiteFiles}
                 setSiteFiles={setTool1SiteFiles}
+                comparisonResults={tool1ComparisonResults}
+                setComparisonResults={setTool1ComparisonResults}
+                activeCompetitorNames={tool1ActiveCompetitorNames}
+                setActiveCompetitorNames={setTool1ActiveCompetitorNames}
               />
             </div>
           )}
@@ -64,6 +78,8 @@ export default function HomePage() {
                 setIndustryKeywords={setTool2IndustryKeywords}
                 csvFile={tool2CsvFile}
                 setCsvFile={setTool2CsvFile}
+                analysisResults={tool2AnalysisResults}
+                setAnalysisResults={setTool2AnalysisResults}
               />
             </div>
           )}
@@ -80,6 +96,10 @@ export default function HomePage() {
                 setMaxAdsToProcess={setTool3MaxAdsToProcess}
                 googleApiKey={tool3GoogleApiKey}
                 setGoogleApiKey={setTool3GoogleApiKey}
+                scrapedAds={tool3ScrapedAds}
+                setScrapedAds={setTool3ScrapedAds}
+                adsWithAnalysis={tool3AdsWithAnalysis}
+                setAdsWithAnalysis={setTool3AdsWithAnalysis}
               />
             </div>
           )}
@@ -88,12 +108,39 @@ export default function HomePage() {
               <Tool4GSCAnalyzer
                 gscExcelFile={tool4GscExcelFile}
                 setGscExcelFile={setTool4GscExcelFile}
+                parsedGscData={tool4ParsedGscData}
+                setParsedGscData={setTool4ParsedGscData}
+                analyzedGscData={tool4AnalyzedGscData}
+                setAnalyzedGscData={setTool4AnalyzedGscData}
+                gscFiltersDisplay={tool4GscFiltersDisplay}
+                setGscFiltersDisplay={setTool4GscFiltersDisplay}
               />
             </div>
           )}
           {activeTool === 'tool5' && (
             <div id="tool5-container">
-              <Tool5MasterReport />
+              <Tool5MasterReport 
+                tool1Data={{
+                  comparisonResultsCount: {
+                    common: tool1ComparisonResults.filter(r => r.status === 'common').length,
+                    mySiteOnly: tool1ComparisonResults.filter(r => r.status === 'mySiteOnly').length,
+                    competitorOnly: tool1ComparisonResults.filter(r => r.status === 'competitorOnly').length,
+                    totalUnique: new Set(tool1ComparisonResults.map(r => r.keyword)).size
+                  },
+                  // Potremmo voler passare qui sintesi più dettagliate se necessario,
+                  // per ora il Tool5MasterReport le ricava dai risultati completi o da localStorage (che possiamo eliminare)
+                  rawResults: tool1ComparisonResults, 
+                  activeCompetitorNames: tool1ActiveCompetitorNames,
+                }}
+                tool3Data={{
+                  scrapedAds: tool3ScrapedAds,
+                  adsWithAnalysis: tool3AdsWithAnalysis,
+                }}
+                tool4Data={{
+                  analyzedGscData: tool4AnalyzedGscData,
+                  gscFiltersDisplay: tool4GscFiltersDisplay,
+                }}
+              />
             </div>
           )}
         </main>

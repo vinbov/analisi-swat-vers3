@@ -21,14 +21,20 @@ const APP_CHUNK_SIZE_TOOL1 = 500;
 interface Tool1ComparatorProps {
   siteFiles: Record<string, { content: string; name: string }>;
   setSiteFiles: React.Dispatch<React.SetStateAction<Record<string, { content: string; name: string }>>>;
+  comparisonResults: ComparisonResult[];
+  setComparisonResults: React.Dispatch<React.SetStateAction<ComparisonResult[]>>;
+  activeCompetitorNames: string[];
+  setActiveCompetitorNames: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProps) {
+export function Tool1Comparator({ 
+  siteFiles, setSiteFiles,
+  comparisonResults, setComparisonResults,
+  activeCompetitorNames, setActiveCompetitorNames
+}: Tool1ComparatorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [progress, setProgress] = useState(0);
-  const [comparisonResults, setComparisonResults] = useState<ComparisonResult[]>([]);
-  const [activeCompetitorNames, setActiveCompetitorNames] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   const { toast } = useToast();
@@ -100,10 +106,9 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
     setLoadingMessage("Preparazione analisi...");
     setProgress(0);
     setError(null);
-    setComparisonResults([]);
+    setComparisonResults([]); // Clear previous results from global state
     setActiveCompetitorNames([]);
     
-    // Clear the ref and state for detail pages
     dataForDetailPagesRef.current.clear();
     setDataForDetailPages(new Map());
     localStorage.removeItem('tool1MioSitoCoreKeywords'); 
@@ -114,13 +119,13 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
       return;
     }
 
-    const currentActiveCompetitors = Object.keys(siteFiles).filter(key => key !== 'Mio Sito' && siteFiles[key]?.content);
-    if (currentActiveCompetitors.length === 0) {
+    const currentActiveComps = Object.keys(siteFiles).filter(key => key !== 'Mio Sito' && siteFiles[key]?.content);
+    if (currentActiveComps.length === 0) {
       setError("Carica i dati CSV per almeno un Competitor.");
       setIsLoading(false);
       return;
     }
-    setActiveCompetitorNames(currentActiveCompetitors);
+    setActiveCompetitorNames(currentActiveComps); // Set active competitors in global state
 
     try {
       const parsedSiteData: Record<string, CsvRowTool1[]> = {};
@@ -179,7 +184,7 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
       const allKeywordsArray = Array.from(allKeywordsSet);
       const totalKeywords = allKeywordsArray.length;
       
-      const results: ComparisonResult[] = [];
+      const resultsCollector: ComparisonResult[] = [];
       
       for (let i = 0; i < totalKeywords; i += APP_CHUNK_SIZE_TOOL1) {
         const chunk = allKeywordsArray.slice(i, i + APP_CHUNK_SIZE_TOOL1);
@@ -189,7 +194,7 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
           let competitorEntriesData: { name: string; entry?: CsvRowTool1 }[] = [];
           let ranksInAtLeastOneCompetitor = false;
 
-          currentActiveCompetitors.forEach(compName => {
+          currentActiveComps.forEach(compName => {
             const compEntry = siteKeywordMaps[compName]?.get(kw);
             competitorEntriesData.push({ name: compName, entry: compEntry });
             if (compEntry) ranksInAtLeastOneCompetitor = true;
@@ -207,7 +212,7 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
             if (firstCompetitorWithKw) commonMetricsSource = firstCompetitorWithKw.entry;
           }
 
-          results.push({
+          resultsCollector.push({
             keyword: kw,
             mySiteInfo: mySiteEntry ? { pos: mySiteEntry.posizione ?? 'N/P', url: mySiteEntry.url ?? 'N/A' } : { pos: 'N/P', url: 'N/A' },
             competitorInfo: competitorEntriesData.map(c => ({ name: c.name, pos: c.entry?.posizione ?? 'N/P', url: c.entry?.url ?? 'N/A' })),
@@ -222,11 +227,12 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
         setLoadingMessage(`Analisi Comparatore... (${Math.min(i + APP_CHUNK_SIZE_TOOL1, totalKeywords)} di ${totalKeywords} kw)`);
         await new Promise(resolve => setTimeout(resolve, 10));
       }
-      setComparisonResults(results);
+      setComparisonResults(resultsCollector); // Update global state with results
       
-      if (results.length > 0) {
+      // Save summary for master report (can be adjusted if Tool5 receives full results)
+      if (resultsCollector.length > 0) {
         try {
-            const commonKWsResult = results.filter(r => r.status === 'common');
+            const commonKWsResult = resultsCollector.filter(r => r.status === 'common');
             const mySiteTop5Common = commonKWsResult
                 .filter(kw => kw.mySiteInfo.pos !== 'N/P' && typeof kw.mySiteInfo.pos === 'number' && kw.mySiteInfo.pos <= 10)
                 .sort((a, b) => (a.mySiteInfo.pos as number) - (b.mySiteInfo.pos as number))
@@ -234,7 +240,7 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
                 .map(kw => ({ keyword: kw.keyword, position: kw.mySiteInfo.pos }));
 
             const competitorsTopCommon: Record<string, { keyword: string; position: number | string | null }[]> = {};
-            currentActiveCompetitors.slice(0, 2).forEach(compName => { 
+            currentActiveComps.slice(0, 2).forEach(compName => { 
                 competitorsTopCommon[compName] = commonKWsResult
                     .filter(kw => {
                         const compInfo = kw.competitorInfo.find(c => c.name === compName);
@@ -249,7 +255,7 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
                     .map(kw => ({ keyword: kw.keyword, position: kw.competitorInfo.find(c => c.name === compName)?.pos || 'N/P' }));
             });
 
-            const top5Opportunities = results
+            const top5Opportunities = resultsCollector
                 .filter(r => r.status === 'competitorOnly' && typeof r.volume === 'number' && r.volume > 0)
                 .sort((a, b) => (b.volume as number) - (a.volume as number))
                 .slice(0, 5)
@@ -258,8 +264,8 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
             const summaryForMasterReport = {
                 comparisonResultsCount: {
                     common: commonKWsResult.length,
-                    mySiteOnly: results.filter(r => r.status === 'mySiteOnly').length,
-                    competitorOnly: results.filter(r => r.status === 'competitorOnly').length,
+                    mySiteOnly: resultsCollector.filter(r => r.status === 'mySiteOnly').length,
+                    competitorOnly: resultsCollector.filter(r => r.status === 'competitorOnly').length,
                     totalUnique: allKeywordsArray.length
                 },
                 mySiteTop5Common,
@@ -274,10 +280,10 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
          localStorage.removeItem('tool1ResultsForMasterReport');
       }
 
-      if (results.length === 0 && Object.values(siteFiles).some(f => f?.content && f.content.trim() !== '')) {
+      if (resultsCollector.length === 0 && Object.values(siteFiles).some(f => f?.content && f.content.trim() !== '')) {
         toast({ title: "Nessun Risultato", description: "Nessuna keyword valida trovata o nessuna corrispondenza/differenza significativa. Controlla le intestazioni dei tuoi file CSV."});
-      } else if (results.length > 0) {
-        toast({ title: "Analisi Completata", description: `${results.length} keyword analizzate.` });
+      } else if (resultsCollector.length > 0) {
+        toast({ title: "Analisi Completata", description: `${resultsCollector.length} keyword analizzate.` });
       }
 
     } catch (e: any) {
@@ -306,9 +312,7 @@ export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProp
       const dataId = `tool1-${section}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       const payloadForDetail: Tool1DataPayload = { comparisonResults, activeCompetitorNames };
       
-      // Directly update the ref's map
       dataForDetailPagesRef.current.set(dataId, payloadForDetail);
-      // Also update state to ensure consistency if other parts rely on it
       setDataForDetailPages(new Map(dataForDetailPagesRef.current));
 
       const url = `/tool1/${section}?dataId=${dataId}`;
