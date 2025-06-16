@@ -17,13 +17,31 @@ import { useRouter } from 'next/navigation';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-export function Tool3Scraper() {
-  const [apifyToken, setApifyToken] = useState('');
-  const [apifyActorId, setApifyActorId] = useState('curious_coder~facebook-ads-library-scraper');
-  const [fbAdsUrl, setFbAdsUrl] = useState('');
-  const [maxAdsToProcess, setMaxAdsToProcess] = useState(10);
-  const [googleApiKey, setGoogleApiKey] = useState(''); // Changed from openAIApiKey
+interface Tool3ScraperProps {
+  apifyToken: string;
+  setApifyToken: (value: string) => void;
+  apifyActorId: string;
+  setApifyActorId: (value: string) => void;
+  fbAdsUrl: string;
+  setFbAdsUrl: (value: string) => void;
+  maxAdsToProcess: number;
+  setMaxAdsToProcess: (value: number) => void;
+  googleApiKey: string;
+  setGoogleApiKey: (value: string) => void;
+}
 
+export function Tool3Scraper({
+  apifyToken,
+  setApifyToken,
+  apifyActorId,
+  setApifyActorId,
+  fbAdsUrl,
+  setFbAdsUrl,
+  maxAdsToProcess,
+  setMaxAdsToProcess,
+  googleApiKey,
+  setGoogleApiKey,
+}: Tool3ScraperProps) {
   const [isLoadingScraping, setIsLoadingScraping] = useState(false);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -141,7 +159,7 @@ export function Tool3Scraper() {
       return;
     }
     
-    const currentGoogleApiKey = googleApiKey.trim(); // Changed from openAIApiKey
+    const currentGoogleApiKey = googleApiKey.trim(); 
     if (!currentGoogleApiKey) {
       setError("Inserisci la tua Google API Key per l'analisi dell'angle con Gemini.");
       toast({ title: "Google API Key Mancante", description: "Inserisci la Google API Key per l'analisi con Gemini.", variant: "destructive" });
@@ -250,7 +268,7 @@ export function Tool3Scraper() {
               type="password" 
               id="googleApiKeyTool3" 
               value={googleApiKey} 
-              onChange={(e) => setGoogleApiKey(e.target.value)} // Changed state variable
+              onChange={(e) => setGoogleApiKey(e.target.value)} 
               placeholder="La tua chiave API Google (es. AIza...)" 
             />
             <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C con i modelli Google AI (Gemini).</p>

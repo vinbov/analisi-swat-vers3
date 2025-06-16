@@ -39,11 +39,23 @@ function tokenizeAndClean(text: string, stopWords: string[] = []): string[] {
     return tokens;
 }
 
+interface Tool2AnalyzerProps {
+  industry: string;
+  setIndustry: (value: string) => void;
+  industryKeywords: string;
+  setIndustryKeywords: (value: string) => void;
+  csvFile: { content: string; name: string } | null;
+  setCsvFile: (file: { content: string; name: string } | null) => void;
+}
 
-export function Tool2Analyzer() {
-  const [industry, setIndustry] = useState('');
-  const [industryKeywords, setIndustryKeywords] = useState('');
-  const [csvFile, setCsvFile] = useState<{ content: string; name: string } | null>(null);
+export function Tool2Analyzer({
+  industry,
+  setIndustry,
+  industryKeywords,
+  setIndustryKeywords,
+  csvFile,
+  setCsvFile,
+}: Tool2AnalyzerProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [progress, setProgress] = useState(0);
@@ -54,12 +66,12 @@ export function Tool2Analyzer() {
   const { toast } = useToast();
 
   const handleFileLoad = useCallback((content: string, name: string) => {
-    if (content) {
+    if (content && name) {
       setCsvFile({ content, name });
     } else {
       setCsvFile(null);
     }
-  }, []);
+  }, [setCsvFile]);
 
   const handleStopAnalysis = () => {
     isAnalysisStoppedRef.current = true;

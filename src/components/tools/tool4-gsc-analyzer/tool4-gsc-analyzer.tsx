@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -29,9 +29,12 @@ const GSC_SHEET_DISPLAY_ORDER: GscReportType[] = ['filters', 'queries', 'pages',
 const GSC_LOGO_URL = "https://placehold.co/150x50/1e3a8a/FFFFFF?text=GSC+Tool";
 const chartColors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
+interface Tool4GSCAnalyzerProps {
+  gscExcelFile: { content: ArrayBuffer; name: string } | null;
+  setGscExcelFile: (file: { content: ArrayBuffer; name: string } | null) => void;
+}
 
-export function Tool4GSCAnalyzer() {
-    const [gscExcelFile, setGscExcelFile] = useState<{ content: ArrayBuffer; name: string } | null>(null);
+export function Tool4GSCAnalyzer({ gscExcelFile, setGscExcelFile }: Tool4GSCAnalyzerProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("");
     const [progress, setProgress] = useState(0);
@@ -58,13 +61,13 @@ export function Tool4GSCAnalyzer() {
             setParsedGscData(null);
             setAnalyzedGscData(null);
             setGscFiltersDisplay("");
-            localStorage.removeItem('tool4ConsolidatedGscData'); // Clear previous consolidated data
+            localStorage.removeItem('tool4ConsolidatedGscData'); 
         } else {
             setError("Errore nel caricamento del file Excel/ODS. Il contenuto non è valido o il file è vuoto.");
             setGscExcelFile(null);
             toast({ title: "Errore File", description: "Contenuto file non valido o file vuoto.", variant: "destructive" });
         }
-    }, [toast]);
+    }, [setGscExcelFile, toast]);
 
     const handleResetFile = () => {
         setGscExcelFile(null);
@@ -229,7 +232,7 @@ export function Tool4GSCAnalyzer() {
             const diffCTR = currentCTR - previousCTR;
             let diffPosition: number | null = null;
             if (currentPosition !== null && previousPosition !== null) {
-                diffPosition = previousPosition - currentPosition; // Improved logic: positive diff = better rank
+                diffPosition = previousPosition - currentPosition; 
             }
 
             return {
@@ -363,7 +366,7 @@ export function Tool4GSCAnalyzer() {
             console.log("[Tool4 ProcessGSCData DEBUG] FINAL newAnalyzedData before setState:", newAnalyzedData);
 
             setParsedGscData(newParsedData);
-            setAnalyzedGscData(newAnalyzedData); // This will trigger the useEffect to save to localStorage
+            setAnalyzedGscData(newAnalyzedData); 
             
             toast({ title: "Analisi Completata", description: "Dati GSC processati." });
 
@@ -437,18 +440,18 @@ export function Tool4GSCAnalyzer() {
     return (
         <div className="space-y-8">
             <header className="text-center">
-                 <Image src={GSC_LOGO_URL} alt="Logo GSC Tool" width={150} height={50} className="mx-auto h-12 mb-4 object-contain" style={{width: "auto"}} data-ai-hint="logo excel chart" />
+                 <Image src={GSC_LOGO_URL} alt="Logo GSC Tool" width={150} height={50} className="mx-auto h-12 mb-4 object-contain" style={{width: "auto"}} data-ai-hint="logo excel chart"/>
                 <h2 className="text-3xl font-bold text-sky-700">Analizzatore Dati Google Search Console</h2>
                 <p className="text-muted-foreground mt-2">Carica il tuo export Excel/ODS da GSC per un'analisi descrittiva dei dati.</p>
             </header>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Caricamento File GSC Excel/ODS (Ver.ULTIMO_TENTATIVO)</CardTitle>
+                    <CardTitle>Caricamento File GSC Excel/ODS</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <FileUploadZone
-                        siteKey="gscExcelFile"
+                        siteKey="gscExcelFileInputTool4" 
                         label="File GSC (formati .xlsx, .xls, .ods)"
                         onFileLoad={handleFileLoad}
                         acceptedFileTypes={acceptedExcelTypes}

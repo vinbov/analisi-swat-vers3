@@ -18,8 +18,12 @@ import { TOOL1_DATA_CHANNEL_NAME, type RequestTool1DataMessage, type ResponseToo
 
 const APP_CHUNK_SIZE_TOOL1 = 500;
 
-export function Tool1Comparator() {
-  const [siteFiles, setSiteFiles] = useState<Record<string, { content: string; name: string }>>({});
+interface Tool1ComparatorProps {
+  siteFiles: Record<string, { content: string; name: string }>;
+  setSiteFiles: React.Dispatch<React.SetStateAction<Record<string, { content: string; name: string }>>>;
+}
+
+export function Tool1Comparator({ siteFiles, setSiteFiles }: Tool1ComparatorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [progress, setProgress] = useState(0);
@@ -30,16 +34,14 @@ export function Tool1Comparator() {
   const { toast } = useToast();
 
   const [dataForDetailPages, setDataForDetailPages] = useState<Map<string, Tool1DataPayload>>(new Map());
-  const dataForDetailPagesRef = useRef(dataForDetailPages); // Ref to hold the latest map
+  const dataForDetailPagesRef = useRef(dataForDetailPages); 
   const channelRef = useRef<BroadcastChannel | null>(null);
 
-  // Keep the ref updated whenever dataForDetailPages state changes
   useEffect(() => {
     dataForDetailPagesRef.current = dataForDetailPages;
   }, [dataForDetailPages]);
 
   useEffect(() => {
-    // Initialize BroadcastChannel only once
     if (!channelRef.current) {
         channelRef.current = new BroadcastChannel(TOOL1_DATA_CHANNEL_NAME);
     }
@@ -47,7 +49,6 @@ export function Tool1Comparator() {
     const handleMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'REQUEST_TOOL1_DATA' && channelRef.current) {
         const { dataId, requestingTabId } = event.data as RequestTool1DataMessage;
-        // Use the ref to get the latest data
         const payload = dataForDetailPagesRef.current.get(dataId) || null;
         
         const responseMsg: ResponseTool1DataMessage = {
@@ -63,21 +64,12 @@ export function Tool1Comparator() {
     channelRef.current.onmessage = handleMessage;
 
     return () => {
-      // Detach the message handler, but don't close the channel here
-      // if it's intended to be persistent for the component's lifetime.
-      // However, standard practice is to close it.
-      // For this app, multiple Tool1 tabs are not expected to be primary, so closing is fine.
       if (channelRef.current) {
         channelRef.current.onmessage = null; 
-        // Closing the channel on every unmount might be too aggressive if HMR or quick navigations occur.
-        // For a more robust solution in complex scenarios, channel management might need a global context or service.
-        // But for this case, let's ensure it's closed when the component truly unmounts.
-        // A single channel instance should be managed.
       }
     };
-  }, []); // Empty dependency array: setup listener once. Relies on ref for current data.
+  }, []); 
 
-  // Effect to close the channel when the component unmounts definitively
   useEffect(() => {
     return () => {
       if (channelRef.current) {
@@ -92,7 +84,6 @@ export function Tool1Comparator() {
     if (content && name) {
       setSiteFiles(prev => ({ ...prev, [siteKey]: { content, name } }));
     } else {
-      // File was reset/removed
       setSiteFiles(prev => {
         const newFiles = { ...prev };
         delete newFiles[siteKey];
@@ -102,7 +93,7 @@ export function Tool1Comparator() {
         localStorage.removeItem('tool1MioSitoCoreKeywords');
       }
     }
-  }, []);
+  }, [setSiteFiles]);
 
   const runComparison = async () => {
     setIsLoading(true);
@@ -111,7 +102,7 @@ export function Tool1Comparator() {
     setError(null);
     setComparisonResults([]);
     setActiveCompetitorNames([]);
-    setDataForDetailPages(new Map()); // Reset map, ref will be updated by its useEffect
+    setDataForDetailPages(new Map()); 
     localStorage.removeItem('tool1MioSitoCoreKeywords'); 
 
     if (!siteFiles['Mio Sito']?.content) {
@@ -311,7 +302,6 @@ export function Tool1Comparator() {
     try {
       const dataId = `tool1-${section}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       
-      // Update state (which will update dataForDetailPagesRef.current via its useEffect)
       setDataForDetailPages(prevMap => {
         const newMap = new Map(prevMap);
         newMap.set(dataId, { comparisonResults, activeCompetitorNames });
