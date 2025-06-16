@@ -14,7 +14,6 @@ import { TableGSC } from './table-gsc';
 import { ChartGSC } from './charts-gsc';
 import { Loader2, BarChart2, PieChartIcon, Download, AlertCircle, Eye } from 'lucide-react';
 import Image from 'next/image';
-// import { useRouter } from 'next/navigation'; // Non più necessario se usiamo window.open
 
 const GSC_SHEET_MAPPING: Record<GscReportType, string[]> = {
     filters: ["Filters", "Filtri", "Panoramica"],
@@ -51,13 +50,11 @@ export function Tool4GSCAnalyzer({
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
-    // const router = useRouter(); // Non più necessario se usiamo window.open
 
     const handleFileLoad = useCallback((content: string, name: string, arrayBufferContent?: ArrayBuffer) => {
         if (arrayBufferContent && arrayBufferContent.byteLength > 0) {
             setGscExcelFile({ content: arrayBufferContent, name });
             setError(null);
-            // Clear previous results from global state when a new file is loaded
             setParsedGscData(null); 
             setAnalyzedGscData(null); 
             setGscFiltersDisplay("");
@@ -123,38 +120,54 @@ export function Tool4GSCAnalyzer({
         }
 
         const headerMap: Record<string, keyof GscSheetRow | 'item'> = {
-            "top queries": "item", "top query": "item", "query": "item", "principali query": "item",
+            // Item identifiers
+            "top queries": "item", "top query": "item", "query": "item", "principali query": "item", "query di ricerca": "item",
             "top pages": "item", "pagina": "item", "pagine principali": "item", "principali pagine": "item",
             "country": "item", "paese": "item", "paesi": "item",
             "device": "item", "dispositivo": "item", "dispositivi": "item",
             "search appearance": "item", "aspetto nella ricerca": "item", "search appearances": "item", "tipi di risultati multimediali": "item", "aspetto della ricerca": "item",
             "date": "item", "data": "item",
-
-            "clicks": "clicks_current", "clic": "clicks_current",
+        
+            // Current Period Metrics - Generic English and Italian
+            "clicks": "clicks_current", "clic": "clicks_current", 
             "impressions": "impressions_current", "impressioni": "impressions_current",
             "ctr": "ctr_current",
             "position": "position_current", "posizione": "position_current",
-
+        
+            // Current Period Metrics - Specific Italian from GSC UI (e.g., "Clic Attuali")
+            "clic attuali": "clicks_current",
+            "impressioni attuali": "impressions_current",
+            "ctr attuale": "ctr_current",
+            "posizione attuale": "position_current", "pos. attuale": "position_current",
+        
+            // Previous Period Metrics - Specific Italian from GSC UI (e.g., "Clic Prec.")
+            "clic prec.": "clicks_previous", "clic precedenti": "clicks_previous",
+            "impressioni prec.": "impressions_previous", "impressioni precedenti": "impressions_previous",
+            "ctr prec.": "ctr_previous", "ctr precedente": "ctr_previous",
+            "posizione prec.": "position_previous", "posizione precedente": "position_previous", "pos. prec.": "position_previous",
+        
+            // GSC Export comparison headers with date ranges (English and Italian)
             "last 3 months clicks": "clicks_current", "clic ultimi 3 mesi": "clicks_current", "clic (ultimi 3 mesi)": "clicks_current",
             "clicks last 28 days": "clicks_current", "clic ultimi 28 giorni": "clicks_current",
             "previous 3 months clicks": "clicks_previous", "clic 3 mesi precedenti": "clicks_previous", "clic (3 mesi precedenti)": "clicks_previous",
             "clicks previous 28 days": "clicks_previous", "clic 28 giorni precedenti": "clicks_previous",
-
+        
             "last 3 months impressions": "impressions_current", "impressioni ultimi 3 mesi": "impressions_current", "impressioni (ultimi 3 mesi)": "impressions_current",
             "impressions last 28 days": "impressions_current", "impressioni ultimi 28 giorni": "impressions_current",
             "previous 3 months impressions": "impressions_previous", "impressioni 3 mesi precedenti": "impressions_previous", "impressioni (3 mesi precedenti)": "impressions_previous",
             "impressions previous 28 days": "impressions_previous", "impressioni 28 giorni precedenti": "impressions_previous",
-
+        
             "last 3 months ctr": "ctr_current", "ctr ultimi 3 mesi": "ctr_current", "ctr (ultimi 3 mesi)": "ctr_current",
             "ctr last 28 days": "ctr_current", "ctr ultimi 28 giorni": "ctr_current",
             "previous 3 months ctr": "ctr_previous", "ctr 3 mesi precedenti": "ctr_previous", "ctr (3 mesi precedenti)": "ctr_previous",
             "ctr previous 28 days": "ctr_previous", "ctr 28 giorni precedenti": "ctr_previous",
-
+        
             "last 3 months position": "position_current", "posizione ultimi 3 mesi": "position_current", "posizione (ultimi 3 mesi)": "position_current",
             "position last 28 days": "position_current", "posizione ultimi 28 giorni": "position_current",
             "previous 3 months position": "position_previous", "posizione 3 mesi precedenti": "position_previous", "posizione (3 mesi precedenti)": "position_previous",
             "position previous 28 days": "position_previous", "posizione 28 giorni precedenti": "position_previous",
-
+        
+            // Filters sheet specific
             "filter": "filterName", "filtro": "filterName",
             "value": "filterValue", "valore": "filterValue"
         };
@@ -175,7 +188,7 @@ export function Tool4GSCAnalyzer({
                     value = (value === undefined || value === null || String(value).trim() === "" || String(value).trim() === "-") ? 0 : parseInt(String(value).replace(/[^\d]/g, '')) || 0;
                 } else if (key === 'ctr_current' || key === 'ctr_previous') {
                     if (typeof value === 'string') value = parseFloat(value.replace('%', '').replace(',', '.')) / 100;
-                    else if (typeof value === 'number') value = (value > 1 && value <= 100) ? value / 100 : value;
+                    else if (typeof value === 'number') value = (value > 1 && value <= 100) ? value / 100 : value; // Handles CTR already as percentage
                     else value = 0;
                     value = isNaN(value) ? 0 : value;
                 } else if (key === 'position_current' || key === 'position_previous') {
@@ -239,7 +252,7 @@ export function Tool4GSCAnalyzer({
         });
 
         let summaryText = `Clic totali (periodo corrente): ${totalCurrentClicks.toLocaleString()}. Impressioni totali: ${totalCurrentImpressions.toLocaleString()}.`;
-        if(totalPreviousClicks > 0 || totalPreviousImpressions > 0) {
+        if(totalPreviousClicks > 0 || totalPreviousImpressions > 0 || processedItems.some(p => p.clicks_previous > 0 || p.impressions_previous > 0) ) { // Check if there's any previous data
             const overallClickDiff = totalCurrentClicks - totalPreviousClicks;
             const overallImpressionDiff = totalCurrentImpressions - totalPreviousImpressions;
             summaryText += ` Variazione clic vs periodo precedente: ${overallClickDiff >= 0 ? '+' : ''}${overallClickDiff.toLocaleString()}.`;
@@ -377,7 +390,11 @@ export function Tool4GSCAnalyzer({
     };
 
     const handleDownloadSectionCSV = (reportType: GscReportType) => {
-        const analysis = analyzedGscData?.[reportType];
+        if (!analyzedGscData) {
+            toast({ title: "Dati non disponibili", description: "Esegui prima l'analisi.", variant: "destructive" });
+            return;
+        }
+        const analysis = analyzedGscData[reportType];
         if (!analysis || !analysis.detailedDataWithDiffs || analysis.detailedDataWithDiffs.length === 0) {
             toast({ title: "Nessun dato", description: `Nessun dato da scaricare per ${getReportItemDisplayName(reportType)}.`, variant: "destructive" });
             return;
@@ -403,7 +420,11 @@ export function Tool4GSCAnalyzer({
     };
 
     const openDetailPage = (reportType: GscReportType) => {
-        const analysis = analyzedGscData?.[reportType];
+        if (!analyzedGscData) {
+             toast({ title: "Dati non disponibili", description: "Esegui prima l'analisi.", variant: "destructive" });
+            return;
+        }
+        const analysis = analyzedGscData[reportType];
         if (!analysis || !analysis.detailedDataWithDiffs || analysis.detailedDataWithDiffs.length === 0) {
             toast({ title: "Dati Insufficienti", description: `Nessun dato dettagliato da visualizzare per ${getReportItemDisplayName(reportType)}.`, variant: "destructive"});
             return;
@@ -417,7 +438,7 @@ export function Tool4GSCAnalyzer({
             description: analysis.summaryText,
         }));
         const url = `/tool4/${reportType}`;
-        window.open(url, '_blank'); // Apre in una nuova scheda
+        window.open(url, '_blank'); 
     };
 
     const acceptedExcelTypes = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.ods,application/vnd.oasis.opendocument.spreadsheet";
@@ -489,6 +510,7 @@ export function Tool4GSCAnalyzer({
                     )}
 
                     {GSC_SHEET_DISPLAY_ORDER.filter(type => type !== 'filters').map((reportType) => {
+                        if (!analyzedGscData) return null;
                         const analysis = analyzedGscData[reportType];
                         const itemDisplayName = getReportItemDisplayName(reportType);
                         const chartTypeToUse = reportType === 'devices' ? 'pie' : 'bar';
@@ -555,5 +577,3 @@ export function Tool4GSCAnalyzer({
         </div>
     );
 }
-
-    
