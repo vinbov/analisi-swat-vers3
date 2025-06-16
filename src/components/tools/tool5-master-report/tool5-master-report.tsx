@@ -205,7 +205,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     reportContent += "========================================\n\n";
     reportContent += "Data del Report: " + new Date().toLocaleDateString("it-IT", { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + "\n\n";
 
-    reportContent += "# ANALIZZATORE COMPARATIVO KEYWORD (TOOL 1)\n";
+    reportContent += "# SINTESI: ANALIZZATORE COMPARATIVO KEYWORD (TOOL 1)\n";
     if (typeof tool1SummaryForDisplay === 'string') {
       reportContent += tool1SummaryForDisplay + "\n\n";
     } else if (tool1SummaryForDisplay) {
@@ -247,18 +247,18 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
       } else {
         reportContent += "  - Nessuna opportunità significativa trovata.\n";
       }
-      reportContent += "\nNOTA: Per i grafici (Keyword Comuni Top 10, Top Opportunità Volume), fare screenshot dal Tool 1.\n\n";
+      reportContent += "\n[[NOTA: Per i grafici (Keyword Comuni Top 10, Top Opportunità Volume), fare screenshot dal Tool 1 e inserirli manualmente nel documento finale.]]\n\n";
     } else {
       reportContent += "Nessun dato disponibile dal Tool 1.\n\n";
     }
     reportContent += "--------------------------------------------------\n\n";
 
-    reportContent += "# ANALIZZATORE PERTINENZA & PRIORITÀ KW (TOOL 2)\n";
+    reportContent += "# SINTESI: ANALIZZATORE PERTINENZA & PRIORITÀ KW (TOOL 2)\n";
     reportContent += "I risultati del Tool 2 sono disponibili e scaricabili come CSV direttamente all'interno del tool stesso.\n";
-    reportContent += "Considerare di includere screenshot delle tabelle dei risultati più significativi.\n\n";
+    reportContent += "[[NOTA: Considerare di includere screenshot delle tabelle dei risultati più significativi dal Tool 2 nel documento finale.]]\n\n";
     reportContent += "-------------------------------------------------------------\n\n";
 
-    reportContent += "# FB ADS LIBRARY SCRAPER & ANALISI ANGLE (TOOL 3)\n";
+    reportContent += "# SINTESI: FB ADS LIBRARY SCRAPER & ANALISI ANGLE (TOOL 3)\n";
     if (typeof tool3SummaryForDisplay === 'string') {
       reportContent += tool3SummaryForDisplay + "\n\n";
     } else if (tool3SummaryForDisplay) {
@@ -276,22 +276,29 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                                .replace('C7', 'C7 Contesto');
           reportContent += `  - ${readableKey}: ${value.toFixed(2)}\n`;
         });
-         reportContent += "\nNOTA: Per il grafico dei punteggi medi 7C, fare uno screenshot dal Tool 3 (Pagina Dettaglio Analisi Angle).\n";
+         reportContent += "\n[[NOTA: Per il grafico dei punteggi medi 7C, fare uno screenshot dal Tool 3 (Pagina Dettaglio Analisi Angle) e inserirlo manualmente nel documento finale.]]\n";
       } else if (tool3SummaryForDisplay.analyzedAdsCount === 0 && tool3SummaryForDisplay.processedAdsCount > 0) {
         reportContent += "Nessuna analisi dell'angle è stata completata con successo.\n";
       }
       if (tool3SummaryForDisplay.error) {
         reportContent += `\nErrore durante l'analisi del Tool 3: ${tool3SummaryForDisplay.error}\n`;
       }
-       reportContent += "\nNOTA: Per visualizzare gli annunci specifici e le analisi dettagliate, fare riferimento al Tool 3 e al suo report CSV.\n\n";
+       reportContent += "\n[[NOTA: Per visualizzare gli annunci specifici e le analisi dettagliate, fare riferimento al Tool 3 e al suo report CSV, oppure fare screenshot della tabella dei Top annunci.]]\n\n";
     } else {
       reportContent += "Nessun dato disponibile dal Tool 3.\n\n";
     }
     reportContent += "------------------------------------------------------------------\n\n";
 
-    reportContent += "# ANALIZZATORE DATI GSC (TOOL 4)\n";
+    reportContent += "# SINTESI: ANALIZZATORE DATI GSC (TOOL 4)\n";
     if (tool4Data && tool4Data.gscFiltersDisplay) {
-        const cleanedFilters = tool4Data.gscFiltersDisplay.replace(/<h4[^>]*>Filtri GSC Applicati all'Export:<\/h4>/i, '## Filtri GSC Applicati all\'Export:\n').replace(/<[^>]*>/g, (match) => match === '<li>' ? '  - ' : match === '</li>' ? '\n' : '').replace(/\s+/g, ' ').trim();
+        const cleanedFilters = tool4Data.gscFiltersDisplay.replace(/<h1[^>]*>Filtri GSC Applicati all'Export:<\/h1>/i, '## Filtri GSC Applicati all\'Export:\n').replace(/<h[1-6][^>]*>/gi, '\n### ').replace(/<\/?h[1-6][^>]*>/gi, '').replace(/<[^>]*>/g, (match) => {
+            if (match.startsWith('<ul')) return '\n';
+            if (match.startsWith('<li>')) return '  - ';
+            if (match.startsWith('</li')) return '\n';
+            if (match.startsWith('<p')) return '\n  ';
+            if (match.startsWith('</p')) return '\n';
+            return ''; // Rimuovi altri tag
+        }).replace(/\n\s*\n/g, '\n').trim();
         reportContent += cleanedFilters + "\n\n";
     }
     if (typeof tool4SummaryForDisplay === 'string') {
@@ -308,9 +315,15 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         else {
           reportContent += "  Nessun dato analizzato o foglio non trovato.\n";
         }
+        if (section.dataPresent && section.topItems && section.topItems.length > 0) {
+            reportContent += `\n  ### Top 5 Elementi per ${section.displayName}:\n`;
+            section.topItems.forEach(item => {
+                 reportContent += `    - ${item.item}: Clic Attuali: ${item.clicks_current}, Diff. Clic: ${item.diff_clicks}, % Clic: ${isFinite(item.perc_change_clicks) ? (item.perc_change_clicks * 100).toFixed(1) + '%' : (item.perc_change_clicks === Infinity ? '+Inf%' : 'N/A')}\n`;
+            });
+        }
         reportContent += "\n";
       });
-      reportContent += "NOTA: Per i grafici dettagliati (Top Items, ecc.) per ogni sezione GSC, fare uno screenshot dal Tool 4.\n\n";
+      reportContent += "[[NOTA: Per i grafici dettagliati (Top Items, ecc.) per ogni sezione GSC, fare uno screenshot dal Tool 4 e inserirli manualmente nel documento finale.]]\n\n";
     } else {
       reportContent += "Nessun dato disponibile dal Tool 4.\n\n";
     }
@@ -338,14 +351,14 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
   }
 
   return (
-    <div className="space-y-8 p-4 md:p-6 bg-background text-foreground">
+    <div className="space-y-8 p-4 md:p-6 text-foreground"> {/* Rimossa classe bg-background per stampa */}
       <header className="text-center py-6">
         <h1 className="text-3xl md:text-4xl font-bold text-sky-700 flex items-center justify-center">
             <Presentation className="mr-3 h-8 w-8 md:h-10 md:w-10" /> Report Consolidato Dati Analisi
         </h1>
         <p className="text-muted-foreground mt-3 max-w-3xl mx-auto text-sm md:text-base">
           Questa pagina presenta una sintesi dei dati elaborati dai vari tool. Per un report completo, utilizza la funzione "Stampa" del tuo browser (Ctrl+P o Cmd+P) e scegli "Salva come PDF".
-          Per i grafici dettagliati, visita i tool specifici e fai degli screenshot da integrare manualmente nel tuo documento finale.
+          Il PDF generato dovrebbe includere tutto il contenuto qui visualizzato, distribuito su più pagine se necessario.
         </p>
          <Button onClick={handleDownloadConsolidatedReport} variant="outline" className="mt-6">
             <Download className="mr-2 h-4 w-4" /> Scarica Sintesi Testuale (.txt)
@@ -399,7 +412,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     <AlertTitle className="text-sky-700 font-semibold">[[INSERIRE GRAFICI DAL TOOL 1]]</AlertTitle>
                     <AlertDescription className="text-sky-600">
                         Per visualizzare i grafici completi (es. "Keyword Comuni in Top 10 per Sito" e "Top 10 Opportunità per Volume"), visita il <strong>Tool 1</strong>. 
-                        Fai uno screenshot di questi grafici per includerli nel tuo report finale.
+                        Fai uno screenshot di questi grafici per includerli manualmente nel tuo report finale.
                     </AlertDescription>
                 </Alert>
             </div>
@@ -419,7 +432,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             <AlertDescription>
               I risultati dell'Analizzatore di Pertinenza & Priorità Keyword (Tool 2) vengono elaborati e visualizzati direttamente all'interno del tool.
               Per consultare questi dati, esegui l'analisi nel Tool 2. Il report scaricabile in CSV è disponibile lì. 
-              <br/><strong>[[INSERIRE SCREENSHOT TABELLA RISULTATI SIGNIFICATIVI DAL TOOL 2]]</strong>
+              <br/><strong>[[NOTA: Considerare di includere screenshot della tabella dei risultati più significativi dal Tool 2 nel documento finale.]]</strong>
             </AlertDescription>
         </Alert>
       </section>
@@ -468,7 +481,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     <AlertTitle className="text-sky-700 font-semibold">[[INSERIRE GRAFICO PUNTEGGI MEDI 7C DAL TOOL 3]]</AlertTitle>
                     <AlertDescription className="text-sky-600">
                         Per visualizzare il grafico dei punteggi medi 7C e le tabelle dettagliate degli annunci, visita il <strong>Tool 3 (Pagina Dettaglio Analisi Angle)</strong>. 
-                        Fai uno screenshot per includerlo nel tuo report.
+                        Fai uno screenshot per includerlo manualmente nel tuo report.
                     </AlertDescription>
                 </Alert>
             </div>
@@ -486,7 +499,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             {tool4Data && tool4Data.gscFiltersDisplay && (
                 <div className="mb-6">
                     <h3 className="text-xl font-semibold text-foreground mb-2">Filtri GSC Applicati all'Export:</h3>
-                    <div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: tool4Data.gscFiltersDisplay.replace(/<h4[^>]*>/i, '').replace(/<\/?ul>/gi, '').replace(/<li>/gi, '<p class="ml-4 my-0.5">&bull; ').replace(/<\/li>/gi, '</p>') }} />
+                    <div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: tool4Data.gscFiltersDisplay.replace(/<h1[^>]*>/i, '<strong>').replace(/<\/h1>/i, '</strong><br/>').replace(/<h[2-6][^>]*>/gi, '<strong>').replace(/<\/h[2-6]>/gi, '</strong><br/>').replace(/<ul>/gi, '<ul class="list-disc pl-5">').replace(/<li>/gi, '<li class="my-0.5">') }} />
                 </div>
             )}
             {typeof tool4SummaryForDisplay === 'string' ? (
@@ -510,11 +523,11 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                                         headers={[section.displayName, "Clic Attuali", "Diff. Clic", "% Clic", "Impr. Attuali", "Diff. Impr.", "% Impr."]} 
                                         data={section.topItems.map(item => ({
                                             [section.displayName]: String(item.item).substring(0,40) + (String(item.item).length > 40 ? '...' : ''),
-                                            "Clic Attuali": item.clicks_current,
-                                            "Diff. Clic": item.diff_clicks,
+                                            "Clic Attuali": item.clicks_current.toLocaleString(),
+                                            "Diff. Clic": item.diff_clicks.toLocaleString(),
                                             "% Clic": isFinite(item.perc_change_clicks) ? (item.perc_change_clicks * 100).toFixed(1) + '%' : (item.perc_change_clicks === Infinity ? '+Inf%' : 'N/A'),
-                                            "Impr. Attuali": item.impressions_current,
-                                            "Diff. Impr.": item.diff_impressions,
+                                            "Impr. Attuali": item.impressions_current.toLocaleString(),
+                                            "Diff. Impr.": item.diff_impressions.toLocaleString(),
                                             "% Impr.": isFinite(item.perc_change_impressions) ? (item.perc_change_impressions * 100).toFixed(1) + '%' : (item.perc_change_impressions === Infinity ? '+Inf%' : 'N/A'),
                                         }))}
                                     />
@@ -531,7 +544,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     <AlertTitle className="text-sky-700 font-semibold">[[INSERIRE GRAFICI DAL TOOL 4]]</AlertTitle>
                     <AlertDescription className="text-sky-600">
                         Per i grafici dettagliati (Top Items, Distribuzione Dispositivi, ecc.) per ogni sezione GSC, visita il <strong>Tool 4</strong>.
-                        Fai uno screenshot di questi grafici per includerli nel tuo report finale.
+                        Fai uno screenshot di questi grafici per includerli manualmente nel tuo report finale.
                     </AlertDescription>
                 </Alert>
                 </div>
@@ -543,8 +556,11 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
 
       <footer className="mt-12 py-6 border-t border-border">
         <div className="p-4 bg-sky-50 border border-sky-200 rounded-md text-center">
-            <p className="text-sky-700 font-medium text-sm md:text-base">
-                Per un report formattato di questa pagina, utilizza la funzione <strong>"Stampa"</strong> del tuo browser (Ctrl+P o Cmd+P) e scegli <strong>"Salva come PDF"</strong>.
+            <h2 className="text-sky-700 font-semibold text-lg md:text-xl mb-2">Come Esportare Questo Report</h2>
+            <p className="text-sky-700 text-sm md:text-base">
+                Per un report formattato di questa pagina (testo e tabelle), utilizza la funzione <strong>"Stampa"</strong> del tuo browser (Ctrl+P o Cmd+P) e scegli <strong>"Salva come PDF"</strong>.
+                <br/>Assicurati che le impostazioni di stampa siano per "Tutte le pagine" e "Layout Verticale".
+                <br/>Per i grafici, visita i tool specifici, fai uno screenshot e inseriscili manualmente nel tuo documento PDF/Word finale.
             </p>
         </div>
       </footer>
