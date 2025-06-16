@@ -4,10 +4,9 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { InfoIcon, AlertCircle, Download, BarChart3, SearchCode, ClipboardList, BarChart2, Presentation, Printer } from 'lucide-react';
+import { InfoIcon, BarChart3, SearchCode, ClipboardList, BarChart2, Presentation, Printer } from 'lucide-react';
 import type { 
-    AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType, GscAnalyzedItem,
+    AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType,
     ComparisonResult, ScrapedAd 
 } from '@/lib/types';
 
@@ -67,18 +66,19 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
   const [average7CScores, setAverage7CScores] = useState<AngleAnalysisScores | null>(null);
 
   useEffect(() => {
-    setIsLoading(true); // Start loading when props change or component mounts
+    setIsLoading(true); 
     if (tool3Data && tool3Data.adsWithAnalysis) {
         const analyzedAds = tool3Data.adsWithAnalysis.filter(ad => ad.angleAnalysis && !ad.angleAnalysis.error);
         if (analyzedAds.length > 0) {
             const avgScores: AngleAnalysisScores = { C1: 0, C2: 0, C3: 0, C4: 0, C5: 0, C6: 0, C7: 0 };
             analyzedAds.forEach(ad => {
-                if (ad.angleAnalysis?.scores) { // scores is nested, check if exists
+                const scores = ad.angleAnalysis?.scores; // Access nested scores object
+                if (scores) {
                     Object.keys(avgScores).forEach(keyStr => {
                         const key = keyStr as keyof AngleAnalysisScores;
-                        avgScores[key] += ad.angleAnalysis!.scores[key] || 0;
+                        avgScores[key] += scores[key] || 0;
                     });
-                } else if (ad.angleAnalysis) { // Fallback to individual c1Clarity etc. if scores object is not there
+                } else if (ad.angleAnalysis) { // Fallback if scores object is not there (old structure)
                     avgScores.C1 += ad.angleAnalysis.c1Clarity || 0;
                     avgScores.C2 += ad.angleAnalysis.c2Engagement || 0;
                     avgScores.C3 += ad.angleAnalysis.c3Concreteness || 0;
@@ -132,14 +132,15 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         </h1>
          <Card className="mt-6 bg-primary/10 border-primary/30">
             <CardHeader>
-                <CardTitle className="text-primary text-xl flex items-center"><Printer className="mr-2 h-6 w-6"/>Esportazione Report Completo (PDF)</CardTitle>
+                <CardTitle className="text-primary text-xl flex items-center justify-center"><Printer className="mr-2 h-6 w-6"/>Esportazione Report Completo (PDF)</CardTitle>
             </CardHeader>
             <CardContent>
-                <p className="text-primary-foreground text-base">
-                    Per esportare questo report consolidato, che include tutti i dati, le tabelle e i grafici visualizzati di seguito, utilizza la funzione <strong>"Stampa"</strong> del tuo browser (scorciatoia: Ctrl+P o Cmd+P) e seleziona <strong>"Salva come PDF"</strong> come destinazione.
+                <p className="text-primary-foreground text-base text-center">
+                    Questa pagina visualizza il report consolidato con tutti i dati, tabelle e grafici disponibili.
+                    <br />Per esportare l'intero report in un unico file PDF multipagina, utilizza la funzione <strong>"Stampa"</strong> del tuo browser (scorciatoia: Ctrl+P o Cmd+P) e seleziona <strong>"Salva come PDF"</strong> come destinazione.
                 </p>
-                <p className="text-primary-foreground text-sm mt-2">
-                    Assicurati che nelle impostazioni di stampa del browser siano selezionate opzioni come "Stampa tutte le pagine" e "Layout Verticale". Il file PDF generato conterrà l'intero contenuto di questa pagina, suddiviso su più pagine se necessario.
+                <p className="text-primary-foreground text-sm mt-2 text-center">
+                    Assicurati che nelle opzioni di stampa del browser siano selezionate impostazioni come "Tutte le pagine" e "Layout Verticale" per un risultato ottimale. Il PDF generato catturerà tutto il contenuto di questa pagina, paginandolo automaticamente se necessario.
                 </p>
             </CardContent>
         </Card>
@@ -185,6 +186,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     <CardHeader><h3 className="text-xl font-semibold">Dettaglio Tabella: Opportunità (Solo Competitor)</h3></CardHeader>
                     <CardContent><ComparisonResultsTable results={tool1Data.rawResults.filter(r => r.status === 'competitorOnly')} type="competitorOnly" activeCompetitorNames={tool1Data.activeCompetitorNames} isDetailPage={true} /></CardContent>
                 </Card>
+                <p className="text-sm text-muted-foreground"><i>[[PER GRAFICI AGGIUNTIVI O DETTAGLI NON INCLUSI QUI, FARE RIFERIMENTO ALLA PAGINA DEL TOOL 1 E USARE SCREENSHOT SE NECESSARIO]]</i></p>
             </div>
         )}
       </section>
@@ -198,7 +200,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             <InfoIcon className="h-4 w-4" />
             <AlertTitle>Info Tool 2</AlertTitle>
             <AlertDescription>
-              I risultati dettagliati del Tool 2 (Analizzatore Pertinenza & Priorità KW) sono visualizzati e scaricabili come CSV direttamente all'interno della pagina del tool stesso.
+              I risultati dettagliati del Tool 2 (Analizzatore Pertinenza & Priorità KW) sono visualizzati e scaricabili come CSV direttamente all'interno della pagina del tool stesso. Includere questi risultati nel report consolidato richiede l'esportazione e l'inserimento manuale.
             </AlertDescription>
         </Alert>
       </section>
@@ -252,6 +254,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                         )}
                     </CardContent>
                 </Card>
+                 <p className="text-sm text-muted-foreground"><i>[[PER VEDERE L'IMMAGINE ASSOCIATA A CIASCUN ANNUNCIO E ALTRI DETTAGLI VISUALI, FARE RIFERIMENTO ALLA PAGINA DEL TOOL 3 E USARE SCREENSHOT SE NECESSARIO]]</i></p>
             </div>
         )}
       </section>
@@ -285,11 +288,11 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     const chartDataForRender = (hasValidAnalysis && analysis.topItemsByClicksChartData) 
                         ? analysis.topItemsByClicksChartData 
                         : { labels: [], datasets: [{ label: `Clic (Corrente) - ${itemDisplayName}`, data: [], backgroundColor: [] }] };
-                    const pieDataForRender = (hasValidAnalysis && analysis.pieChartData) ? analysis.pieChartData : []; // Usa la nuova prop pieChartData
+                    const pieDataForRender = (hasValidAnalysis && analysis.pieChartData) ? analysis.pieChartData : [];
                     const shouldRenderChart = chartTypeToUse === 'bar' ? (hasValidAnalysis && chartDataForRender.labels.length > 0) : (hasValidAnalysis && pieDataForRender && pieDataForRender.length > 0);
 
-                    if (!hasValidAnalysis && isLoading) return null; // Non mostrare nulla se sta ancora caricando e non ci sono dati
-                    if (!hasValidAnalysis && !isLoading) { // Mostra un messaggio se ha finito di caricare ma non ci sono dati
+                    if (!hasValidAnalysis && isLoading) return null;
+                    if (!hasValidAnalysis && !isLoading) {
                          return (
                             <Card key={reportType}>
                                 <CardHeader><h3 className="text-xl font-semibold">Analisi {itemDisplayName}</h3></CardHeader>
@@ -312,16 +315,15 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                                             data={chartDataForRender}
                                             pieData={pieDataForRender} 
                                             type={chartTypeToUse}
-                                            title={`Top Elementi per ${itemDisplayName}`}
+                                            title={`Top Elementi per ${itemDisplayName} per Clic`}
                                         />
                                     </div>
                                 ) : (
-                                    <p className="text-muted-foreground text-center py-4">Nessun dato sufficiente per il grafico di {itemDisplayName}.</p>
+                                    <p className="text-muted-foreground text-center py-4">[[GRAFICO PER ${itemDisplayName.toUpperCase()} NON DISPONIBILE O DATI INSUFFICIENTI. FARE SCREENSHOT DAL TOOL 4 SE NECESSARIO]]</p>
                                 )}
                                 
                                 <h4 className="text-md font-semibold text-foreground mt-4 mb-2">Tabella Dati Completa: {itemDisplayName}</h4>
                                 <TableGSC data={analysis.detailedDataWithDiffs} itemDisplayName={itemDisplayName} isDetailPage={true}/>
-                                <p className="text-xs text-muted-foreground mt-1"><i>[[INSERIRE QUI SCREENSHOT GRAFICO DETTAGLIATO PER {itemDisplayName.toUpperCase()} SE NECESSARIO DAL TOOL 4]]</i></p>
                             </CardContent>
                         </Card>
                     );
@@ -333,15 +335,23 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
       <footer className="mt-12 py-6 border-t border-border text-center">
           <Card className="bg-primary/10 border-primary/30">
             <CardHeader>
-                <CardTitle className="text-primary text-xl flex items-center justify-center"><Printer className="mr-2 h-6 w-6"/>Esportazione Finale Report Completo in PDF</CardTitle>
+                <CardTitle className="text-primary text-xl flex items-center justify-center"><Printer className="mr-2 h-6 w-6"/>Esportazione Finale del Report Consolidato in PDF</CardTitle>
             </CardHeader>
             <CardContent>
-                <p className="text-primary-foreground text-base">
-                    Questa pagina contiene il report consolidato con tutti i dati, tabelle e grafici.
-                    <br />Per esportare l'intero report in un unico file PDF multipagina, utilizza la funzione <strong>"Stampa"</strong> del tuo browser (Ctrl+P o Cmd+P) e seleziona <strong>"Salva come PDF"</strong> come destinazione.
+                <p className="text-primary-foreground text-base font-medium">
+                    Questa pagina contiene il report consolidato con tutti i dati, tabelle e grafici disponibili.
                 </p>
-                <p className="text-primary-foreground text-sm mt-2">
-                    Assicurati che nelle opzioni di stampa del browser siano selezionate impostazioni come "Tutte le pagine" e "Layout Verticale" per un risultato ottimale.
+                <p className="text-primary-foreground text-base mt-2">
+                    Per esportare l'intero contenuto di questa pagina (che potrebbe estendersi su più fogli) in un unico file PDF:
+                </p>
+                <ol className="list-decimal list-inside text-primary-foreground text-base mt-2 space-y-1">
+                    <li>Utilizza la funzione <strong>"Stampa"</strong> del tuo browser (solitamente accessibile con le scorciatoie da tastiera <kbd>Ctrl+P</kbd> su Windows/Linux o <kbd>Cmd+P</kbd> su macOS).</li>
+                    <li>Nella finestra di dialogo di stampa che appare, seleziona <strong>"Salva come PDF"</strong> (o "Stampa su PDF") come destinazione o stampante.</li>
+                    <li>Assicurati che nelle opzioni di stampa siano selezionate impostazioni come "Tutte le pagine" e "Layout Verticale" (Portrait) per un risultato ottimale.</li>
+                    <li>Clicca su "Salva" o "Stampa" per generare il file PDF.</li>
+                </ol>
+                 <p className="text-primary-foreground text-sm mt-3">
+                    Questo metodo catturerà tutto il contenuto visibile e non visibile (che richiede scorrimento) della pagina, impaginandolo automaticamente nel PDF.
                 </p>
             </CardContent>
         </Card>
@@ -349,5 +359,3 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     </div>
   );
 }
-
-    
