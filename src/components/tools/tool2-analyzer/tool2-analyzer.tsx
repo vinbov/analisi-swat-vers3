@@ -13,8 +13,10 @@ import { useToast } from '@/hooks/use-toast';
 import { TablePertinenceResults } from './table-pertinence-results';
 import { PlayIcon, StopCircle, Download, AlertCircle, Loader2, ImportIcon, KeyRound } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { fetchDataForSEOAction } from '@/app/actions/dataforseo-actions';
 
 const APP_CHUNK_SIZE_TOOL2_OFFLINE = 50;
+const DFS_CONCURRENCY_LIMIT = 5; // Limita le chiamate concorrenti a DFS
 
 const STOP_WORDS_IT = [
   "a", "ad", "al", "allo", "ai", "agli", "all", "agl", "alla", "alle", "con", "col", "coi", "da", "dal", "dallo", "dai", "dagli", "dall", "dagl", "dalla", "dalle",
@@ -259,6 +261,8 @@ export function Tool2Analyzer({
     setAnalysisResults([]); 
     isAnalysisStoppedRef.current = false;
 
+    let offlineResultsCollector: PertinenceAnalysisResult[] = [];
+
     try {
       const keywordData = parseCSVTool2(csvFile.content);
       if (!keywordData || keywordData.length === 0) {
@@ -268,13 +272,12 @@ export function Tool2Analyzer({
       }
 
       const totalKeywords = keywordData.length;
-      const resultsCollector: PertinenceAnalysisResult[] = [];
       
       for (let i = 0; i < totalKeywords; i += APP_CHUNK_SIZE_TOOL2_OFFLINE) {
         if (isAnalysisStoppedRef.current) break;
 
         const chunk = keywordData.slice(i, i + APP_CHUNK_SIZE_TOOL2_OFFLINE);
-        setLoadingMessage(`Analisi keyword ${i + 1}-${Math.min(i + chunk.length, totalKeywords)} di ${totalKeywords}...`);
+        setLoadingMessage(`Analisi offline keyword ${i + 1}-${Math.min(i + chunk.length, totalKeywords)} di ${totalKeywords}...`);
         
         const chunkPromises = chunk.map(async (row) => {
           if (isAnalysisStoppedRef.current) return null;
@@ -296,28 +299,22 @@ export function Tool2Analyzer({
               intento: row.intento
             };
           } catch (e: any) {
-            console.error(`Errore analisi keyword ${row.keyword}:`, e);
+            console.error(`Errore analisi offline keyword ${row.keyword}:`, e);
             return {
               keyword: row.keyword,
               settore: globalSettore,
-              pertinenza: "Errore",
-              prioritaSEO: "Errore",
+              pertinenza: "Errore Offline",
+              prioritaSEO: "Errore Offline",
               motivazioneSEO: e.message || "Errore sconosciuto durante analisi offline",
-              volume: row.volume,
-              kd: row.difficolta,
-              opportunity: row.opportunity,
-              posizione: row.posizione,
-              url: row.url,
-              intento: row.intento
             };
           }
         });
 
         const chunkResults = (await Promise.all(chunkPromises)).filter(r => r !== null) as PertinenceAnalysisResult[];
-        resultsCollector.push(...chunkResults);
+        offlineResultsCollector.push(...chunkResults);
         setAnalysisResults(prev => [...prev, ...chunkResults]); 
         
-        setProgress(((i + chunk.length) / totalKeywords) * 100);
+        setProgress(((i + chunk.length) / totalKeywords) * 50); // Offline analysis is 50% of total progress
         
         if (!isAnalysisStoppedRef.current && i + APP_CHUNK_SIZE_TOOL2_OFFLINE < totalKeywords) {
           await new Promise(resolve => setTimeout(resolve, 0)); 
@@ -325,15 +322,79 @@ export function Tool2Analyzer({
       }
 
       if (isAnalysisStoppedRef.current) {
-        setLoadingMessage(`Analisi interrotta. ${resultsCollector.length} keyword processate.`);
+        setLoadingMessage(`Analisi interrotta. ${offlineResultsCollector.length} keyword processate (offline).`);
+        setIsLoading(false);
+        return;
+      }
+      
+      setLoadingMessage("Analisi offline completata!");
+      toast({ title: "Analisi Offline Completata", description: `${offlineResultsCollector.length} keyword analizzate offline.` });
+
+      // DataForSEO Enrichment
+      if (dataForSeoLogin && dataForSeoPassword) {
+        setLoadingMessage("Avvio arricchimento dati con DataForSEO...");
+        const totalOfflineResults = offlineResultsCollector.length;
+        let dfsProcessedCount = 0;
+
+        const enrichedResultsCollector: PertinenceAnalysisResult[] = [];
+        
+        for (let i = 0; i < totalOfflineResults; i += DFS_CONCURRENCY_LIMIT) {
+            if (isAnalysisStoppedRef.current) break;
+            const chunkToEnrich = offlineResultsCollector.slice(i, i + DFS_CONCURRENCY_LIMIT);
+            setLoadingMessage(`Recupero dati DFS per keyword ${i + 1}-${Math.min(i + chunkToEnrich.length, totalOfflineResults)} di ${totalOfflineResults}...`);
+
+            const dfsPromises = chunkToEnrich.map(async (offlineResult) => {
+                if (isAnalysisStoppedRef.current) return offlineResult;
+                try {
+                    const dfsMetrics = await fetchDataForSEOAction({
+                        keyword: offlineResult.keyword,
+                        apiLogin: dataForSeoLogin,
+                        apiPassword: dataForSeoPassword,
+                        // locationCode and languageCode can be parameterized if needed
+                    });
+                    return { ...offlineResult, ...dfsMetrics };
+                } catch (e: any) {
+                    console.error(`Errore recupero DFS per keyword ${offlineResult.keyword}:`, e);
+                    return { ...offlineResult, dfs_error: e.message || "Errore API DataForSEO" };
+                }
+            });
+
+            const enrichedChunkResults = await Promise.all(dfsPromises);
+            enrichedResultsCollector.push(...enrichedChunkResults);
+            
+            // Update analysisResults state incrementally for better UI responsiveness
+            setAnalysisResults(prevResults => {
+                const updatedResults = [...prevResults];
+                enrichedChunkResults.forEach(enrichedRes => {
+                    const indexToUpdate = updatedResults.findIndex(r => r.keyword === enrichedRes.keyword);
+                    if (indexToUpdate !== -1) {
+                        updatedResults[indexToUpdate] = enrichedRes;
+                    }
+                });
+                return updatedResults;
+            });
+
+            dfsProcessedCount += enrichedChunkResults.length;
+            setProgress(50 + (dfsProcessedCount / totalOfflineResults) * 50); // DFS is the other 50%
+             if (!isAnalysisStoppedRef.current && i + DFS_CONCURRENCY_LIMIT < totalOfflineResults) {
+                await new Promise(resolve => setTimeout(resolve, 50)); // Small delay
+            }
+        }
+        
+        if (isAnalysisStoppedRef.current) {
+            setLoadingMessage(`Arricchimento DFS interrotto. ${dfsProcessedCount} keyword processate con DFS.`);
+        } else {
+            setLoadingMessage("Arricchimento DataForSEO completato!");
+            toast({ title: "Arricchimento DFS Completato", description: `${dfsProcessedCount} keyword arricchite.` });
+        }
       } else {
-        setLoadingMessage("Analisi completata!");
-        toast({ title: "Analisi Completata", description: `${resultsCollector.length} keyword analizzate.` });
+         setProgress(100); // If no DFS, then offline is 100%
       }
 
+
     } catch (e: any) {
-      console.error("Errore durante l'analisi (Tool 2 Offline):", e);
-      setError(`Errore analisi (Tool 2 Offline): ${e.message}`);
+      console.error("Errore durante l'analisi (Tool 2):", e);
+      setError(`Errore analisi (Tool 2): ${e.message}`);
       toast({
         title: "Errore di Analisi",
         description: e.message,
@@ -341,6 +402,9 @@ export function Tool2Analyzer({
       });
     } finally {
       setIsLoading(false);
+      if (!isAnalysisStoppedRef.current) {
+          setLoadingMessage(offlineResultsCollector.length > 0 ? "Analisi e arricchimento completati!" : "Analisi completata. Nessun dato da processare.");
+      }
     }
   };
 
@@ -367,7 +431,7 @@ export function Tool2Analyzer({
         "DFS Difficulty": res.dfs_keyword_difficulty ?? "N/A",
         "DFS Error": res.dfs_error ?? ""
     }));
-    exportToCSV("report_analisi_pertinenza_priorita_offline.csv", headers, dataToExport);
+    exportToCSV("report_analisi_pertinenza_priorita_completo.csv", headers, dataToExport);
   };
 
   return (
@@ -493,7 +557,7 @@ export function Tool2Analyzer({
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-2xl">Risultati Analisi Pertinenza e Priorità SEO</CardTitle>
-                <CardDescription>{analysisResults.length} keyword analizzate finora. Clicca sulle intestazioni per ordinare. (Implementazione arricchimento Dati DataForSEO in corso).</CardDescription>
+                <CardDescription>{analysisResults.length} keyword analizzate. {dataForSeoLogin && dataForSeoPassword ? "Include arricchimento da DataForSEO." : "Solo analisi offline."}</CardDescription>
               </div>
               <Button onClick={handleDownloadCSV} variant="outline" disabled={isLoading && analysisResults.length === 0}>
                 Scarica Risultati (CSV) <Download className="ml-2 h-4 w-4" />
