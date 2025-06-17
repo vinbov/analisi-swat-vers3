@@ -1,15 +1,17 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState }
+from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { InfoIcon, BarChart3, SearchCode, ClipboardList, BarChart2, Presentation, Download, FileCode } from 'lucide-react';
+import { InfoIcon, BarChart3, SearchCode, ClipboardList, BarChart2, Presentation, Download, FileCode, Copy } from 'lucide-react';
 import type {
     AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType, GscSectionAnalysis,
     ComparisonResult, ScrapedAd
 } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 // Importa i componenti di tabella e grafico (per la visualizzazione LIVE nel Tool 5)
 import { ComparisonResultsTable } from '@/components/tools/tool1-comparator/table-comparison-results';
@@ -63,6 +65,7 @@ const chartJsBorderColors = chartJsColors.map(color => color.replace('0.7', '1')
 
 export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5MasterReportProps) {
   const [average7CScores, setAverage7CScores] = useState<AngleAnalysisScores | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (tool3Data && tool3Data.adsWithAnalysis) {
@@ -145,8 +148,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     return html;
   };
   
-  const generateCompleteHTMLReport = () => {
-    
+  const prepareFullHTMLReportString = (): string => {
     let tocHTML = '<div class="toc"><h2>Indice dei Contenuti</h2><ul>';
     const sections: {id: string; title: string, level: number}[] = [];
 
@@ -283,7 +285,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             "C1": item.angleAnalysis?.c1Clarity ?? 'N/A', "C2": item.angleAnalysis?.c2Engagement ?? 'N/A', "C3": item.angleAnalysis?.c3Concreteness ?? 'N/A',
             "C4": item.angleAnalysis?.c4Coherence ?? 'N/A', "C5": item.angleAnalysis?.c5Credibility ?? 'N/A', "C6": item.angleAnalysis?.c6CallToAction ?? 'N/A',
             "C7": item.angleAnalysis?.c7Context ?? 'N/A', "Totale": item.angleAnalysis?.totalScore ?? 'N/A', "Valutazione": item.angleAnalysis?.evaluation ?? 'N/A',
-            "Analisi Approfondita": item.angleAnalysis?.detailedAnalysis?.replace(/\\n/g, '<br />') ?? 'N/A',
+            "Analisi Approfondita": item.angleAnalysis?.detailedAnalysis?.replace(/\r\n|\r|\n/g, '<br />') ?? 'N/A',
             "Errore": item.analysisError || item.angleAnalysis?.error || ''
         }));
         reportHtml += generateTableHtml(angleHeadersTool3, angleTableDataTool3, "Dettaglio: Analisi Angle Inserzioni (Metodo 7C)", "tool3-angle-table");
@@ -513,8 +515,12 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     }
 
     finalHtml += `</div></body></html>`;
+    return finalHtml;
+  }
 
-    const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' });
+  const handleDownloadCompleteHTMLReport = () => {
+    const reportString = prepareFullHTMLReportString();
+    const blob = new Blob([reportString], { type: 'text/html;charset=utf-8' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = "report_consolidato_swat_completo.html";
@@ -522,6 +528,26 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
+  };
+
+  const handleCopyHTMLToClipboard = async () => {
+    const reportString = prepareFullHTMLReportString();
+    try {
+      await navigator.clipboard.writeText(reportString);
+      toast({
+        title: "HTML Copiato!",
+        description: "Il codice HTML completo del report è stato copiato negli appunti.",
+        duration: 3000,
+      });
+    } catch (err) {
+      console.error('Errore nel copiare HTML negli appunti:', err);
+      toast({
+        title: "Errore Copia",
+        description: "Impossibile copiare l'HTML. Controlla la console per i dettagli.",
+        variant: "destructive",
+        duration: 5000,
+      });
+    }
   };
 
 
@@ -535,18 +561,25 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
       
       <Card className="no-print">
         <CardHeader>
-            <CardTitle className="text-primary text-xl flex items-center"><FileCode className="mr-2 h-6 w-6"/>Esportazione Report HTML Completo</CardTitle>
+            <CardTitle className="text-primary text-xl flex items-center"><FileCode className="mr-2 h-6 w-6"/>Esportazione Report</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
             <p className="text-primary-foreground text-base">
-                Clicca il pulsante qui sotto per scaricare un file HTML contenente tutti i dati dettagliati, le tabelle e i grafici (renderizzati da Chart.js) dalle analisi effettuate.
+                Scegli come vuoi condividere o salvare il report completo.
             </p>
-            <p className="text-sm text-muted-foreground">
-                Una volta scaricato il file <code>report_consolidato_swat_completo.html</code>, aprilo nel tuo browser. I grafici verranno generati dinamicamente. Da lì, potrai utilizzare la funzione "Stampa" del browser (solitamente <code>Ctrl+P</code> o <code>Cmd+P</code>) e scegliere "Salva come PDF" per generare un documento PDF completo e multipagina.
+            <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                <li><strong>Scarica Report HTML:</strong> Genera un file <code>.html</code> che puoi aprire nel browser. Questo file contiene tutti i dati, le tabelle interattive (espandibili) e i grafici (renderizzati dinamicamente con Chart.js).</li>
+                <li><strong>Copia HTML Report:</strong> Copia l'intero codice sorgente HTML del report negli appunti. Puoi incollarlo in servizi come GitHub Gist per una facile condivisione online o per altri usi.</li>
+            </ul>
+             <p className="text-xs text-muted-foreground mt-2">
+                Per una versione PDF, scarica prima il report HTML, aprilo nel browser, quindi utilizza la funzione "Stampa" (Ctrl+P o Cmd+P) e scegli "Salva come PDF".
             </p>
-            <div>
-                <Button onClick={generateCompleteHTMLReport} variant="default" size="lg">
-                    <Download className="mr-2 h-5 w-5"/> Scarica Report HTML (con Grafici e Tabelle Dettagliate)
+            <div className="flex flex-wrap gap-3 mt-4">
+                <Button onClick={handleDownloadCompleteHTMLReport} variant="default" size="lg">
+                    <Download className="mr-2 h-5 w-5"/> Scarica Report HTML
+                </Button>
+                 <Button onClick={handleCopyHTMLToClipboard} variant="outline" size="lg">
+                    <Copy className="mr-2 h-5 w-5"/> Copia HTML Report
                 </Button>
             </div>
         </CardContent>
@@ -678,3 +711,4 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     </div>
   );
 }
+
