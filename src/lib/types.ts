@@ -54,6 +54,11 @@ export interface PertinenceAnalysisResult {
   posizione?: number | string;
   url?: string;
   intento?: string;
+  // DataForSEO specific metrics
+  dfs_volume?: number | null;
+  dfs_cpc?: number | null;
+  dfs_keyword_difficulty?: number | null;
+  dfs_error?: string | null;
 }
 
 // Tool 3: Facebook Ads Library Scraper

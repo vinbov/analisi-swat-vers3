@@ -11,7 +11,7 @@ import { parseCSVTool2, exportToCSV } from '@/lib/csv';
 import type { CsvRowTool2, PertinenceAnalysisResult } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { TablePertinenceResults } from './table-pertinence-results';
-import { PlayIcon, StopCircle, Download, AlertCircle, Loader2, ImportIcon } from 'lucide-react';
+import { PlayIcon, StopCircle, Download, AlertCircle, Loader2, ImportIcon, KeyRound } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const APP_CHUNK_SIZE_TOOL2_OFFLINE = 50;
@@ -65,6 +65,9 @@ export function Tool2Analyzer({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const isAnalysisStoppedRef = useRef(false);
+
+  const [dataForSeoLogin, setDataForSeoLogin] = useState('');
+  const [dataForSeoPassword, setDataForSeoPassword] = useState('');
 
   const { toast } = useToast();
 
@@ -346,7 +349,7 @@ export function Tool2Analyzer({
       toast({ title: "Nessun dato", description: "Nessun risultato da scaricare.", variant: "destructive" });
       return;
     }
-    const headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione", "Volume", "KD", "Opportunity", "Posizione", "URL", "Intent"];
+    const headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione", "Volume", "KD", "Opportunity", "Posizione", "URL", "Intent", "DFS Volume", "DFS CPC", "DFS Difficulty", "DFS Error"];
     const dataToExport = analysisResults.map(res => ({
         "Keyword": res.keyword || "",
         "Settore Analizzato": res.settore || "",
@@ -358,7 +361,11 @@ export function Tool2Analyzer({
         "Opportunity": res.opportunity !== undefined ? res.opportunity : "N/A",
         "Posizione": res.posizione !== undefined ? res.posizione : "N/A",
         "URL": res.url || "",
-        "Intent": res.intento || ""
+        "Intent": res.intento || "",
+        "DFS Volume": res.dfs_volume ?? "N/A",
+        "DFS CPC": res.dfs_cpc ?? "N/A",
+        "DFS Difficulty": res.dfs_keyword_difficulty ?? "N/A",
+        "DFS Error": res.dfs_error ?? ""
     }));
     exportToCSV("report_analisi_pertinenza_priorita_offline.csv", headers, dataToExport);
   };
@@ -366,13 +373,13 @@ export function Tool2Analyzer({
   return (
     <div className="space-y-8">
       <header className="text-center">
-        <h2 className="text-3xl font-bold" style={{ color: 'hsl(var(--sky-600))' }}>Analizzatore Pertinenza & Priorità KW (Offline)</h2>
-        <p className="text-muted-foreground mt-2">Determina pertinenza e priorità SEO per le tue keyword con regole offline.</p>
+        <h2 className="text-3xl font-bold" style={{ color: 'hsl(var(--sky-600))' }}>Analizzatore Pertinenza & Priorità KW</h2>
+        <p className="text-muted-foreground mt-2">Determina pertinenza e priorità SEO per le tue keyword con regole offline e arricchisci i dati con DataForSEO.</p>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle>Configurazione Analisi Offline</CardTitle>
+          <CardTitle>Configurazione Analisi</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -417,11 +424,46 @@ export function Tool2Analyzer({
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center"><KeyRound className="mr-2 h-5 w-5 text-blue-600" />Credenziali API DataForSEO (Opzionale)</CardTitle>
+            <CardDescription>
+              Inserisci le tue credenziali DataForSEO per arricchire le keyword con metriche aggiuntive (volume, CPC, difficoltà) tramite l'API.
+              Se lasciati vuoti, l'analisi procederà solo con le regole offline.
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label htmlFor="dfsApiLogin" className="block text-sm font-medium text-foreground mb-1">API Login (Email)</label>
+                    <Input 
+                        type="email" 
+                        id="dfsApiLogin" 
+                        value={dataForSeoLogin} 
+                        onChange={(e) => setDataForSeoLogin(e.target.value)} 
+                        placeholder="La tua email di login DataForSEO" 
+                    />
+                </div>
+                <div>
+                    <label htmlFor="dfsApiPassword" className="block text-sm font-medium text-foreground mb-1">API Password (o API Key)</label>
+                    <Input 
+                        type="password" 
+                        id="dfsApiPassword" 
+                        value={dataForSeoPassword} 
+                        onChange={(e) => setDataForSeoPassword(e.target.value)} 
+                        placeholder="La tua password o API key DataForSEO"
+                    />
+                </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Queste credenziali vengono usate solo per effettuare chiamate API dirette a DataForSEO e non vengono memorizzate permanentemente dall'applicazione.</p>
+        </CardContent>
+      </Card>
       
       <div className="text-center space-x-4">
         <Button onClick={runAnalysis} disabled={isLoading} className="action-button bg-sky-600 hover:bg-sky-700 text-white text-lg">
           {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlayIcon className="mr-2 h-5 w-5" />}
-          {isLoading ? "Analisi in corso..." : "Analizza Keyword (Offline)"}
+          {isLoading ? "Analisi in corso..." : "Avvia Analisi Keyword"}
         </Button>
         {isLoading && (
           <Button onClick={handleStopAnalysis} variant="destructive" className="action-button text-lg">
@@ -450,8 +492,8 @@ export function Tool2Analyzer({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-2xl">Risultati Analisi Pertinenza e Priorità SEO (Offline)</CardTitle>
-                <CardDescription>{analysisResults.length} keyword analizzate finora.</CardDescription>
+                <CardTitle className="text-2xl">Risultati Analisi Pertinenza e Priorità SEO</CardTitle>
+                <CardDescription>{analysisResults.length} keyword analizzate finora. Clicca sulle intestazioni per ordinare. (Implementazione arricchimento Dati DataForSEO in corso).</CardDescription>
               </div>
               <Button onClick={handleDownloadCSV} variant="outline" disabled={isLoading && analysisResults.length === 0}>
                 Scarica Risultati (CSV) <Download className="ml-2 h-4 w-4" />
