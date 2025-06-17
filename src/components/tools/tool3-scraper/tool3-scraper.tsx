@@ -11,7 +11,7 @@ import { analyzeAdAngleAction } from '@/app/actions/tool3-actions';
 import { TableScrapedAds } from './table-scraped-ads';
 import { TableAngleAnalysis } from './table-angle-analysis';
 import { exportToCSV } from '@/lib/csv';
-import { PlayIcon, Download, AlertCircle, Bot, SearchCode, Loader2, FileText } from 'lucide-react';
+import { PlayIcon, Download, AlertCircle, Bot, SearchCode, Loader2, FileText, PackageX } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 
@@ -26,8 +26,8 @@ interface Tool3ScraperProps {
   setFbAdsUrl: (value: string) => void;
   maxAdsToProcess: number;
   setMaxAdsToProcess: (value: number) => void;
-  openAIApiKey: string; // Modificato da googleApiKey
-  setOpenAIApiKey: (value: string) => void; // Modificato da setGoogleApiKey
+  openAIApiKey: string;
+  setOpenAIApiKey: (value: string) => void;
   scrapedAds: ScrapedAd[];
   setScrapedAds: React.Dispatch<React.SetStateAction<ScrapedAd[]>>;
   adsWithAnalysis: AdWithAngleAnalysis[];
@@ -43,8 +43,8 @@ export function Tool3Scraper({
   setFbAdsUrl,
   maxAdsToProcess,
   setMaxAdsToProcess,
-  openAIApiKey, // Modificato
-  setOpenAIApiKey, // Modificato
+  openAIApiKey,
+  setOpenAIApiKey,
   scrapedAds,
   setScrapedAds,
   adsWithAnalysis,
@@ -55,6 +55,7 @@ export function Tool3Scraper({
   const [loadingMessage, setLoadingMessage] = useState("");
   const [apifyStatus, setApifyStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [openAIPluginMissingError, setOpenAIPluginMissingError] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -67,6 +68,7 @@ export function Tool3Scraper({
     setLoadingMessage("Avvio scraping con Apify...");
     setApifyStatus("Stato: Inizializzazione...");
     setError(null);
+    setOpenAIPluginMissingError(false);
     setScrapedAds([]); 
     setAdsWithAnalysis([]); 
 
@@ -163,16 +165,17 @@ export function Tool3Scraper({
       return;
     }
     
-    const currentOpenAIApiKey = openAIApiKey.trim(); // Modificato
+    const currentOpenAIApiKey = openAIApiKey.trim();
     if (!currentOpenAIApiKey) {
-      setError("Inserisci la tua OpenAI API Key per l'analisi dell'angle."); // Modificato
-      toast({ title: "OpenAI API Key Mancante", description: "Inserisci la OpenAI API Key per l'analisi.", variant: "destructive" }); // Modificato
+      setError("Inserisci la tua OpenAI API Key per l'analisi dell'angle.");
+      toast({ title: "OpenAI API Key Mancante", description: "Inserisci la OpenAI API Key per l'analisi.", variant: "destructive" });
       return;
     }
 
     setIsLoadingAnalysis(true);
-    setLoadingMessage("Analisi angle in corso con OpenAI..."); // Modificato
+    setLoadingMessage("Analisi angle in corso con OpenAI...");
     setError(null);
+    setOpenAIPluginMissingError(false);
 
     const currentAdsForAnalysis = [...adsWithAnalysis]; 
 
@@ -182,11 +185,20 @@ export function Tool3Scraper({
         const analysisResult = await analyzeAdAngleAction({
           adText: ad.testo,
           adTitle: ad.titolo,
-        }, currentOpenAIApiKey); // Modificato
+        }, currentOpenAIApiKey);
+        
+        // Controlla se l'analisi è fallita a causa del plugin mancante
+        if (analysisResult.evaluation === "Analisi AI Non Disponibile" && analysisResult.detailedAnalysis.includes("plugin OpenAI potrebbe non essere installato")) {
+          setOpenAIPluginMissingError(true); // Imposta lo stato per mostrare l'avviso globale
+        }
         return { ...ad, angleAnalysis: analysisResult };
       } catch (e: any) {
         console.error(`Errore analisi angle per ad "${ad.titolo}":`, e);
-        return { ...ad, analysisError: e.message || "Errore sconosciuto durante analisi AI con OpenAI" }; // Modificato
+        // Se l'errore è dovuto al plugin mancante, questo potrebbe non essere catturato qui, ma nel flow
+        if (e.message && e.message.toLowerCase().includes("openai")) {
+           setOpenAIPluginMissingError(true);
+        }
+        return { ...ad, analysisError: e.message || "Errore sconosciuto durante analisi AI con OpenAI" };
       }
     });
 
@@ -194,10 +206,10 @@ export function Tool3Scraper({
       const results = await Promise.all(analysisPromises);
       setAdsWithAnalysis(results); 
       setLoadingMessage("Analisi angle completata!");
-      toast({ title: "Analisi Angle Completata", description: "L'analisi 7C degli annunci (OpenAI) è terminata." }); // Modificato
+      toast({ title: "Analisi Angle Completata", description: "L'analisi 7C degli annunci (OpenAI) è terminata." });
     } catch (e: any) {
-      setError(`Errore durante l'analisi degli angle (OpenAI): ${e.message}`); // Modificato
-      toast({ title: "Errore Analisi Angle (OpenAI)", description: e.message, variant: "destructive" }); // Modificato
+      setError(`Errore durante l'analisi degli angle (OpenAI): ${e.message}`);
+      toast({ title: "Errore Analisi Angle (OpenAI)", description: e.message, variant: "destructive" });
     } finally {
       setIsLoadingAnalysis(false);
     }
@@ -250,6 +262,19 @@ export function Tool3Scraper({
         <p className="text-muted-foreground mt-2">Estrai dati dalla Facebook Ads Library e analizza gli angle di marketing con OpenAI.</p>
       </header>
 
+      {openAIPluginMissingError && (
+        <Alert variant="destructive" className="my-4">
+          <PackageX className="h-4 w-4" />
+          <AlertTitle>Plugin OpenAI Mancante o Non Funzionante</AlertTitle>
+          <AlertDescription>
+            L'analisi dell'angle degli annunci non può essere eseguita perché il plugin Genkit per OpenAI (`@genkit-ai/openai`)
+            non è stato installato correttamente. Questo è probabilmente dovuto a problemi con `npm install` che non riesce a trovare il pacchetto.
+            Verifica la configurazione del tuo ambiente `npm` (registro, cache, connessione di rete) e prova a reinstallare i pacchetti
+            o il plugin `@genkit-ai/openai` manualmente. Fino a quando il plugin non sarà installato, questa funzionalità rimarrà non disponibile.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader><CardTitle>Configurazione Scraping & Analisi</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -273,9 +298,9 @@ export function Tool3Scraper({
             <label htmlFor="openAIApiKeyTool3" className="block text-sm font-medium text-foreground mb-1">OpenAI API Key</label> 
             <Input 
               type="password" 
-              id="openAIApiKeyTool3" // Modificato
-              value={openAIApiKey} // Modificato
-              onChange={(e) => setOpenAIApiKey(e.target.value)} // Modificato
+              id="openAIApiKeyTool3"
+              value={openAIApiKey}
+              onChange={(e) => setOpenAIApiKey(e.target.value)}
               placeholder="La tua chiave API OpenAI (es. sk-...)" 
             />
             <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C con i modelli OpenAI.</p>
@@ -315,7 +340,12 @@ export function Tool3Scraper({
           <CardContent>
             <TableScrapedAds ads={scrapedAds} />
             <div className="text-center mt-8">
-              <Button onClick={runAngleAnalysis} disabled={isLoadingAnalysis} className="action-button bg-purple-600 hover:bg-purple-700 text-white text-lg">
+              <Button 
+                onClick={runAngleAnalysis} 
+                disabled={isLoadingAnalysis || openAIPluginMissingError} 
+                className="action-button bg-purple-600 hover:bg-purple-700 text-white text-lg"
+                title={openAIPluginMissingError ? "Funzionalità non disponibile a causa di problemi con l'installazione del plugin OpenAI" : "Analizza angle con OpenAI"}
+              >
                 {isLoadingAnalysis ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Bot className="mr-2 h-5 w-5" />}
                 {isLoadingAnalysis ? "Analisi Angle (OpenAI)..." : "Analizza Angle Inserzioni (7C con OpenAI)"} 
               </Button>

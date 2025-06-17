@@ -42,9 +42,10 @@ const analyzeFacebookAdMarketingAnglePrompt = ai.definePrompt({
   name: 'analyzeFacebookAdMarketingAnglePrompt',
   input: {schema: AnalyzeFacebookAdMarketingAngleInputSchema},
   output: {schema: AnalyzeFacebookAdMarketingAngleOutputSchema},
-  // TEMPORARY CHANGE: Using Google AI model because OpenAI plugin is currently disabled due to install issues.
-  // Original intention was 'openai/gpt-4o-mini'. The prompt might need adjustments for optimal Gemini performance.
-  model: 'googleai/gemini-1.5-flash-latest',
+  // NOTA: Il modello OpenAI è specificato qui. Se il plugin OpenAI non è attivo in src/ai/genkit.ts
+  // (a causa di problemi di installazione di @genkit-ai/openai),
+  // la chiamata a questo prompt fallirà. Il flow gestirà questo errore.
+  model: 'openai/gpt-4o-mini', 
   prompt: `Analyze the following text and title (if available) using the \"Metodo 7C\" framework.
 
 Text: {{{adText}}}
@@ -107,6 +108,7 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
         } catch (parseError) {
             console.error("analyzeFacebookAdMarketingAngleFlow: Errore nel parsing dell'output JSON grezzo:", parseError);
             console.error("analyzeFacebookAdMarketingAngleFlow: Output grezzo ricevuto:", result.output);
+            // Fallisce qui se il parsing non va a buon fine
             throw new Error(`L'AI ha restituito una stringa non JSON valida. Contenuto: ${result.output.substring(0, 200)}...`);
         }
       } else {
@@ -119,24 +121,38 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
 
     } catch (flowError: any) {
       console.error("analyzeFacebookAdMarketingAngleFlow: Errore durante l'esecuzione del prompt AI:", flowError);
-      throw new Error(`Errore nella chiamata all'AI: ${flowError.message}`);
+      // Se il prompt fallisce (es. plugin OpenAI non trovato), restituisci un output strutturato di errore.
+      return {
+        c1Clarity: 0, c2Engagement: 0, c3Concreteness: 0, c4Coherence: 0, c5Credibility: 0, c6CallToAction: 0, c7Context: 0,
+        totalScore: 0,
+        evaluation: "Analisi AI Non Disponibile",
+        detailedAnalysis: `Impossibile eseguire l'analisi dell'angle. Il plugin OpenAI richiesto ('@genkit-ai/openai') potrebbe non essere installato o configurato correttamente. Controlla la console e prova a reinstallare i pacchetti. Errore originale: ${flowError.message}`,
+      };
     }
     
+    // Questa parte viene eseguita solo se la chiamata al prompt ha successo
     const validationResult = AnalyzeFacebookAdMarketingAngleOutputSchema.safeParse(outputJson);
     
     if (!validationResult.success) {
       console.warn("analyzeFacebookAdMarketingAngleFlow: L'output dell'AI non corrisponde perfettamente allo schema. Tentativo di sanitizzazione.", validationResult.error.flatten());
       const sanitizedParse = AnalyzeFacebookAdMarketingAngleOutputSchemaSanitized.safeParse(outputJson);
       if (sanitizedParse.success) {
-        outputJson = sanitizedParse.data;
+        outputJson = sanitizedParse.data; // Usa i dati sanitizzati
       } else {
+        // Se anche la sanitizzazione fallisce, restituisci un errore strutturato
         console.error("analyzeFacebookAdMarketingAngleFlow: Fallita anche la sanitizzazione dell'output AI:", sanitizedParse.error.flatten());
-        throw new Error(`L'output dell'AI non è valido neanche dopo la sanitizzazione: ${JSON.stringify(sanitizedParse.error.flatten())}`);
+        return {
+            c1Clarity: 0, c2Engagement: 0, c3Concreteness: 0, c4Coherence: 0, c5Credibility: 0, c6CallToAction: 0, c7Context: 0,
+            totalScore: 0,
+            evaluation: "Errore Output AI",
+            detailedAnalysis: `L'output dell'AI non è valido e non è stato possibile sanitizzarlo. Dettagli: ${JSON.stringify(sanitizedParse.error.flatten())}`,
+        };
       }
     } else {
-       outputJson = validationResult.data;
+       outputJson = validationResult.data; // Usa i dati validati
     }
 
+    // Calcola i punteggi e la valutazione basati sull'output (potenzialmente sanitizzato)
     const c1 = outputJson.c1Clarity ?? 0;
     const c2 = outputJson.c2Engagement ?? 0;
     const c3 = outputJson.c3Concreteness ?? 0;
@@ -148,6 +164,7 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
     const totalScore = c1 + c2 + c3 + c4 + c5 + c6 + c7;
 
     let evaluation = outputJson.evaluation;
+    // Se la valutazione non è una stringa o è mancante, calcolala basandoti sul totalScore
     if (!evaluation || typeof evaluation !== 'string') {
         evaluation =
             totalScore >= 12 ? 'Ottimo - copy ad alta resa' :
@@ -170,4 +187,3 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
     };
   }
 );
-
