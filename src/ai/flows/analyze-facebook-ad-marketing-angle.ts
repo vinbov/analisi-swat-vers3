@@ -42,11 +42,7 @@ const analyzeFacebookAdMarketingAnglePrompt = ai.definePrompt({
   name: 'analyzeFacebookAdMarketingAnglePrompt',
   input: {schema: AnalyzeFacebookAdMarketingAngleInputSchema},
   output: {schema: AnalyzeFacebookAdMarketingAngleOutputSchema},
-  // Modello aggiornato a openai/gpt-4o.
-  // NOTA: Il modello OpenAI è specificato qui. Se il plugin OpenAI non è attivo in src/ai/genkit.ts
-  // (a causa di problemi di installazione di @genkit-ai/openai),
-  // la chiamata a questo prompt fallirà. Il flow gestirà questo errore.
-  model: 'openai/gpt-4o', 
+  model: 'openai/gpt-4o', // Impostato per utilizzare gpt-4o
   prompt: `Analyze the following text and title (if available) using the \"Metodo 7C\" framework.
 
 Text: {{{adText}}}
@@ -101,6 +97,7 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
   async (input: AnalyzeFacebookAdMarketingAngleInput): Promise<AnalyzeFacebookAdMarketingAngleOutput> => {
     let outputJson: any;
     try {
+      // La chiamata a analyzeFacebookAdMarketingAnglePrompt ora dovrebbe usare OpenAI se il plugin è attivo
       const result = await analyzeFacebookAdMarketingAnglePrompt(input);
 
       if (typeof result.output === 'string') {
@@ -109,7 +106,6 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
         } catch (parseError) {
             console.error("analyzeFacebookAdMarketingAngleFlow: Errore nel parsing dell'output JSON grezzo:", parseError);
             console.error("analyzeFacebookAdMarketingAngleFlow: Output grezzo ricevuto:", result.output);
-            // Fallisce qui se il parsing non va a buon fine
             throw new Error(`L'AI ha restituito una stringa non JSON valida. Contenuto: ${result.output.substring(0, 200)}...`);
         }
       } else {
@@ -122,25 +118,27 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
 
     } catch (flowError: any) {
       console.error("analyzeFacebookAdMarketingAngleFlow: Errore durante l'esecuzione del prompt AI:", flowError);
-      // Se il prompt fallisce (es. plugin OpenAI non trovato), restituisci un output strutturato di errore.
+      // Se il prompt fallisce (es. plugin OpenAI non trovato o altri problemi API), restituisci un output strutturato di errore.
+      let detailedErrorMessage = `Impossibile eseguire l'analisi dell'angle. Errore originale: ${flowError.message}`;
+      if (flowError.message?.toLowerCase().includes('openai') && (flowError.message?.includes('not found') || flowError.message?.includes('not configured'))) {
+        detailedErrorMessage = `Impossibile eseguire l'analisi dell'angle. Il plugin OpenAI richiesto ('@genkit-ai/openai') potrebbe non essere installato o configurato correttamente. Controlla la console e prova a reinstallare i pacchetti. Errore originale: ${flowError.message}`;
+      }
       return {
         c1Clarity: 0, c2Engagement: 0, c3Concreteness: 0, c4Coherence: 0, c5Credibility: 0, c6CallToAction: 0, c7Context: 0,
         totalScore: 0,
         evaluation: "Analisi AI Non Disponibile",
-        detailedAnalysis: `Impossibile eseguire l'analisi dell'angle. Il plugin OpenAI richiesto ('@genkit-ai/openai') potrebbe non essere installato o configurato correttamente. Controlla la console e prova a reinstallare i pacchetti. Errore originale: ${flowError.message}`,
+        detailedAnalysis: detailedErrorMessage,
       };
     }
 
-    // Questa parte viene eseguita solo se la chiamata al prompt ha successo
     const validationResult = AnalyzeFacebookAdMarketingAngleOutputSchema.safeParse(outputJson);
 
     if (!validationResult.success) {
       console.warn("analyzeFacebookAdMarketingAngleFlow: L'output dell'AI non corrisponde perfettamente allo schema. Tentativo di sanitizzazione.", validationResult.error.flatten());
       const sanitizedParse = AnalyzeFacebookAdMarketingAngleOutputSchemaSanitized.safeParse(outputJson);
       if (sanitizedParse.success) {
-        outputJson = sanitizedParse.data; // Usa i dati sanitizzati
+        outputJson = sanitizedParse.data; 
       } else {
-        // Se anche la sanitizzazione fallisce, restituisci un errore strutturato
         console.error("analyzeFacebookAdMarketingAngleFlow: Fallita anche la sanitizzazione dell'output AI:", sanitizedParse.error.flatten());
         return {
             c1Clarity: 0, c2Engagement: 0, c3Concreteness: 0, c4Coherence: 0, c5Credibility: 0, c6CallToAction: 0, c7Context: 0,
@@ -150,10 +148,9 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
         };
       }
     } else {
-       outputJson = validationResult.data; // Usa i dati validati
+       outputJson = validationResult.data; 
     }
 
-    // Calcola i punteggi e la valutazione basati sull'output (potenzialmente sanitizzato)
     const c1 = outputJson.c1Clarity ?? 0;
     const c2 = outputJson.c2Engagement ?? 0;
     const c3 = outputJson.c3Concreteness ?? 0;
@@ -165,7 +162,6 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
     const totalScore = c1 + c2 + c3 + c4 + c5 + c6 + c7;
 
     let evaluation = outputJson.evaluation;
-    // Se la valutazione non è una stringa o è mancante, calcolala basandoti sul totalScore
     if (!evaluation || typeof evaluation !== 'string') {
         evaluation =
             totalScore >= 12 ? 'Ottimo - copy ad alta resa' :

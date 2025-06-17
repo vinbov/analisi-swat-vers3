@@ -1,19 +1,18 @@
 
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
-// import { openAI } from '@genkit-ai/openai'; // Temporaneamente commentato a causa di problemi di npm install (E404)
+// import { openAI } from '@genkit-ai/openai'; // Temporaneamente commentato a causa di problemi di installazione persistenti (E404 per @genkit-ai/openai).
 
 export const ai = genkit({
   plugins: [
-    googleAI(), 
-    // openAI(), // TEMPORANEAMENTE DISABILITATO.
-              // Decommentare questa riga e l'import sopra una volta risolti i problemi
-              // con 'npm install @genkit-ai/openai'.
-              // Assicurarsi che la variabile d'ambiente OPENAI_API_KEY sia impostata,
-              // o che venga passata tramite UI al Tool 3 per l'analisi dell'angle.
+    googleAI(),
+    // openAI(), // Temporaneamente commentato.
+              // Per riattivare:
+              // 1. Risolvi i problemi nel tuo ambiente npm che impediscono l'installazione di `@genkit-ai/openai`.
+              // 2. Esegui `npm install @genkit-ai/openai`.
+              // 3. Decommenta questa riga e l'importazione sopra.
+              // 4. Assicurati che la variabile d'ambiente OPENAI_API_KEY sia impostata o fornita tramite UI nel Tool 3.
   ],
-  // È FONDAMENTALE che le variabili d'ambiente appropriate (OPENAI_API_KEY e/o GOOGLE_API_KEY) 
+  // È FONDAMENTALE che le variabili d'ambiente appropriate (GOOGLE_API_KEY e/o OPENAI_API_KEY)
   // siano impostate (es. nel file .env o nell'ambiente server) affinché i plugin funzionino.
-  // Per OpenAI (@genkit-ai/openai), il plugin cercherà OPENAI_API_KEY.
-  // Per GoogleAI (Gemini), il plugin cercherà GOOGLE_API_KEY o GEMINI_API_KEY.
 });
