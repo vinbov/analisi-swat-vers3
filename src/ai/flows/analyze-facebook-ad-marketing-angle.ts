@@ -39,10 +39,12 @@ export async function analyzeFacebookAdMarketingAngle(
 }
 
 const analyzeFacebookAdMarketingAnglePrompt = ai.definePrompt({
-  name: 'analyzeFacebookAdMarketingAnglePrompt', // Rimosso GoogleAI dal nome
+  name: 'analyzeFacebookAdMarketingAnglePrompt',
   input: {schema: AnalyzeFacebookAdMarketingAngleInputSchema},
   output: {schema: AnalyzeFacebookAdMarketingAngleOutputSchema},
-  model: ai.model('openai/gpt-4o-mini'), // Modello OpenAI (es. gpt-4o-mini o gpt-3.5-turbo)
+  // TEMPORARY CHANGE: Using Google AI model because OpenAI plugin is currently disabled due to install issues.
+  // Original intention was 'openai/gpt-4o-mini'. The prompt might need adjustments for optimal Gemini performance.
+  model: 'googleai/gemini-1.5-flash-latest',
   prompt: `Analyze the following text and title (if available) using the \"Metodo 7C\" framework.
 
 Text: {{{adText}}}
@@ -70,8 +72,7 @@ Assicurati che i punteggi per C1-C7 siano sempre numeri tra 0 e 2.
 L'intero output DEVE essere un oggetto JSON valido. Non includere testo prima o dopo l'oggetto JSON.
 `,
   config: {
-    temperature: 0.5, // Temperatura appropriata per OpenAI
-    // Per OpenAI, la richiesta di formato JSON è implicita con output: {schema: ...} in Genkit.
+    temperature: 0.5,
   },
 });
 
@@ -91,7 +92,7 @@ const AnalyzeFacebookAdMarketingAngleOutputSchemaSanitized = z.object({
 
 const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
   {
-    name: 'analyzeFacebookAdMarketingAngleFlow', // Rimosso GoogleAI dal nome
+    name: 'analyzeFacebookAdMarketingAngleFlow',
     inputSchema: AnalyzeFacebookAdMarketingAngleInputSchema,
     outputSchema: AnalyzeFacebookAdMarketingAngleOutputSchema,
   },
@@ -169,3 +170,4 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
     };
   }
 );
+
