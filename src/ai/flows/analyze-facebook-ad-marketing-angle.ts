@@ -42,10 +42,11 @@ const analyzeFacebookAdMarketingAnglePrompt = ai.definePrompt({
   name: 'analyzeFacebookAdMarketingAnglePrompt',
   input: {schema: AnalyzeFacebookAdMarketingAngleInputSchema},
   output: {schema: AnalyzeFacebookAdMarketingAngleOutputSchema},
+  // Modello aggiornato a openai/gpt-4o.
   // NOTA: Il modello OpenAI è specificato qui. Se il plugin OpenAI non è attivo in src/ai/genkit.ts
   // (a causa di problemi di installazione di @genkit-ai/openai),
   // la chiamata a questo prompt fallirà. Il flow gestirà questo errore.
-  model: 'openai/gpt-4o-mini',
+  model: 'openai/gpt-4o', 
   prompt: `Analyze the following text and title (if available) using the \"Metodo 7C\" framework.
 
 Text: {{{adText}}}
