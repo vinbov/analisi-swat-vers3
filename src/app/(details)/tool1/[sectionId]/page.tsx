@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AppHeader } from '@/components/layout/app-header';
 import type { ComparisonResult, DetailPageSection, DetailPageDataTool1 } from '@/lib/types';
@@ -27,7 +27,12 @@ export default function Tool1DetailPage() {
 
   const channelRef = useRef<BroadcastChannel | null>(null);
   const requestingTabIdRef = useRef<string>(`detailTab-${Date.now()}-${Math.random().toString(36).substring(2,7)}`);
-  const dataIdRef = useRef<string | null>(null);
+  const dataIdRef = useRef<string | null>(null); // Per memorizzare il dataId letto dai params
+
+  // Stabilizza dataIdFromParams usando useMemo
+  const dataIdFromParams = useMemo(() => {
+    return searchParams.get('dataId');
+  }, [searchParams]);
 
   const handleDownloadChart = () => {
     toast({
@@ -95,7 +100,6 @@ export default function Tool1DetailPage() {
       });
 
     } else if (pageData.tableData && pageData.tableHeaders && pageData.activeCompetitorNames) {
-      // For commonKeywordsSectionTool1, mySiteOnlyKeywordsSectionTool1, competitorOnlyKeywordsSectionTool1
       csvHeaders = pageData.tableHeaders;
       const type = pageData.tableType;
 
@@ -133,7 +137,7 @@ export default function Tool1DetailPage() {
 
 
   useEffect(() => {
-    const dataIdFromParams = searchParams.get('dataId');
+    // dataIdFromParams è ora stabile grazie a useMemo
     dataIdRef.current = dataIdFromParams;
 
     if (!dataIdFromParams || !sectionId) {
@@ -142,10 +146,14 @@ export default function Tool1DetailPage() {
       return;
     }
     
-    // Ensure channel is created only once or correctly re-initialized
+    // Reset state for this effect run if dataId or sectionId changed
+    setIsLoading(true);
+    setPageData(null);
+    setDataLoadError(null);
+    
     if (!channelRef.current || channelRef.current.name !== TOOL1_DATA_CHANNEL_NAME) {
       if (channelRef.current) {
-        channelRef.current.close(); // Close if already exists but is wrong one (e.g. HMR)
+        channelRef.current.close();
       }
       channelRef.current = new BroadcastChannel(TOOL1_DATA_CHANNEL_NAME);
     }
@@ -155,7 +163,7 @@ export default function Tool1DetailPage() {
         const { dataId: responseDataId, requestingTabId: responseTabId, payload } = event.data as ResponseTool1DataMessage;
         
         if (responseDataId === dataIdRef.current && responseTabId === requestingTabIdRef.current) {
-          setIsLoading(false); // Stop loading indicator once response (even if null payload) is received for this tab
+          setIsLoading(false);
           if (payload) {
             const { comparisonResults: allResults, activeCompetitorNames: currentActiveCompNames } = payload;
             let dataForPage: DetailPageDataTool1 | null = null;
@@ -342,11 +350,11 @@ export default function Tool1DetailPage() {
               default: 
                 setDataLoadError(`La sezione di dettaglio '${sectionId}' non è riconosciuta o è stata rimossa. Torna al tool principale.`);
                 setPageData(null);
-                return;
+                return; // Esce da handleMessage
             }
             setPageData(dataForPage as DetailPageDataTool1);
-            setDataLoadError(null);
-          } else {
+            setDataLoadError(null); // Pulisce eventuali errori precedenti se i dati sono ora validi
+          } else { // payload is null
             setDataLoadError("I dati per questa sessione di dettaglio non sono più disponibili. Questo può accadere se la scheda del tool principale è stata chiusa o l'analisi è stata aggiornata. Torna al tool principale e riesegui l'analisi se necessario.");
             setPageData(null);
           }
@@ -354,35 +362,51 @@ export default function Tool1DetailPage() {
       }
     };
     
-    // Attach the handler to the current channel instance
     if (channelRef.current) {
         channelRef.current.onmessage = handleMessage;
     }
 
     const requestMsg: RequestTool1DataMessage = {
       type: 'REQUEST_TOOL1_DATA',
-      dataId: dataIdFromParams,
+      dataId: dataIdFromParams, // Usa la versione stabile
       requestingTabId: requestingTabIdRef.current,
     };
     channelRef.current?.postMessage(requestMsg);
 
     const timeoutId = setTimeout(() => {
+      // Questa condizione è cruciale. Se isLoading è ancora true E non abbiamo pageData, allora è un vero timeout.
       if (isLoading && !pageData) { 
         setDataLoadError("Timeout: Nessuna risposta dal tool principale. Assicurati che la scheda del Tool 1 sia aperta e attiva. Potrebbe essere necessario rieseguire l'analisi.");
-        setPageData(null);
-        setIsLoading(false);
+        // setPageData(null); // Già null se isLoading è true e !pageData
+        setIsLoading(false); // Sblocca l'UI per mostrare l'errore
       }
     }, 7000); 
 
     return () => {
-      // Cleanup: remove the message handler specific to this effect instance
       if (channelRef.current) {
           channelRef.current.onmessage = null; 
       }
-      // The channel itself might be closed by a higher-level cleanup effect if the tab is closed.
       if (timeoutId) clearTimeout(timeoutId);
+      // Non chiudere il canale qui, potrebbe essere usato da altre schede dettaglio
+      // o se l'utente naviga avanti/indietro. La chiusura del canale dovrebbe avvenire
+      // quando Tool1Comparator (la pagina principale) si smonta.
     };
-  }, [sectionId, searchParams]); // Simplified dependencies
+  // Dipendenze dell'useEffect: solo quelle che, se cambiano, richiedono un nuovo fetch.
+  // isLoading e pageData sono gestiti internamente all'effetto e non dovrebbero causarne la riesecuzione.
+  }, [sectionId, dataIdFromParams]);
+
+
+  // Effetto per la pulizia del canale SOLO quando il componente si smonta
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        channelRef.current.close();
+        channelRef.current = null;
+        // console.log(`Tool1DetailPage: BroadcastChannel ${TOOL1_DATA_CHANNEL_NAME} chiuso per ${requestingTabIdRef.current}`);
+      }
+    };
+  }, []); // Array di dipendenze vuoto per eseguirlo solo on unmount
+
 
   if (isLoading) {
     return <div className="flex justify-center items-center min-h-screen"><p>Caricamento dettagli in corso... Richiesta dati al tool principale.</p></div>;
