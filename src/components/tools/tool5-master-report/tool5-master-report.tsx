@@ -114,10 +114,18 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
   };
 
   const generateTableHtml = (headers: string[], data: Record<string, any>[], title?: string, tableId?: string): string => {
-    if (!data || data.length === 0) return title ? `<h3 class="report-h3" id="${tableId}-title">${escapeHtml(title)}</h3><p class="no-data-message">Nessun dato disponibile per questa tabella.</p>` : '<p class="no-data-message">Nessun dato disponibile per questa tabella.</p>';
+    const uniqueTableId = tableId || `table-${Math.random().toString(36).substring(2, 9)}`;
+    const previewWrapperId = `${uniqueTableId}-preview-wrapper`;
+
+    if (!data || data.length === 0) {
+        return (title ? `<h3 class="report-h3" id="${uniqueTableId}-title">${escapeHtml(title)}</h3>` : '') +
+               `<p class="no-data-message">Nessun dato disponibile per questa tabella.</p>`;
+    }
     
-    let html = title ? `<h3 class="report-h3" id="${tableId}-title">${escapeHtml(title)}</h3>` : '';
-    html += `<div class="table-wrapper"><table ${tableId ? `id="${tableId}"` : ''}>`;
+    let html = title ? `<h3 class="report-h3" id="${uniqueTableId}-title">${escapeHtml(title)}</h3>` : '';
+    
+    html += `<div class="table-preview-container" id="${previewWrapperId}">`;
+    html += `<div class="table-wrapper"><table id="${uniqueTableId}">`;
     html += '<thead><tr>';
     headers.forEach(header => html += `<th>${escapeHtml(header)}</th>`);
     html += '</tr></thead><tbody>';
@@ -132,7 +140,8 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
       });
       html += '</tr>';
     });
-    html += '</tbody></table></div>';
+    html += '</tbody></table></div></div>'; // Close table-wrapper and table-preview-container
+    html += `<button class="toggle-table-button" onclick="toggleTableVisibility('${previewWrapperId}', this)">Mostra tutta la tabella</button>`;
     return html;
   };
   
@@ -274,7 +283,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             "C1": item.angleAnalysis?.c1Clarity ?? 'N/A', "C2": item.angleAnalysis?.c2Engagement ?? 'N/A', "C3": item.angleAnalysis?.c3Concreteness ?? 'N/A',
             "C4": item.angleAnalysis?.c4Coherence ?? 'N/A', "C5": item.angleAnalysis?.c5Credibility ?? 'N/A', "C6": item.angleAnalysis?.c6CallToAction ?? 'N/A',
             "C7": item.angleAnalysis?.c7Context ?? 'N/A', "Totale": item.angleAnalysis?.totalScore ?? 'N/A', "Valutazione": item.angleAnalysis?.evaluation ?? 'N/A',
-            "Analisi Approfondita": item.angleAnalysis?.detailedAnalysis?.replace(/\n/g, '<br />') ?? 'N/A',
+            "Analisi Approfondita": item.angleAnalysis?.detailedAnalysis?.replace(/\\n/g, '<br />') ?? 'N/A',
             "Errore": item.analysisError || item.angleAnalysis?.error || ''
         }));
         reportHtml += generateTableHtml(angleHeadersTool3, angleTableDataTool3, "Dettaglio: Analisi Angle Inserzioni (Metodo 7C)", "tool3-angle-table");
@@ -285,7 +294,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     reportHtml += addSection("tool4-main", "Tool 4: Analizzatore Dati GSC", 1);
     if (tool4Data && tool4Data.analyzedGscData) {
         if (tool4Data.gscFiltersDisplay) {
-            const cleanGscFiltersDisplay = tool4Data.gscFiltersDisplay.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+            const cleanGscFiltersDisplay = tool4Data.gscFiltersDisplay.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
             reportHtml += addSection("tool4-filters", "Filtri GSC Applicati all'Export", 3);
             reportHtml += `<div class="filters-display">${cleanGscFiltersDisplay}</div>`;
             reportHtml += '<hr class="subsection-separator">';
@@ -297,7 +306,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
             reportHtml += addSection(`tool4-${reportType}-section`, `Analisi GSC: ${escapeHtml(itemDisplayName)}`, 3);
             
             if (analysis && analysis.detailedDataWithDiffs && analysis.detailedDataWithDiffs.length > 0) {
-                const cleanSummaryText = (analysis.summaryText || "").replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+                const cleanSummaryText = (analysis.summaryText || "").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
                 reportHtml += `<p>${cleanSummaryText}</p>`;
                 
                 const chart4Id = `chartTool4_${reportType}`;
@@ -314,7 +323,7 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                             label: `Clic per ${itemDisplayName}`,
                             data: analysis.pieChartData.map(d => d.value),
                             backgroundColor: analysis.pieChartData.map((_, i) => chartJsColors[i % chartJsColors.length]),
-                            borderColor: analysis.pieChartData.map((_, i) => chartJsBorderColors[i % chartJsBorderColors.length]),
+                            borderColor: analysis.pieChartData.map((_, i) => chartJsBorderColors[i % chartJsColors.length]),
                             borderWidth: 1
                         }]
                     };
@@ -401,14 +410,18 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
 
 
           /* Tables */
-          .table-wrapper { overflow-x: auto; margin-bottom: 30px; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
+          .table-preview-container { max-height: 300px; /* Initial collapsed height */ overflow-y: auto; margin-bottom: 0px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; background-color: #fdfdfe; position: relative; }
+          .table-preview-container.expanded { max-height: none; overflow-y: visible; }
+          .table-wrapper { overflow-x: auto; /* Existing horizontal scroll for wide tables */ }
           table { border-collapse: collapse; width: 100%; font-size: 13px; }
           th, td { border: 1px solid #e2e8f0; /* Light Gray */ padding: 10px 12px; text-align: left; vertical-align: top; word-break: break-word; }
-          th { background-color: #f1f5f9; /* Very Light Blue/Gray */ font-weight: 600; color: #0f172a; /* Darker Gray for header text */ white-space: nowrap; }
+          th { background-color: #f1f5f9; /* Very Light Blue/Gray */ font-weight: 600; color: #0f172a; /* Darker Gray for header text */ white-space: nowrap; position: sticky; top: 0; z-index: 1;}
           tr:nth-child(even) td { background-color: #f8fafc; /* Slightly off-white for zebra */ }
           td { color: #334155; /* Slate Gray for table text */ }
           td a { color: #2563eb; text-decoration: none; }
           td a:hover { text-decoration: underline; }
+          .toggle-table-button { display: block; width: auto; margin: 8px auto 25px auto; padding: 6px 12px; font-size: 0.85em; color: #1e40af; background-color: #e0f2fe; border: 1px solid #93c5fd; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+          .toggle-table-button:hover { background-color: #d1eaff; }
 
 
           /* Chart Containers */
@@ -436,16 +449,16 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
           @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; font-size: 10pt; background-color: #fff !important; color: #000 !important; }
             .report-container { box-shadow: none !important; border: none !important; padding:0 !important; margin: 10mm !important; max-width: none !important; border-radius: 0 !important; }
-            th { background-color: #f1f5f9 !important; color: #0f172a !important;}
+            th { background-color: #f1f5f9 !important; color: #0f172a !important; position: static !important; /* Override sticky for print */ }
             tr:nth-child(even) td { background-color: #f8fafc !important; }
             .chart-container-html-report { border: 1px solid #ccc !important; box-shadow: none !important; page-break-inside: avoid !important; background-color: #fff !important; }
-            .table-wrapper { page-break-inside: avoid !important; border: 1px solid #ccc !important; box-shadow: none !important; border-radius: 0 !important;}
+            .table-preview-container, .table-wrapper { page-break-inside: avoid !important; border: 1px solid #ccc !important; box-shadow: none !important; border-radius: 0 !important; max-height: none !important; overflow: visible !important; }
             table { page-break-inside: auto !important; font-size: 9pt !important; } /* Allow tables to break if very long */
             th, td { padding: 6px 8px !important; }
             h1, h3, .report-h1, .report-h3 { page-break-after: avoid !important; page-break-inside: avoid !important; color: #000 !important; border-color: #999 !important; }
             .report-h1 { font-size: 20pt !important; }
             .report-h3 { font-size: 14pt !important; }
-            .toc, .no-print { display: none !important; }
+            .toc, .no-print, .toggle-table-button { display: none !important; }
             hr { border-color: #ccc !important; }
             a { color: #000 !important; text-decoration: none !important; } /* Make links black and not underlined for print */
           }
@@ -460,6 +473,20 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         </div>
     `;
     
+    finalHtml += `<script>
+      function toggleTableVisibility(wrapperId, buttonElement) {
+        const wrapper = document.getElementById(wrapperId);
+        if (wrapper) {
+          wrapper.classList.toggle('expanded');
+          if (wrapper.classList.contains('expanded')) {
+            buttonElement.textContent = 'Mostra meno';
+          } else {
+            buttonElement.textContent = 'Mostra tutta la tabella';
+          }
+        }
+      }
+    <\/script>`;
+
     if (chartConfigs.length > 0) {
         finalHtml += `<script>
             window.addEventListener('DOMContentLoaded', () => {
@@ -651,7 +678,3 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     </div>
   );
 }
-
-    
-
-    
