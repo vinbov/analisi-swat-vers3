@@ -27,8 +27,7 @@ export default function Tool1DetailPage() {
 
   const channelRef = useRef<BroadcastChannel | null>(null);
   const requestingTabIdRef = useRef<string>(`detailTab-${Date.now()}-${Math.random().toString(36).substring(2,7)}`);
-  const dataIdRef = useRef<string | null>(null);
-
+  
   const dataIdFromParams = useMemo(() => {
     return searchParams.get('dataId');
   }, [searchParams]);
@@ -134,20 +133,20 @@ export default function Tool1DetailPage() {
     }
   };
 
-
   useEffect(() => {
-    dataIdRef.current = dataIdFromParams;
-
     if (!dataIdFromParams || !sectionId) {
       setDataLoadError("Impossibile caricare i dettagli. ID dati o sezione mancante. Torna al tool principale e riprova.");
       setIsLoading(false);
-      setPageData(null); // Assicura che pageData sia null se gli ID non sono validi
+      setPageData(null);
       return;
     }
     
-    setIsLoading(true);
-    setPageData(null);
-    setDataLoadError(null);
+    // Non resettare pageData qui se isLoading è già false e pageData esiste, per evitare flicker
+    if (isLoading || !pageData) {
+      setIsLoading(true);
+      setPageData(null); 
+      setDataLoadError(null);
+    }
     
     if (!channelRef.current || channelRef.current.name !== TOOL1_DATA_CHANNEL_NAME) {
       if (channelRef.current) {
@@ -160,7 +159,7 @@ export default function Tool1DetailPage() {
       if (event.data && event.data.type === 'RESPONSE_TOOL1_DATA') {
         const { dataId: responseDataId, requestingTabId: responseTabId, payload } = event.data as ResponseTool1DataMessage;
         
-        if (responseDataId === dataIdRef.current && responseTabId === requestingTabIdRef.current) {
+        if (responseDataId === dataIdFromParams && responseTabId === requestingTabIdRef.current) {
           setIsLoading(false);
           if (payload) {
             const { comparisonResults: allResults, activeCompetitorNames: currentActiveCompNames } = payload;
@@ -171,7 +170,7 @@ export default function Tool1DetailPage() {
             const competitorOnlyKWs = allResults.filter(r => r.status === 'competitorOnly');
             
             const getTableHeaders = (type: 'common' | 'mySiteOnly' | 'competitorOnly') => {
-              if (!currentActiveCompNames) return []; // Gestione per currentActiveCompNames undefined
+              if (!currentActiveCompNames) return [];
               if (type === 'common') return ['Keyword', 'Mio Sito Pos.', 'Mio Sito URL', ...currentActiveCompNames.flatMap(name => [`${name} Pos.`, `${name} URL`]), 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
               if (type === 'mySiteOnly') return ['Keyword', 'Mio Sito Pos.', 'Mio Sito URL', 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
               return ['Keyword', ...currentActiveCompNames.flatMap(name => [`${name} Pos.`, `${name} URL`]), 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
@@ -385,7 +384,7 @@ export default function Tool1DetailPage() {
       }
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [sectionId, dataIdFromParams, isLoading, pageData]); // Aggiunto isLoading e pageData per il controllo del timeout
+  }, [sectionId, dataIdFromParams, isLoading, pageData]); // Ripristino isLoading e pageData nelle dipendenze
 
   useEffect(() => {
     return () => {
