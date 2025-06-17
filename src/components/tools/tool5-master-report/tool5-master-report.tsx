@@ -6,11 +6,12 @@ from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { InfoIcon, BarChart3, SearchCode, ClipboardList, BarChart2, Presentation, Download, FileCode, Copy } from 'lucide-react';
+import { InfoIcon, BarChart3, SearchCode, ClipboardList, BarChart2, Presentation, Download, FileCode, Copy, Brain } from 'lucide-react';
 import type {
     AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType, GscSectionAnalysis,
-    ComparisonResult, ScrapedAd, PertinenceAnalysisResult, Tool2MasterReportData
+    ComparisonResult, ScrapedAd, PertinenceAnalysisResult, Tool2MasterReportData, ToolDataForSeoMasterReportData
 } from '@/lib/types';
+import type { DataForSEOKeywordMetrics } from '@/lib/dataforseo/types';
 import { useToast } from '@/hooks/use-toast';
 
 // Importa i componenti di tabella e grafico (per la visualizzazione LIVE nel Tool 5)
@@ -18,7 +19,8 @@ import { ComparisonResultsTable } from '@/components/tools/tool1-comparator/tabl
 import { CommonKeywordsTop10Chart } from '@/components/tools/tool1-comparator/chart-common-keywords-top10';
 import { TopOpportunitiesChart } from '@/components/tools/tool1-comparator/chart-top-opportunities';
 import { TableAngleAnalysis } from '@/components/tools/tool3-scraper/table-angle-analysis';
-import { TablePertinenceResults } from '@/components/tools/tool2-analyzer/table-pertinence-results'; // Importa la tabella per Tool 2
+import { TablePertinenceResults } from '@/components/tools/tool2-analyzer/table-pertinence-results';
+import { TableDataForSeoResults } from '@/components/tools/tool-dataforseo-analyzer/table-dataforseo-results';
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'; // Per il grafico 7C live
 import { ChartGSC } from '@/components/tools/tool4-gsc-analyzer/charts-gsc';
 
@@ -47,6 +49,7 @@ interface Tool4MasterReportData {
 interface Tool5MasterReportProps {
     tool1Data: Tool1MasterReportData | null;
     tool2Data: Tool2MasterReportData | null;
+    toolDataForSeoData: ToolDataForSeoMasterReportData | null;
     tool3Data: Tool3MasterReportData | null;
     tool4Data: Tool4MasterReportData | null;
 }
@@ -64,7 +67,7 @@ const chartJsColors = [
 const chartJsBorderColors = chartJsColors.map(color => color.replace('0.7', '1'));
 
 
-export function Tool5MasterReport({ tool1Data, tool2Data, tool3Data, tool4Data }: Tool5MasterReportProps) {
+export function Tool5MasterReport({ tool1Data, tool2Data, toolDataForSeoData, tool3Data, tool4Data }: Tool5MasterReportProps) {
   const [average7CScores, setAverage7CScores] = useState<AngleAnalysisScores | null>(null);
   const { toast } = useToast();
 
@@ -249,25 +252,29 @@ export function Tool5MasterReport({ tool1Data, tool2Data, tool3Data, tool4Data }
     reportHtml += '<hr class="tool-section-separator">';
 
     // --- Tool 2 Section ---
-    reportHtml += addSection("tool2-main", "Tool 2: Analizzatore Pertinenza & Priorità KW (Offline)", 1);
+    reportHtml += addSection("tool2-main", "Tool 2: Analizzatore Pertinenza & Priorità KW (Offline + DFS)", 1);
     if (tool2Data && tool2Data.analysisResults && tool2Data.analysisResults.length > 0) {
-        reportHtml += addSection("tool2-summary", "Riepilogo Analisi Pertinenza Keyword (Offline)", 3);
+        reportHtml += addSection("tool2-summary", "Riepilogo Analisi Pertinenza Keyword", 3);
         if (tool2Data.industryContext) {
             reportHtml += `<p class="context-info"><strong>Contesto Analisi:</strong> ${escapeHtml(tool2Data.industryContext)}</p>`;
         }
-        const tool2Headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione", "Volume", "KD", "Opportunity", "Posizione", "URL", "Intent"];
+        const tool2Headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione", "Volume (CSV)", "KD (CSV)", "Opportunity (CSV)", "Posizione (CSV)", "URL (CSV)", "Intent (CSV)", "DFS Volume", "DFS CPC", "DFS Difficulty", "DFS Error"];
         const tool2TableData = tool2Data.analysisResults.map(res => ({
             "Keyword": res.keyword,
             "Settore Analizzato": res.settore,
             "Pertinenza": res.pertinenza,
             "Priorità SEO": res.prioritaSEO,
             "Motivazione": res.motivazioneSEO,
-            "Volume": res.volume !== undefined && res.volume !== null ? String(res.volume) : 'N/A',
-            "KD": res.kd !== undefined && res.kd !== null ? String(res.kd) : 'N/A',
-            "Opportunity": res.opportunity !== undefined && res.opportunity !== null ? String(res.opportunity) : 'N/A',
-            "Posizione": res.posizione !== undefined && res.posizione !== null ? String(res.posizione) : 'N/A',
-            "URL": res.url || 'N/A',
-            "Intent": res.intento || 'N/A'
+            "Volume (CSV)": res.volume !== undefined && res.volume !== null ? String(res.volume) : 'N/A',
+            "KD (CSV)": res.kd !== undefined && res.kd !== null ? String(res.kd) : 'N/A',
+            "Opportunity (CSV)": res.opportunity !== undefined && res.opportunity !== null ? String(res.opportunity) : 'N/A',
+            "Posizione (CSV)": res.posizione !== undefined && res.posizione !== null ? String(res.posizione) : 'N/A',
+            "URL (CSV)": res.url || 'N/A',
+            "Intent (CSV)": res.intento || 'N/A',
+            "DFS Volume": res.dfs_volume ?? "N/A",
+            "DFS CPC": res.dfs_cpc ?? "N/A",
+            "DFS Difficulty": res.dfs_keyword_difficulty ?? "N/A",
+            "DFS Error": res.dfs_error ?? ""
         }));
         reportHtml += generateTableHtml(tool2Headers, tool2TableData, "Dettaglio: Analisi Pertinenza e Priorità Keyword", "tool2-analysis-table");
     } else {
@@ -275,6 +282,27 @@ export function Tool5MasterReport({ tool1Data, tool2Data, tool3Data, tool4Data }
     }
     reportHtml += '<hr class="tool-section-separator">';
 
+    // --- Tool DataForSEO Analyzer Section ---
+    reportHtml += addSection("toolDataForSeo-main", "Tool Analisi Domanda Consapevole (DataForSEO)", 1);
+    if (toolDataForSeoData && toolDataForSeoData.results && toolDataForSeoData.results.length > 0) {
+        reportHtml += addSection("toolDataForSeo-summary", "Riepilogo Analisi Domanda Consapevole", 3);
+        reportHtml += `<p class="context-info"><strong>Keyword Seed:</strong> ${escapeHtml(toolDataForSeoData.seedKeywords)}<br/>
+                        <strong>Contesto:</strong> ${escapeHtml(toolDataForSeoData.locationContext)}<br/>
+                        <strong>Idee Totali Trovate:</strong> ${toolDataForSeoData.totalIdeasFound}</p>`;
+        
+        const dfsHeaders = ["Keyword", "Volume di Ricerca", "CPC", "Difficoltà Keyword", "Competizione"];
+        const dfsTableData = toolDataForSeoData.results.map(item => ({
+            "Keyword": item.keyword || "N/D",
+            "Volume di Ricerca": item.search_volume?.toLocaleString() ?? "N/A",
+            "CPC": item.cpc ?? "N/A",
+            "Difficoltà Keyword": item.keyword_difficulty ?? "N/A",
+            "Competizione": item.competition !== null && item.competition !== undefined ? (item.competition * 100).toFixed(0) + '%' : "N/A"
+        }));
+        reportHtml += generateTableHtml(dfsHeaders, dfsTableData, "Dettaglio: Keyword Ideas da DataForSEO", "toolDataForSeo-results-table");
+    } else {
+        reportHtml += "<p class='no-data-message'>Nessun dato disponibile dal Tool Analisi Domanda Consapevole o analisi non eseguita.</p>";
+    }
+    reportHtml += '<hr class="tool-section-separator">';
 
     // Tool 3 Section
     reportHtml += addSection("tool3-main", "Tool 3: FB Ads Library Scraper & Analisi Angle", 1);
@@ -614,13 +642,17 @@ export function Tool5MasterReport({ tool1Data, tool2Data, tool3Data, tool4Data }
         <p className="text-muted-foreground mb-4">
             Di seguito un'anteprima dei dati che saranno inclusi nel report HTML scaricabile. I grafici qui sotto sono renderizzati con Recharts per la visualizzazione live; il report HTML scaricato userà Chart.js per renderizzare grafici simili.
         </p>
-        {(!tool1Data?.rawResults?.length && (!tool2Data || !tool2Data.analysisResults || tool2Data.analysisResults.length === 0) && !tool3Data?.adsWithAnalysis?.length && !tool4Data?.analyzedGscData) && (
+        {(!tool1Data?.rawResults?.length && 
+          (!tool2Data || !tool2Data.analysisResults || tool2Data.analysisResults.length === 0) &&
+          (!toolDataForSeoData || !toolDataForSeoData.results || toolDataForSeoData.results.length === 0) &&
+          !tool3Data?.adsWithAnalysis?.length && 
+          !tool4Data?.analyzedGscData) && (
              <Alert variant="default" className="my-4">
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>Nessun Dato da Visualizzare</AlertTitle>
                 <AlertDescription>
                     Nessuna analisi è stata ancora eseguita nei tool precedenti, oppure i dati non sono stati passati correttamente.
-                    Esegui le analisi nei Tool 1, 2, 3 e 4 per popolare il report consolidato.
+                    Esegui le analisi nei tool precedenti per popolare il report consolidato.
                 </AlertDescription>
             </Alert>
         )}
@@ -656,7 +688,7 @@ export function Tool5MasterReport({ tool1Data, tool2Data, tool3Data, tool4Data }
         {tool2Data && tool2Data.analysisResults && tool2Data.analysisResults.length > 0 && (
             <Card className="my-4 report-section" id="tool2-summary-live">
                 <CardHeader>
-                    <CardTitle className="report-h1 text-2xl flex items-center"><ClipboardList className="mr-2 h-6 w-6"/>Tool 2: Analizzatore Pertinenza & Priorità KW (Offline)</CardTitle>
+                    <CardTitle className="report-h1 text-2xl flex items-center"><ClipboardList className="mr-2 h-6 w-6"/>Tool 2: Analizzatore Pertinenza & Priorità KW</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {tool2Data.industryContext && <p className="text-sm text-muted-foreground mb-2"><strong>Contesto Analisi:</strong> {tool2Data.industryContext}</p>}
@@ -664,6 +696,20 @@ export function Tool5MasterReport({ tool1Data, tool2Data, tool3Data, tool4Data }
                     <TablePertinenceResults results={tool2Data.analysisResults.slice(0,5)} />
                 </CardContent>
             </Card>
+        )}
+        {toolDataForSeoData && toolDataForSeoData.results && toolDataForSeoData.results.length > 0 && (
+          <Card className="my-4 report-section" id="toolDataForSeo-summary-live">
+            <CardHeader>
+                <CardTitle className="report-h1 text-2xl flex items-center"><Brain className="mr-2 h-6 w-6"/>Tool: Analisi Domanda Consapevole (DFS)</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p className="text-sm text-muted-foreground mb-1"><strong>Keyword Seed:</strong> {toolDataForSeoData.seedKeywords}</p>
+                <p className="text-sm text-muted-foreground mb-2"><strong>Contesto:</strong> {toolDataForSeoData.locationContext}</p>
+                <p className="text-sm text-muted-foreground mb-3"><strong>Idee Totali Trovate:</strong> {toolDataForSeoData.totalIdeasFound}</p>
+                <h3 className="report-h3 text-lg mt-4">Anteprima Tabella: Idee Keyword da DataForSEO (Prime 5 righe)</h3>
+                <TableDataForSeoResults results={toolDataForSeoData.results.slice(0,5)} />
+            </CardContent>
+          </Card>
         )}
          {tool3Data && (tool3Data.scrapedAds?.length > 0 || tool3Data.adsWithAnalysis?.length > 0) && (
             <Card className="my-4 report-section" id="tool3-summary-live">

@@ -6,14 +6,18 @@ import { AppHeader } from '@/components/layout/app-header';
 import { ToolNavigation } from '@/components/layout/tool-navigation';
 import { Tool1Comparator } from '@/components/tools/tool1-comparator/tool1-comparator';
 import { Tool2Analyzer } from '@/components/tools/tool2-analyzer/tool2-analyzer';
+import { ToolDataForSeoAnalyzer } from '@/components/tools/tool-dataforseo-analyzer/tool-dataforseo-analyzer';
 import { Tool3Scraper } from '@/components/tools/tool3-scraper/tool3-scraper';
 import { Tool4GSCAnalyzer } from '@/components/tools/tool4-gsc-analyzer/tool4-gsc-analyzer';
 import { Tool5MasterReport } from '@/components/tools/tool5-master-report/tool5-master-report';
 import type { ComparisonResult, PertinenceAnalysisResult, ScrapedAd, AdWithAngleAnalysis, GscParsedData, GscAnalyzedData } from '@/lib/types';
+import type { DataForSEOKeywordMetrics } from '@/lib/dataforseo/types';
+
 
 const tools = [
   { id: 'tool1', label: 'Analizzatore Comparativo KW' },
   { id: 'tool2', label: 'Analizzatore Pertinenza & Priorità KW' },
+  { id: 'toolDataForSeo', label: 'Analisi Domanda Consapevole (DFS)' },
   { id: 'tool3', label: 'FB Ads Library Scraper' },
   { id: 'tool4', label: 'Analizzatore Dati GSC' },
   { id: 'tool5', label: 'Report Consolidato' },
@@ -33,12 +37,21 @@ export default function HomePage() {
   const [tool2CsvFile, setTool2CsvFile] = useState<{ content: string; name: string } | null>(null);
   const [tool2AnalysisResults, setTool2AnalysisResults] = useState<PertinenceAnalysisResult[]>([]);
   
+  // --- State for Tool DataForSeo Analyzer ---
+  const [dataForSeoLogin, setDataForSeoLogin] = useState('');
+  const [dataForSeoPassword, setDataForSeoPassword] = useState('');
+  const [dataForSeoSeedKeywords, setDataForSeoSeedKeywords] = useState('');
+  const [dataForSeoLocationCode, setDataForSeoLocationCode] = useState('2840'); // Default USA
+  const [dataForSeoLanguageCode, setDataForSeoLanguageCode] = useState('en'); // Default English
+  const [dataForSeoAnalysisResults, setDataForSeoAnalysisResults] = useState<DataForSEOKeywordMetrics[]>([]);
+
+
   // --- State for Tool 3 ---
   const [tool3ApifyToken, setTool3ApifyToken] = useState('');
   const [tool3ApifyActorId, setTool3ApifyActorId] = useState('curious_coder~facebook-ads-library-scraper');
   const [tool3FbAdsUrl, setTool3FbAdsUrl] = useState('');
   const [tool3MaxAdsToProcess, setTool3MaxAdsToProcess] = useState(10);
-  const [tool3OpenAIApiKey, setTool3OpenAIApiKey] = useState(''); // Modificato da googleApiKey
+  const [tool3OpenAIApiKey, setTool3OpenAIApiKey] = useState('');
   const [tool3ScrapedAds, setTool3ScrapedAds] = useState<ScrapedAd[]>([]);
   const [tool3AdsWithAnalysis, setTool3AdsWithAnalysis] = useState<AdWithAngleAnalysis[]>([]);
 
@@ -83,6 +96,24 @@ export default function HomePage() {
               />
             </div>
           )}
+          {activeTool === 'toolDataForSeo' && (
+            <div id="toolDataForSeo-container">
+              <ToolDataForSeoAnalyzer
+                dataForSeoLogin={dataForSeoLogin}
+                setDataForSeoLogin={setDataForSeoLogin}
+                dataForSeoPassword={dataForSeoPassword}
+                setDataForSeoPassword={setDataForSeoPassword}
+                seedKeywords={dataForSeoSeedKeywords}
+                setSeedKeywords={setDataForSeoSeedKeywords}
+                locationCode={dataForSeoLocationCode}
+                setLocationCode={setDataForSeoLocationCode}
+                languageCode={dataForSeoLanguageCode}
+                setLanguageCode={setDataForSeoLanguageCode}
+                analysisResults={dataForSeoAnalysisResults}
+                setAnalysisResults={setDataForSeoAnalysisResults}
+              />
+            </div>
+          )}
           {activeTool === 'tool3' && (
             <div id="tool3-container">
               <Tool3Scraper
@@ -94,8 +125,8 @@ export default function HomePage() {
                 setFbAdsUrl={setTool3FbAdsUrl}
                 maxAdsToProcess={tool3MaxAdsToProcess}
                 setMaxAdsToProcess={setTool3MaxAdsToProcess}
-                openAIApiKey={tool3OpenAIApiKey} // Modificato
-                setOpenAIApiKey={setTool3OpenAIApiKey} // Modificato
+                openAIApiKey={tool3OpenAIApiKey}
+                setOpenAIApiKey={setTool3OpenAIApiKey}
                 scrapedAds={tool3ScrapedAds}
                 setScrapedAds={setTool3ScrapedAds}
                 adsWithAnalysis={tool3AdsWithAnalysis}
@@ -133,6 +164,12 @@ export default function HomePage() {
                 tool2Data={{
                   analysisResults: tool2AnalysisResults,
                   industryContext: tool2Industry || tool2IndustryKeywords ? `Settore di riferimento: ${tool2Industry || 'N/D'}, Parole chiave specifiche: ${tool2IndustryKeywords || 'N/D'}` : "Nessun contesto di settore fornito per l'analisi del Tool 2.",
+                }}
+                toolDataForSeoData={{
+                  seedKeywords: dataForSeoSeedKeywords,
+                  locationContext: `Località: ${dataForSeoLocationCode || 'Default'}, Lingua: ${dataForSeoLanguageCode || 'Default'}`,
+                  results: dataForSeoAnalysisResults,
+                  totalIdeasFound: dataForSeoAnalysisResults.length,
                 }}
                 tool3Data={{
                   scrapedAds: tool3ScrapedAds,

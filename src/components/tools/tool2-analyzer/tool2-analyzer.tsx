@@ -9,14 +9,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileUploadZone } from '@/components/shared/file-upload-zone';
 import { parseCSVTool2, exportToCSV } from '@/lib/csv';
 import type { CsvRowTool2, PertinenceAnalysisResult } from '@/lib/types';
+import type { DataForSEOKeywordMetrics } from '@/lib/dataforseo/types';
 import { useToast } from '@/hooks/use-toast';
 import { TablePertinenceResults } from './table-pertinence-results';
 import { PlayIcon, StopCircle, Download, AlertCircle, Loader2, ImportIcon, KeyRound } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { fetchDataForSEOAction } from '@/app/actions/dataforseo-actions';
+import { fetchDataForSEOKeywordIdeasAction } from '@/app/actions/dataforseo-actions';
 
 const APP_CHUNK_SIZE_TOOL2_OFFLINE = 50;
-const DFS_CONCURRENCY_LIMIT = 5; // Limita le chiamate concorrenti a DFS
+const DFS_CONCURRENCY_LIMIT_TOOL2 = 3; // Adjusted concurrency for Tool 2 specifically
 
 const STOP_WORDS_IT = [
   "a", "ad", "al", "allo", "ai", "agli", "all", "agl", "alla", "alle", "con", "col", "coi", "da", "dal", "dallo", "dai", "dagli", "dall", "dagl", "dalla", "dalle",
@@ -335,24 +336,36 @@ export function Tool2Analyzer({
         setLoadingMessage("Avvio arricchimento dati con DataForSEO...");
         const totalOfflineResults = offlineResultsCollector.length;
         let dfsProcessedCount = 0;
-
-        const enrichedResultsCollector: PertinenceAnalysisResult[] = [];
         
-        for (let i = 0; i < totalOfflineResults; i += DFS_CONCURRENCY_LIMIT) {
+        for (let i = 0; i < totalOfflineResults; i += DFS_CONCURRENCY_LIMIT_TOOL2) {
             if (isAnalysisStoppedRef.current) break;
-            const chunkToEnrich = offlineResultsCollector.slice(i, i + DFS_CONCURRENCY_LIMIT);
+            const chunkToEnrich = offlineResultsCollector.slice(i, i + DFS_CONCURRENCY_LIMIT_TOOL2);
             setLoadingMessage(`Recupero dati DFS per keyword ${i + 1}-${Math.min(i + chunkToEnrich.length, totalOfflineResults)} di ${totalOfflineResults}...`);
 
             const dfsPromises = chunkToEnrich.map(async (offlineResult) => {
                 if (isAnalysisStoppedRef.current) return offlineResult;
                 try {
-                    const dfsMetrics = await fetchDataForSEOAction({
-                        keyword: offlineResult.keyword,
+                    const dfsMetricsResponse = await fetchDataForSEOKeywordIdeasAction({
+                        keywords: [offlineResult.keyword], // Send one keyword at a time for enrichment
                         apiLogin: dataForSeoLogin,
                         apiPassword: dataForSeoPassword,
-                        // locationCode and languageCode can be parameterized if needed
                     });
-                    return { ...offlineResult, ...dfsMetrics };
+
+                    if ('dfs_error' in dfsMetricsResponse) { // Error object from action
+                       return { ...offlineResult, dfs_error: dfsMetricsResponse.dfs_error };
+                    }
+                    
+                    // Assuming the first result in the array corresponds to the input keyword
+                    const firstMetric = dfsMetricsResponse.length > 0 ? dfsMetricsResponse[0] : null;
+                    
+                    return { 
+                        ...offlineResult, 
+                        dfs_volume: firstMetric?.search_volume,
+                        dfs_cpc: firstMetric?.cpc,
+                        dfs_keyword_difficulty: firstMetric?.keyword_difficulty,
+                        dfs_error: !firstMetric ? "Nessuna metrica specifica per la keyword da DFS" : null
+                    };
+
                 } catch (e: any) {
                     console.error(`Errore recupero DFS per keyword ${offlineResult.keyword}:`, e);
                     return { ...offlineResult, dfs_error: e.message || "Errore API DataForSEO" };
@@ -360,9 +373,7 @@ export function Tool2Analyzer({
             });
 
             const enrichedChunkResults = await Promise.all(dfsPromises);
-            enrichedResultsCollector.push(...enrichedChunkResults);
             
-            // Update analysisResults state incrementally for better UI responsiveness
             setAnalysisResults(prevResults => {
                 const updatedResults = [...prevResults];
                 enrichedChunkResults.forEach(enrichedRes => {
@@ -375,9 +386,9 @@ export function Tool2Analyzer({
             });
 
             dfsProcessedCount += enrichedChunkResults.length;
-            setProgress(50 + (dfsProcessedCount / totalOfflineResults) * 50); // DFS is the other 50%
-             if (!isAnalysisStoppedRef.current && i + DFS_CONCURRENCY_LIMIT < totalOfflineResults) {
-                await new Promise(resolve => setTimeout(resolve, 50)); // Small delay
+            setProgress(50 + (dfsProcessedCount / totalOfflineResults) * 50);
+             if (!isAnalysisStoppedRef.current && i + DFS_CONCURRENCY_LIMIT_TOOL2 < totalOfflineResults) {
+                await new Promise(resolve => setTimeout(resolve, 50));
             }
         }
         
@@ -388,7 +399,7 @@ export function Tool2Analyzer({
             toast({ title: "Arricchimento DFS Completato", description: `${dfsProcessedCount} keyword arricchite.` });
         }
       } else {
-         setProgress(100); // If no DFS, then offline is 100%
+         setProgress(100);
       }
 
 
@@ -413,19 +424,19 @@ export function Tool2Analyzer({
       toast({ title: "Nessun dato", description: "Nessun risultato da scaricare.", variant: "destructive" });
       return;
     }
-    const headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione", "Volume", "KD", "Opportunity", "Posizione", "URL", "Intent", "DFS Volume", "DFS CPC", "DFS Difficulty", "DFS Error"];
+    const headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione", "Volume (CSV)", "KD (CSV)", "Opportunity (CSV)", "Posizione (CSV)", "URL (CSV)", "Intent (CSV)", "DFS Volume", "DFS CPC", "DFS Difficulty", "DFS Error"];
     const dataToExport = analysisResults.map(res => ({
         "Keyword": res.keyword || "",
         "Settore Analizzato": res.settore || "",
         "Pertinenza": res.pertinenza || "",
         "Priorità SEO": res.prioritaSEO || "",
         "Motivazione": res.motivazioneSEO || "",
-        "Volume": res.volume !== undefined ? res.volume : "N/A",
-        "KD": res.kd !== undefined ? res.kd : "N/A",
-        "Opportunity": res.opportunity !== undefined ? res.opportunity : "N/A",
-        "Posizione": res.posizione !== undefined ? res.posizione : "N/A",
-        "URL": res.url || "",
-        "Intent": res.intento || "",
+        "Volume (CSV)": res.volume !== undefined ? res.volume : "N/A",
+        "KD (CSV)": res.kd !== undefined ? res.kd : "N/A",
+        "Opportunity (CSV)": res.opportunity !== undefined ? res.opportunity : "N/A",
+        "Posizione (CSV)": res.posizione !== undefined ? res.posizione : "N/A",
+        "URL (CSV)": res.url || "",
+        "Intent (CSV)": res.intento || "",
         "DFS Volume": res.dfs_volume ?? "N/A",
         "DFS CPC": res.dfs_cpc ?? "N/A",
         "DFS Difficulty": res.dfs_keyword_difficulty ?? "N/A",
@@ -491,9 +502,9 @@ export function Tool2Analyzer({
 
       <Card>
         <CardHeader>
-            <CardTitle className="flex items-center"><KeyRound className="mr-2 h-5 w-5 text-blue-600" />Credenziali API DataForSEO (Opzionale)</CardTitle>
+            <CardTitle className="flex items-center"><KeyRound className="mr-2 h-5 w-5 text-blue-600" />Credenziali API DataForSEO (Opzionale per Arricchimento)</CardTitle>
             <CardDescription>
-              Inserisci le tue credenziali DataForSEO per arricchire le keyword con metriche aggiuntive (volume, CPC, difficoltà) tramite l'API.
+              Inserisci le tue credenziali DataForSEO per arricchire le keyword del CSV con metriche aggiuntive (volume, CPC, difficoltà) tramite l'API.
               Se lasciati vuoti, l'analisi procederà solo con le regole offline.
             </CardDescription>
         </CardHeader>

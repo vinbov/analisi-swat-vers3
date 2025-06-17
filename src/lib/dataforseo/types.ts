@@ -8,7 +8,7 @@ export interface DataForSEORequestParams {
   location_code?: number; // Location code e.g., 2840 for United States
   keywords?: string[];
   // Add other common parameters as needed, e.g.,
-  // search_partners?: boolean;
+  search_partners?: boolean;
   // sort_by?: string;
   // limit?: number;
   // offset?: number;
@@ -35,10 +35,12 @@ export interface DataForSEOKeywordMetrics {
   language_code?: string;
   search_volume?: number | null;
   cpc?: number | null;
-  keyword_difficulty?: number | null; // Often a 0-100 scale
+  keyword_difficulty?: number | null;
   // Add other metrics as needed:
-  // competition?: number | null; // 0-1 scale
+  competition?: number | null; // 0-1 scale
   // monthly_searches?: Array<{ year: number, month: number, search_volume: number }>;
+  categories?: number[] | null;
+  average_bid?: number | null;
 }
 
 export interface DataForSEOTaskResult {
@@ -63,7 +65,7 @@ export interface DataForSEOLiveResponse {
   }>;
 }
 
-// Simplified structure for the output of our server action
+// Simplified structure for the output of our server action for Tool 2 (single keyword focus)
 export interface ProcessedDataForSEOMetrics {
   dfs_volume?: number | null;
   dfs_cpc?: number | null;

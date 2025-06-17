@@ -5,39 +5,42 @@ import type {
   KeywordIdeasLiveRequestParams, 
   DataForSEOLiveResponse,
   DataForSEOTaskPost,
-  ProcessedDataForSEOMetrics
+  DataForSEOKeywordMetrics // Changed from ProcessedDataForSEOMetrics
 } from '@/lib/dataforseo/types';
 
 interface FetchDataForSEOInput {
-  keyword: string;
+  keywords: string[]; // Changed to array to support multiple seed keywords for the new tool
   apiLogin: string;
   apiPassword: string;
   locationCode?: number; // e.g., 2840 for US
   languageCode?: string; // e.g., "en"
+  searchPartners?: boolean;
 }
 
 const DFS_API_BASE_URL = "https://api.dataforseo.com/v3";
 
-export async function fetchDataForSEOAction(
+// This action now returns an array of keyword metrics or an error object
+export async function fetchDataForSEOKeywordIdeasAction(
   input: FetchDataForSEOInput
-): Promise<ProcessedDataForSEOMetrics> {
-  const { keyword, apiLogin, apiPassword, locationCode = 2840, languageCode = "en" } = input;
+): Promise<DataForSEOKeywordMetrics[] | { dfs_error: string }> {
+  const { keywords, apiLogin, apiPassword, locationCode = 2840, languageCode = "en", searchPartners = false } = input;
 
   if (!apiLogin || !apiPassword) {
     return { dfs_error: "DataForSEO API Login and Password are required." };
   }
-  if (!keyword) {
-    return { dfs_error: "Keyword is required." };
+  if (!keywords || keywords.length === 0) {
+    return { dfs_error: "At least one keyword is required." };
   }
 
   const endpoint = `${DFS_API_BASE_URL}/keywords_data/google/keyword_ideas/live`;
   
   const requestPayload: DataForSEOTaskPost<KeywordIdeasLiveRequestParams>[] = [
     {
-      keywords: [keyword],
+      keywords: keywords,
       location_code: locationCode,
       language_code: languageCode,
-      search_partners: false, // Example default, can be parameterized
+      search_partners: searchPartners,
+      // limit: 100, // Example: can be parameterized for the new tool
     },
   ];
 
@@ -59,30 +62,19 @@ export async function fetchDataForSEOAction(
 
     const data = await response.json() as DataForSEOLiveResponse;
 
-    if (data.tasks_error > 0 || !data.tasks || data.tasks.length === 0) {
+    if (data.tasks_error > 0 || !data.tasks || data.tasks.length === 0 || data.tasks[0].status_code !== 20000) {
       const taskError = data.tasks?.[0]?.status_message || "Unknown task error.";
       console.error("DataForSEO Task Error:", taskError, data);
       return { dfs_error: `DataForSEO task error: ${taskError}` };
     }
 
     const taskResult = data.tasks[0].result;
-    if (!taskResult || taskResult.length === 0 || !taskResult[0].items || taskResult[0].items.length === 0) {
-      return { dfs_error: "No metrics returned from DataForSEO for this keyword." };
+    if (!taskResult || taskResult.length === 0 || !taskResult[0].items) {
+      return { dfs_error: "No metrics or keyword ideas returned from DataForSEO for these keywords." };
     }
     
-    // Assuming the first item in 'items' array contains the primary metrics for the keyword
-    const metrics = taskResult[0].items[0];
-
-    return {
-      dfs_volume: metrics.search_volume,
-      dfs_cpc: metrics.cpc,
-      // DataForSEO 'keyword_difficulty' is typically 0-100, but the endpoint 'keyword_ideas' might not return it directly.
-      // It's more common in 'keywords_data.google.adwords.search_volume' or 'keywords_data.google.keywords_for_keywords.live'
-      // For 'keyword_ideas', you might get 'competition_level' or similar instead, or just volume/CPC.
-      // Adjust this based on the actual response structure of 'keyword_ideas/live'.
-      // For now, I'll leave it as potentially null.
-      dfs_keyword_difficulty: metrics.keyword_difficulty ?? null, 
-    };
+    // taskResult[0].items is an array of DataForSEOKeywordMetrics
+    return taskResult[0].items;
 
   } catch (error: any) {
     console.error("Error calling DataForSEO API:", error);

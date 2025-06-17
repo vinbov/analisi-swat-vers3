@@ -1,4 +1,5 @@
 
+import type { DataForSEOKeywordMetrics } from './dataforseo/types';
 
 // Tool 1: Keyword Comparator
 export interface CsvRowTool1 {
@@ -60,6 +61,9 @@ export interface PertinenceAnalysisResult {
   dfs_keyword_difficulty?: number | null;
   dfs_error?: string | null;
 }
+
+// Tool "Analisi Domanda Consapevole" (DataForSEO Keyword Ideas)
+// This tool will directly use DataForSEOKeywordMetrics[] for its results state.
 
 // Tool 3: Facebook Ads Library Scraper
 export interface ApifyRawAdItem {
@@ -198,6 +202,13 @@ export interface GscAnalyzedData {
 export interface Tool2MasterReportData {
   analysisResults: PertinenceAnalysisResult[];
   industryContext: string;
+}
+
+export interface ToolDataForSeoMasterReportData {
+  seedKeywords: string;
+  locationContext: string;
+  results: DataForSEOKeywordMetrics[]; // Top N results for the report
+  totalIdeasFound: number;
 }
 
 
