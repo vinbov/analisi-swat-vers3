@@ -130,6 +130,10 @@ export default function HomePage() {
                   rawResults: tool1ComparisonResults, 
                   activeCompetitorNames: tool1ActiveCompetitorNames,
                 }}
+                tool2Data={{
+                  analysisResults: tool2AnalysisResults,
+                  industryContext: tool2Industry || tool2IndustryKeywords ? `Settore di riferimento: ${tool2Industry || 'N/D'}, Parole chiave specifiche: ${tool2IndustryKeywords || 'N/D'}` : "Nessun contesto di settore fornito per l'analisi del Tool 2.",
+                }}
                 tool3Data={{
                   scrapedAds: tool3ScrapedAds,
                   adsWithAnalysis: tool3AdsWithAnalysis,

@@ -189,6 +189,12 @@ export interface GscAnalyzedData {
   searchAppearance?: GscSectionAnalysis;
 }
 
+// For Master Report Tool 5
+export interface Tool2MasterReportData {
+  analysisResults: PertinenceAnalysisResult[];
+  industryContext: string;
+}
+
 
 // For detail pages
 export type DetailPageSection = 

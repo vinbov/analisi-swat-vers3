@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { InfoIcon, BarChart3, SearchCode, ClipboardList, BarChart2, Presentation, Download, FileCode, Copy } from 'lucide-react';
 import type {
     AdWithAngleAnalysis, AngleAnalysisScores, GscAnalyzedData, GscReportType, GscSectionAnalysis,
-    ComparisonResult, ScrapedAd
+    ComparisonResult, ScrapedAd, PertinenceAnalysisResult, Tool2MasterReportData
 } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -18,8 +18,8 @@ import { ComparisonResultsTable } from '@/components/tools/tool1-comparator/tabl
 import { CommonKeywordsTop10Chart } from '@/components/tools/tool1-comparator/chart-common-keywords-top10';
 import { TopOpportunitiesChart } from '@/components/tools/tool1-comparator/chart-top-opportunities';
 import { TableAngleAnalysis } from '@/components/tools/tool3-scraper/table-angle-analysis';
+import { TablePertinenceResults } from '@/components/tools/tool2-analyzer/table-pertinence-results'; // Importa la tabella per Tool 2
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'; // Per il grafico 7C live
-import { TableGSC } from '@/components/tools/tool4-gsc-analyzer/table-gsc';
 import { ChartGSC } from '@/components/tools/tool4-gsc-analyzer/charts-gsc';
 
 
@@ -46,6 +46,7 @@ interface Tool4MasterReportData {
 
 interface Tool5MasterReportProps {
     tool1Data: Tool1MasterReportData | null;
+    tool2Data: Tool2MasterReportData | null;
     tool3Data: Tool3MasterReportData | null;
     tool4Data: Tool4MasterReportData | null;
 }
@@ -63,7 +64,7 @@ const chartJsColors = [
 const chartJsBorderColors = chartJsColors.map(color => color.replace('0.7', '1'));
 
 
-export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5MasterReportProps) {
+export function Tool5MasterReport({ tool1Data, tool2Data, tool3Data, tool4Data }: Tool5MasterReportProps) {
   const [average7CScores, setAverage7CScores] = useState<AngleAnalysisScores | null>(null);
   const { toast } = useToast();
 
@@ -247,10 +248,31 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     } else { reportHtml += "<p class='no-data-message'>Nessun dato disponibile dal Tool 1 o analisi non eseguita.</p>"; }
     reportHtml += '<hr class="tool-section-separator">';
 
-    // Tool 2 Section Placeholder
+    // --- Tool 2 Section ---
     reportHtml += addSection("tool2-main", "Tool 2: Analizzatore Pertinenza & Priorità KW (Offline)", 1);
-    reportHtml += "<p>I risultati dettagliati del Tool 2 (analisi offline) sono visualizzati e scaricabili come CSV direttamente all'interno della pagina del tool stesso. Questa sezione del report consolidato serve come promemoria per includerli se necessario.</p>";
-    reportHtml += "<p><em>(INCLUDERE QUI MANUALMENTE SCREENSHOT/DATI SIGNIFICATIVI DAL TOOL 2 SE RICHIESTO PER IL REPORT FINALE)</em></p>";
+    if (tool2Data && tool2Data.analysisResults && tool2Data.analysisResults.length > 0) {
+        reportHtml += addSection("tool2-summary", "Riepilogo Analisi Pertinenza Keyword (Offline)", 3);
+        if (tool2Data.industryContext) {
+            reportHtml += `<p class="context-info"><strong>Contesto Analisi:</strong> ${escapeHtml(tool2Data.industryContext)}</p>`;
+        }
+        const tool2Headers = ["Keyword", "Settore Analizzato", "Pertinenza", "Priorità SEO", "Motivazione", "Volume", "KD", "Opportunity", "Posizione", "URL", "Intent"];
+        const tool2TableData = tool2Data.analysisResults.map(res => ({
+            "Keyword": res.keyword,
+            "Settore Analizzato": res.settore,
+            "Pertinenza": res.pertinenza,
+            "Priorità SEO": res.prioritaSEO,
+            "Motivazione": res.motivazioneSEO,
+            "Volume": res.volume !== undefined && res.volume !== null ? String(res.volume) : 'N/A',
+            "KD": res.kd !== undefined && res.kd !== null ? String(res.kd) : 'N/A',
+            "Opportunity": res.opportunity !== undefined && res.opportunity !== null ? String(res.opportunity) : 'N/A',
+            "Posizione": res.posizione !== undefined && res.posizione !== null ? String(res.posizione) : 'N/A',
+            "URL": res.url || 'N/A',
+            "Intent": res.intento || 'N/A'
+        }));
+        reportHtml += generateTableHtml(tool2Headers, tool2TableData, "Dettaglio: Analisi Pertinenza e Priorità Keyword", "tool2-analysis-table");
+    } else {
+        reportHtml += "<p class='no-data-message'>Nessun dato disponibile dal Tool 2 o analisi non eseguita.</p>";
+    }
     reportHtml += '<hr class="tool-section-separator">';
 
 
@@ -398,11 +420,12 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
           .report-h3 { color: #1d4ed8; /* Medium Blue */ margin-top: 30px; margin-bottom: 20px; padding-bottom: 8px; border-bottom: 1px solid #93c5fd; /* Lighter Blue */ font-size: 20px; font-weight: 500;}
 
           /* Paragraphs and Lists */
-          p, .summary-list, .filters-display p { margin-bottom: 15px; font-size: 14px; color: #334155; }
+          p, .summary-list, .filters-display p, .context-info { margin-bottom: 15px; font-size: 14px; color: #334155; }
           .summary-list { list-style-type: disc; padding-left: 25px; }
           .summary-list li { margin-bottom: 8px; }
           .summary-list strong { color: #1e40af; }
           p.no-data-message { color: #64748b; font-style: italic; text-align: center; padding: 20px 0; }
+          .context-info { background-color: #eef2ff; border-left: 3px solid #4f46e5; padding: 10px 15px; margin-bottom: 20px; border-radius: 4px; font-size: 0.9em;}
 
 
           /* Separators */
@@ -591,13 +614,13 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
         <p className="text-muted-foreground mb-4">
             Di seguito un'anteprima dei dati che saranno inclusi nel report HTML scaricabile. I grafici qui sotto sono renderizzati con Recharts per la visualizzazione live; il report HTML scaricato userà Chart.js per renderizzare grafici simili.
         </p>
-        {(!tool1Data?.rawResults?.length && !tool3Data?.adsWithAnalysis?.length && !tool4Data?.analyzedGscData) && (
+        {(!tool1Data?.rawResults?.length && (!tool2Data || !tool2Data.analysisResults || tool2Data.analysisResults.length === 0) && !tool3Data?.adsWithAnalysis?.length && !tool4Data?.analyzedGscData) && (
              <Alert variant="default" className="my-4">
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>Nessun Dato da Visualizzare</AlertTitle>
                 <AlertDescription>
                     Nessuna analisi è stata ancora eseguita nei tool precedenti, oppure i dati non sono stati passati correttamente.
-                    Esegui le analisi nei Tool 1, 3 e 4 per popolare il report consolidato.
+                    Esegui le analisi nei Tool 1, 2, 3 e 4 per popolare il report consolidato.
                 </AlertDescription>
             </Alert>
         )}
@@ -627,6 +650,18 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
                     
                     <h3 className="report-h3 text-lg mt-4">Anteprima Tabella: Keyword Comuni (Prime 5 righe)</h3>
                     <ComparisonResultsTable results={tool1Data.rawResults.filter(r => r.status === 'common').slice(0,5)} type="common" activeCompetitorNames={tool1Data.activeCompetitorNames} />
+                </CardContent>
+            </Card>
+        )}
+        {tool2Data && tool2Data.analysisResults && tool2Data.analysisResults.length > 0 && (
+            <Card className="my-4 report-section" id="tool2-summary-live">
+                <CardHeader>
+                    <CardTitle className="report-h1 text-2xl flex items-center"><ClipboardList className="mr-2 h-6 w-6"/>Tool 2: Analizzatore Pertinenza & Priorità KW (Offline)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {tool2Data.industryContext && <p className="text-sm text-muted-foreground mb-2"><strong>Contesto Analisi:</strong> {tool2Data.industryContext}</p>}
+                    <h3 className="report-h3 text-lg mt-4">Anteprima Tabella: Analisi Pertinenza e Priorità (Prime 5 righe)</h3>
+                    <TablePertinenceResults results={tool2Data.analysisResults.slice(0,5)} />
                 </CardContent>
             </Card>
         )}
@@ -711,4 +746,3 @@ export function Tool5MasterReport({ tool1Data, tool3Data, tool4Data }: Tool5Mast
     </div>
   );
 }
-
