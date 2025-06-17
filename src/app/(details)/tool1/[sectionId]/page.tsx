@@ -27,9 +27,8 @@ export default function Tool1DetailPage() {
 
   const channelRef = useRef<BroadcastChannel | null>(null);
   const requestingTabIdRef = useRef<string>(`detailTab-${Date.now()}-${Math.random().toString(36).substring(2,7)}`);
-  const dataIdRef = useRef<string | null>(null); // Per memorizzare il dataId letto dai params
+  const dataIdRef = useRef<string | null>(null);
 
-  // Stabilizza dataIdFromParams usando useMemo
   const dataIdFromParams = useMemo(() => {
     return searchParams.get('dataId');
   }, [searchParams]);
@@ -137,16 +136,15 @@ export default function Tool1DetailPage() {
 
 
   useEffect(() => {
-    // dataIdFromParams è ora stabile grazie a useMemo
     dataIdRef.current = dataIdFromParams;
 
     if (!dataIdFromParams || !sectionId) {
       setDataLoadError("Impossibile caricare i dettagli. ID dati o sezione mancante. Torna al tool principale e riprova.");
       setIsLoading(false);
+      setPageData(null); // Assicura che pageData sia null se gli ID non sono validi
       return;
     }
     
-    // Reset state for this effect run if dataId or sectionId changed
     setIsLoading(true);
     setPageData(null);
     setDataLoadError(null);
@@ -173,6 +171,7 @@ export default function Tool1DetailPage() {
             const competitorOnlyKWs = allResults.filter(r => r.status === 'competitorOnly');
             
             const getTableHeaders = (type: 'common' | 'mySiteOnly' | 'competitorOnly') => {
+              if (!currentActiveCompNames) return []; // Gestione per currentActiveCompNames undefined
               if (type === 'common') return ['Keyword', 'Mio Sito Pos.', 'Mio Sito URL', ...currentActiveCompNames.flatMap(name => [`${name} Pos.`, `${name} URL`]), 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
               if (type === 'mySiteOnly') return ['Keyword', 'Mio Sito Pos.', 'Mio Sito URL', 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
               return ['Keyword', ...currentActiveCompNames.flatMap(name => [`${name} Pos.`, `${name} URL`]), 'Volume', 'Difficoltà', 'Opportunity', 'Intento'];
@@ -212,7 +211,7 @@ export default function Tool1DetailPage() {
                   commonTop10AdditionalContent += '<p class="text-sm text-muted-foreground mt-1 mb-3">Nessuna keyword comune in Top 10 per "Mio Sito".</p>';
                 }
 
-                currentActiveCompNames.forEach(compName => {
+                currentActiveCompNames?.forEach(compName => {
                   commonTop10AdditionalContent += `<h5 class="mt-6 font-semibold text-foreground">${compName} - Keyword Comuni in Top 10:</h5>`;
                   const competitorKWsDetail = commonKWs
                     .filter(kw => {
@@ -256,7 +255,7 @@ export default function Tool1DetailPage() {
                 dataForPage = {
                   pageTitle: "Analisi Keyword Comuni: Posizionamento Top 10",
                   description: "Confronto del numero di keyword comuni per cui \"Il Mio Sito\" e ciascun competitor si posizionano in Top 10, con dettaglio tabellare delle keyword.",
-                  chartComponent: <CommonKeywordsTop10Chart results={allResults} activeCompetitorNames={currentActiveCompNames} />,
+                  chartComponent: <CommonKeywordsTop10Chart results={allResults} activeCompetitorNames={currentActiveCompNames || []} />,
                   additionalContent: commonTop10AdditionalContent,
                   comparisonResults: allResults, 
                   activeCompetitorNames: currentActiveCompNames,
@@ -285,7 +284,7 @@ export default function Tool1DetailPage() {
                             <tbody class="bg-card divide-y divide-border">`;
                     top10Opportunities.forEach(item => {
                         const competitorsRanking = item.competitorInfo
-                            .filter(c => c.pos !== 'N/P' && currentActiveCompNames.includes(c.name))
+                            .filter(c => c.pos !== 'N/P' && currentActiveCompNames?.includes(c.name))
                             .map(c => `${c.name} (${c.pos})`)
                             .join(', ');
                         topOpportunitiesTable += `
@@ -350,11 +349,11 @@ export default function Tool1DetailPage() {
               default: 
                 setDataLoadError(`La sezione di dettaglio '${sectionId}' non è riconosciuta o è stata rimossa. Torna al tool principale.`);
                 setPageData(null);
-                return; // Esce da handleMessage
+                return;
             }
             setPageData(dataForPage as DetailPageDataTool1);
-            setDataLoadError(null); // Pulisce eventuali errori precedenti se i dati sono ora validi
-          } else { // payload is null
+            setDataLoadError(null);
+          } else {
             setDataLoadError("I dati per questa sessione di dettaglio non sono più disponibili. Questo può accadere se la scheda del tool principale è stata chiusa o l'analisi è stata aggiornata. Torna al tool principale e riesegui l'analisi se necessario.");
             setPageData(null);
           }
@@ -368,17 +367,15 @@ export default function Tool1DetailPage() {
 
     const requestMsg: RequestTool1DataMessage = {
       type: 'REQUEST_TOOL1_DATA',
-      dataId: dataIdFromParams, // Usa la versione stabile
+      dataId: dataIdFromParams,
       requestingTabId: requestingTabIdRef.current,
     };
     channelRef.current?.postMessage(requestMsg);
 
     const timeoutId = setTimeout(() => {
-      // Questa condizione è cruciale. Se isLoading è ancora true E non abbiamo pageData, allora è un vero timeout.
       if (isLoading && !pageData) { 
         setDataLoadError("Timeout: Nessuna risposta dal tool principale. Assicurati che la scheda del Tool 1 sia aperta e attiva. Potrebbe essere necessario rieseguire l'analisi.");
-        // setPageData(null); // Già null se isLoading è true e !pageData
-        setIsLoading(false); // Sblocca l'UI per mostrare l'errore
+        setIsLoading(false);
       }
     }, 7000); 
 
@@ -387,25 +384,17 @@ export default function Tool1DetailPage() {
           channelRef.current.onmessage = null; 
       }
       if (timeoutId) clearTimeout(timeoutId);
-      // Non chiudere il canale qui, potrebbe essere usato da altre schede dettaglio
-      // o se l'utente naviga avanti/indietro. La chiusura del canale dovrebbe avvenire
-      // quando Tool1Comparator (la pagina principale) si smonta.
     };
-  // Dipendenze dell'useEffect: solo quelle che, se cambiano, richiedono un nuovo fetch.
-  // isLoading e pageData sono gestiti internamente all'effetto e non dovrebbero causarne la riesecuzione.
-  }, [sectionId, dataIdFromParams]);
+  }, [sectionId, dataIdFromParams, isLoading, pageData]); // Aggiunto isLoading e pageData per il controllo del timeout
 
-
-  // Effetto per la pulizia del canale SOLO quando il componente si smonta
   useEffect(() => {
     return () => {
       if (channelRef.current) {
         channelRef.current.close();
         channelRef.current = null;
-        // console.log(`Tool1DetailPage: BroadcastChannel ${TOOL1_DATA_CHANNEL_NAME} chiuso per ${requestingTabIdRef.current}`);
       }
     };
-  }, []); // Array di dipendenze vuoto per eseguirlo solo on unmount
+  }, []);
 
 
   if (isLoading) {
