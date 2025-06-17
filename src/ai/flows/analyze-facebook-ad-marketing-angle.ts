@@ -45,7 +45,7 @@ const analyzeFacebookAdMarketingAnglePrompt = ai.definePrompt({
   // NOTA: Il modello OpenAI è specificato qui. Se il plugin OpenAI non è attivo in src/ai/genkit.ts
   // (a causa di problemi di installazione di @genkit-ai/openai),
   // la chiamata a questo prompt fallirà. Il flow gestirà questo errore.
-  model: 'openai/gpt-4o-mini', 
+  model: 'openai/gpt-4o-mini',
   prompt: `Analyze the following text and title (if available) using the \"Metodo 7C\" framework.
 
 Text: {{{adText}}}
@@ -101,7 +101,7 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
     let outputJson: any;
     try {
       const result = await analyzeFacebookAdMarketingAnglePrompt(input);
-      
+
       if (typeof result.output === 'string') {
         try {
             outputJson = JSON.parse(result.output);
@@ -129,10 +129,10 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
         detailedAnalysis: `Impossibile eseguire l'analisi dell'angle. Il plugin OpenAI richiesto ('@genkit-ai/openai') potrebbe non essere installato o configurato correttamente. Controlla la console e prova a reinstallare i pacchetti. Errore originale: ${flowError.message}`,
       };
     }
-    
+
     // Questa parte viene eseguita solo se la chiamata al prompt ha successo
     const validationResult = AnalyzeFacebookAdMarketingAngleOutputSchema.safeParse(outputJson);
-    
+
     if (!validationResult.success) {
       console.warn("analyzeFacebookAdMarketingAngleFlow: L'output dell'AI non corrisponde perfettamente allo schema. Tentativo di sanitizzazione.", validationResult.error.flatten());
       const sanitizedParse = AnalyzeFacebookAdMarketingAngleOutputSchemaSanitized.safeParse(outputJson);
@@ -172,7 +172,7 @@ const analyzeFacebookAdMarketingAngleFlow = ai.defineFlow(
             totalScore >= 6 ? 'Debole - serve revisione' :
             'Scarso - da riscrivere';
     }
-    
+
     return {
       c1Clarity: c1,
       c2Engagement: c2,
