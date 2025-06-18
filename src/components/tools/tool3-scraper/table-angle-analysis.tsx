@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { AdWithAngleAnalysis, AngleAnalysis } from '@/lib/types'; // Aggiunto AngleAnalysis
+import type { AdWithAngleAnalysis, AngleAnalysis } from '@/lib/types';
 
 interface TableAngleAnalysisProps {
   adsWithAnalysis: AdWithAngleAnalysis[];
@@ -14,16 +14,6 @@ export function TableAngleAnalysis({ adsWithAnalysis, isDetailPage = false }: Ta
   }
 
   const headers = ["Ad (Titolo/Testo)", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "Totale", "Valutazione", "Analisi Approfondita"];
-
-  // Funzione helper per accedere ai punteggi in modo sicuro
-  const getScore = (analysis: AngleAnalysis | undefined, scoreKey: keyof Omit<AngleAnalysis, 'scores' | 'totalScore' | 'evaluation' | 'detailedAnalysis' | 'error' | 'raw'> | keyof AngleAnalysis['scores']) => {
-    if (!analysis) return 'N/A';
-    // Prova prima i campi diretti come c1Clarity, poi quelli dentro 'scores'
-    if (scoreKey in analysis) return (analysis as any)[scoreKey] ?? 'N/A';
-    if (analysis.scores && scoreKey in analysis.scores) return (analysis.scores as any)[scoreKey] ?? 'N/A';
-    return 'N/A';
-  };
-
 
   return (
     <div className={isDetailPage ? "detail-page-table-container" : "table-container"}>
@@ -38,7 +28,7 @@ export function TableAngleAnalysis({ adsWithAnalysis, isDetailPage = false }: Ta
         <tbody className="bg-card divide-y divide-border">
           {adsWithAnalysis.map((item) => {
             const adIdentifier = item.titolo ? item.titolo.substring(0, 50) + (item.titolo.length > 50 ? "..." : "") : item.testo.substring(0, 50) + "...";
-            const analysis = item.angleAnalysis; // Questo è l'oggetto AnalyzeFacebookAdMarketingAngleOutput
+            const analysis = item.angleAnalysis;
             const hasError = item.analysisError || analysis?.error;
 
             return (
@@ -46,24 +36,29 @@ export function TableAngleAnalysis({ adsWithAnalysis, isDetailPage = false }: Ta
                 <td className="wrap-text-detail font-medium text-foreground" title={`${item.titolo || ''}\n${item.testo || ''}`}>{adIdentifier}</td>
                 {hasError ? (
                   <td colSpan={headers.length - 1} className="text-destructive wrap-text-detail">
-                    Errore analisi: {item.analysisError || analysis?.error} 
-                    {analysis?.raw && ` (Raw: ${analysis.raw.substring(0,100)}...)`}
+                    Errore analisi: {item.analysisError || analysis?.error || "Errore sconosciuto"}
+                    {/* Non tentare di accedere a analysis.raw qui se analysis potrebbe essere l'errore stesso */}
                   </td>
                 ) : analysis ? (
                   <>
-                    <td className="text-center">{getScore(analysis, 'c1Clarity')}</td>
-                    <td className="text-center">{getScore(analysis, 'c2Engagement')}</td>
-                    <td className="text-center">{getScore(analysis, 'c3Concreteness')}</td>
-                    <td className="text-center">{getScore(analysis, 'c4Coherence')}</td>
-                    <td className="text-center">{getScore(analysis, 'c5Credibility')}</td>
-                    <td className="text-center">{getScore(analysis, 'c6CallToAction')}</td>
-                    <td className="text-center">{getScore(analysis, 'c7Context')}</td>
+                    <td className="text-center">{analysis.c1Clarity ?? 'N/A'}</td>
+                    <td className="text-center">{analysis.c2Engagement ?? 'N/A'}</td>
+                    <td className="text-center">{analysis.c3Concreteness ?? 'N/A'}</td>
+                    <td className="text-center">{analysis.c4Coherence ?? 'N/A'}</td>
+                    <td className="text-center">{analysis.c5Credibility ?? 'N/A'}</td>
+                    <td className="text-center">{analysis.c6CallToAction ?? 'N/A'}</td>
+                    <td className="text-center">{analysis.c7Context ?? 'N/A'}</td>
                     <td className="text-center font-semibold">{analysis.totalScore ?? 'N/A'}</td>
                     <td className="wrap-text-detail">{analysis.evaluation || 'N/A'}</td>
-                    <td className="wrap-text-detail min-w-[300px] md:min-w-[350px]" dangerouslySetInnerHTML={{ __html: (analysis.detailedAnalysis || 'N/A').replace(/\n/g, '<br />') }} />
+                    <td 
+                      className="wrap-text-detail min-w-[300px] md:min-w-[350px]" 
+                      dangerouslySetInnerHTML={{ __html: (analysis.detailedAnalysis || 'N/A').replace(/\n/g, '<br />') }} 
+                    />
                   </>
                 ) : (
-                  <td colSpan={headers.length - 1} className="text-muted-foreground wrap-text-detail text-center">Analisi non ancora eseguita.</td>
+                  <td colSpan={headers.length - 1} className="text-muted-foreground wrap-text-detail text-center">
+                    Analisi non ancora eseguita o non selezionata.
+                  </td>
                 )}
               </tr>
             );
@@ -73,5 +68,4 @@ export function TableAngleAnalysis({ adsWithAnalysis, isDetailPage = false }: Ta
     </div>
   );
 }
-
     
