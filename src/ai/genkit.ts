@@ -1,4 +1,7 @@
 
+import { config } from 'dotenv';
+config();
+
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 // import { openAI } from '@genkit-ai/openai'; // Commentato a causa di problemi di installazione pacchetto
@@ -15,5 +18,4 @@ export const ai = genkit({
               // 4. Assicurati che la variabile d'ambiente OPENAI_API_KEY sia impostata o fornita tramite UI nel Tool 3.
   ],
   // È FONDAMENTALE che le variabili d'ambiente appropriate (GOOGLE_API_KEY e/o OPENAI_API_KEY)
-  // siano impostate (es. nel file .env o nell'ambiente server) affinché i plugin funzionino.
-});
+  // siano impostate (es. nel file .env o nell'
