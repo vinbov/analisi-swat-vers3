@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -99,7 +100,7 @@ export default function Tool4DetailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl">{pageTitle}</CardTitle>
-            {description && <CardDescription className="mt-1 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: description}} />}
+            {description && <CardDescription className="mt-1 prose prose-sm max-w-none">{description}</CardDescription>}
           </CardHeader>
           <CardContent>
             {analyzedData.topItemsByClicksChartData && (

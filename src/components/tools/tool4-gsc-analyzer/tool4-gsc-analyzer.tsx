@@ -592,7 +592,7 @@ export function Tool4GSCAnalyzer({
                                     </Button>
                                 </CardHeader>
                                 <CardContent>
-                                    {analysis?.summaryText && <CardDescription className="mb-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{__html: analysis.summaryText}} /> }
+                                    {analysis?.summaryText && <CardDescription className="mb-3 prose prose-sm max-w-none">{analysis.summaryText}</CardDescription> }
 
                                     {shouldRenderChart ? (
                                         <div className="my-6 h-[350px] md:h-[400px]">

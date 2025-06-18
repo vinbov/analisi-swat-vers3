@@ -359,7 +359,7 @@ export function Tool5MasterReport({ tool1Data, tool2Data, toolDataForSeoData, to
             
             if (analysis && analysis.detailedDataWithDiffs && analysis.detailedDataWithDiffs.length > 0) {
                 const cleanSummaryText = (analysis.summaryText || "").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
-                reportHtml += `<p>${cleanSummaryText}</p>`;
+                reportHtml += `<p>${escapeHtml(cleanSummaryText)}</p>`;
                 
                 const chart4Id = `chartTool4_${reportType}`;
                 const isPieChart = reportType === 'devices';
@@ -761,7 +761,7 @@ export function Tool5MasterReport({ tool1Data, tool2Data, toolDataForSeoData, to
                     return (
                         <div key={reportType} className="my-6">
                             <h3 className="report-h3 text-lg">{`Sintesi ${itemDisplayName}`}</h3>
-                            {analysis.summaryText && <p className="text-sm text-muted-foreground mb-2" dangerouslySetInnerHTML={{__html: analysis.summaryText}} />}
+                            {analysis.summaryText && <p className="text-sm text-muted-foreground mb-2">{analysis.summaryText}</p>}
                             <div className="h-[350px] md:h-[400px] my-4">
                                 <ChartGSC
                                     data={analysis.topItemsByClicksChartData}
