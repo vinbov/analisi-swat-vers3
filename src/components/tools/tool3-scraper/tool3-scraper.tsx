@@ -55,7 +55,7 @@ export function Tool3Scraper({
   const [loadingMessage, setLoadingMessage] = useState("");
   const [apifyStatus, setApifyStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [openAIPluginMissingError, setOpenAIPluginMissingError] = useState(false); // Mantengo per coerenza con lo stato attuale, anche se non usato con chiamate dirette
+  const [openAIPluginMissingError, setOpenAIPluginMissingError] = useState(false);
   const [selectedAdIds, setSelectedAdIds] = useState<Set<string>>(new Set());
   const router = useRouter();
   const { toast } = useToast();
@@ -182,9 +182,11 @@ export function Tool3Scraper({
   };
 
   const runAngleAnalysis = async () => {
+    console.log("Tool3: runAngleAnalysis - Inizio. Annunci selezionati:", selectedAdIds.size);
     if (selectedAdIds.size === 0) {
       setError("Nessun annuncio selezionato per l'analisi.");
       toast({ title: "Nessuna Selezione", description: "Seleziona almeno un annuncio per l'analisi.", variant: "default" });
+      console.log("Tool3: runAngleAnalysis - Nessun annuncio selezionato.");
       return;
     }
     
@@ -192,54 +194,70 @@ export function Tool3Scraper({
     if (!currentOpenAIApiKey) {
       setError("Inserisci la tua OpenAI API Key per l'analisi dell'angle.");
       toast({ title: "OpenAI API Key Mancante", description: "Inserisci la OpenAI API Key per l'analisi.", variant: "destructive" });
+      console.log("Tool3: runAngleAnalysis - OpenAI API Key mancante.");
       return;
     }
+    console.log("Tool3: runAngleAnalysis - API Key fornita.");
 
     setIsLoadingAnalysis(true);
     setLoadingMessage(`Analisi angle in corso per ${selectedAdIds.size} annunci selezionati con OpenAI...`);
     setError(null);
 
     const adsToAnalyze = adsWithAnalysis.filter(ad => selectedAdIds.has(ad.id));
-    let processedCount = 0;
+    console.log("Tool3: runAngleAnalysis - Annunci da analizzare:", adsToAnalyze.length, adsToAnalyze);
+    let processedCountForLoadingMessage = 0;
 
-    const analysisPromises = adsToAnalyze.map(async (ad) => {
-      if (ad.angleAnalysis || ad.analysisError) return ad; 
+    const analysisPromises = adsToAnalyze.map(async (ad, index) => {
+      console.log(`Tool3: runAngleAnalysis - Preparazione analisi per ad ID: ${ad.id} (indice: ${index})`);
+      if (ad.angleAnalysis || ad.analysisError) {
+        console.log(`Tool3: runAngleAnalysis - Ad ID: ${ad.id} già processato o con errore precedente, skipping.`);
+        processedCountForLoadingMessage++;
+        setLoadingMessage(`Analisi angle: ${processedCountForLoadingMessage} di ${adsToAnalyze.length} completati...`);
+        return Promise.resolve(ad); 
+      }
       try {
+        console.log(`Tool3: runAngleAnalysis - Chiamata ad analyzeAdAngleAction per ad ID: ${ad.id}`);
         const analysisResult = await analyzeAdAngleAction({
           adText: ad.testo,
           adTitle: ad.titolo,
         }, currentOpenAIApiKey);
         
-        processedCount++;
-        setLoadingMessage(`Analisi angle: ${processedCount} di ${selectedAdIds.size} completati...`);
-        return { ...ad, angleAnalysis: analysisResult };
+        console.log(`Tool3: runAngleAnalysis - Risultato da analyzeAdAngleAction per ad ID: ${ad.id}:`, analysisResult);
+        processedCountForLoadingMessage++;
+        setLoadingMessage(`Analisi angle: ${processedCountForLoadingMessage} di ${adsToAnalyze.length} completati...`);
+        return { ...ad, angleAnalysis: analysisResult, analysisError: undefined };
       } catch (e: any) {
-        console.error(`Errore analisi angle per ad "${ad.titolo}":`, e);
-        processedCount++;
-        setLoadingMessage(`Analisi angle: ${processedCount} di ${selectedAdIds.size} completati (con errori)...`);
-        return { ...ad, analysisError: e.message || "Errore sconosciuto durante analisi AI con OpenAI" };
+        console.error(`Tool3: runAngleAnalysis - Errore analisi angle per ad ID "${ad.id}":`, e);
+        processedCountForLoadingMessage++;
+        setLoadingMessage(`Analisi angle: ${processedCountForLoadingMessage} di ${adsToAnalyze.length} completati (con errori)...`);
+        return { ...ad, angleAnalysis: undefined, analysisError: e.message || "Errore sconosciuto durante analisi AI con OpenAI" };
       }
     });
 
     try {
+      console.log("Tool3: runAngleAnalysis - In attesa di Promise.all per le analisi...");
       const results = await Promise.all(analysisPromises);
-      // Update adsWithAnalysis with the new results, preserving existing ones
+      console.log("Tool3: runAngleAnalysis - Risultati da Promise.all:", results);
+      
       setAdsWithAnalysis(prevAdsWithAnalysis => {
-        const updatedAds = [...prevAdsWithAnalysis];
-        results.forEach(result => {
-            const index = updatedAds.findIndex(a => a.id === result.id);
-            if (index !== -1) {
-                updatedAds[index] = result;
+        const updatedAdsMap = new Map(prevAdsWithAnalysis.map(ad => [ad.id, ad]));
+        results.forEach(resultFromPromise => {
+            if (resultFromPromise && updatedAdsMap.has(resultFromPromise.id)) {
+                 updatedAdsMap.set(resultFromPromise.id, resultFromPromise);
             }
         });
-        return updatedAds;
+        const finalUpdatedAds = Array.from(updatedAdsMap.values());
+        console.log("Tool3: runAngleAnalysis - Nuovo stato adsWithAnalysis:", finalUpdatedAds);
+        return finalUpdatedAds;
       });
       setLoadingMessage("Analisi angle completata!");
-      toast({ title: "Analisi Angle Completata", description: `L'analisi 7C di ${selectedAdIds.size} annunci è terminata.` });
+      toast({ title: "Analisi Angle Completata", description: `L'analisi 7C di ${adsToAnalyze.length} annunci è terminata.` });
     } catch (e: any) {
+      console.error("Tool3: runAngleAnalysis - Errore durante Promise.all o aggiornamento stato:", e);
       setError(`Errore durante l'analisi degli angle (OpenAI): ${e.message}`);
       toast({ title: "Errore Analisi Angle (OpenAI)", description: e.message, variant: "destructive" });
     } finally {
+      console.log("Tool3: runAngleAnalysis - Blocco finally eseguito.");
       setIsLoadingAnalysis(false);
     }
   };
@@ -350,7 +368,7 @@ export function Tool3Scraper({
         <div className="text-center my-6">
           <p className="text-sky-600 text-lg mb-1">{loadingMessage}</p>
           {isLoadingScraping && <p className="text-sm text-muted-foreground">{apifyStatus}</p>}
-          <Progress value={isLoadingAnalysis ? (selectedAdIds.size > 0 ? (adsWithAnalysis.filter(ad => selectedAdIds.has(ad.id) && (ad.angleAnalysis || ad.analysisError)).length / selectedAdIds.size) * 100 : 0) : (isLoadingScraping ? 25: 0) } className="w-3/4 mx-auto mt-2" />
+          <Progress value={isLoadingAnalysis ? (adsToAnalyze.length > 0 ? (processedCountForLoadingMessage / adsToAnalyze.length) * 100 : 0) : (isLoadingScraping ? 25: 0) } className="w-3/4 mx-auto mt-2" />
         </div>
       )}
 
