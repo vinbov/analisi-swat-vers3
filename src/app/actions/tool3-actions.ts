@@ -4,9 +4,18 @@
 import type {
   AnalyzeFacebookAdMarketingAngleInput,
   AnalyzeFacebookAdMarketingAngleOutput,
-} from '@/lib/types'; // Assumendo che AnalyzeFacebookAdMarketingAngleOutput sia definito qui
+} from '@/lib/types'; 
 
-// Helper function per parsare la risposta dall'API OpenAI
+// Funzione per stimare approssimativamente i token.
+// Nota: Questa è una stima MOLTO grezza. Un tokenizer reale sarebbe più preciso.
+// Per l'italiano, il rapporto caratteri/token può essere diverso dall'inglese.
+// Usiamo un divisore conservativo.
+function estimateTokensApprox(text: string): number {
+  if (!text) return 0;
+  return Math.ceil(text.length / 3.0); // Stima: 1 token ogni 3 caratteri (più conservativo)
+}
+
+// Funzione per parsare la risposta dall'API OpenAI
 function parseOpenAIResponse(responseText: string | undefined): Partial<AnalyzeFacebookAdMarketingAngleOutput> {
   if (!responseText) {
     return {
@@ -32,7 +41,6 @@ function parseOpenAIResponse(responseText: string | undefined): Partial<AnalyzeF
   }
 
   try {
-    const scores: Record<string, number> = {};
     const scoreKeys: (keyof AnalyzeFacebookAdMarketingAngleOutput)[] = ['c1Clarity', 'c2Engagement', 'c3Concreteness', 'c4Coherence', 'c5Credibility', 'c6CallToAction', 'c7Context'];
     
     for (let i = 0; i < 7; i++) {
@@ -51,23 +59,19 @@ function parseOpenAIResponse(responseText: string | undefined): Partial<AnalyzeF
     const evaluationPart = parts[8].split(':');
     result.evaluation = evaluationPart[1] ? evaluationPart[1].trim() : 'Valutazione non disponibile';
     
-    // L'ultima parte è l'analisi dettagliata
-    result.detailedAnalysis = parts.slice(9).join('|||').trim(); // Ricongiunge se '|||' fosse presente nell'analisi
+    result.detailedAnalysis = parts.slice(9).join('|||').trim(); 
 
     if (result.detailedAnalysis.toLowerCase().startsWith('analisi approfondita:')) {
         result.detailedAnalysis = result.detailedAnalysis.substring('analisi approfondita:'.length).trim();
     }
 
-
   } catch (e) {
     console.error('Errore durante il parsing della risposta OpenAI:', e, 'Risposta:', responseText);
-    // result.detailedAnalysis è già impostato con la raw response
   }
   return result;
 }
 
 
-// Funzione per costruire il prompt per OpenAI
 function buildOpenAIPrompt(adText: string, adTitle?: string): string {
   return `
 Analizza il seguente testo pubblicitario (e titolo, se presente) usando il framework "Metodo 7C".
@@ -93,6 +97,8 @@ L'Analisi Approfondita DEVE contenere le 4 sezioni indicate.
 `;
 }
 
+const INPUT_TOKEN_THRESHOLD = 3000; // Soglia per i token di input stimati
+
 export async function analyzeAdAngleAction(
   input: AnalyzeFacebookAdMarketingAngleInput,
   apiKey: string
@@ -106,11 +112,23 @@ export async function analyzeAdAngleAction(
     };
   }
 
-  const prompt = buildOpenAIPrompt(input.adText, input.adTitle);
+  const promptContent = buildOpenAIPrompt(input.adText, input.adTitle);
+  const estimatedInputTokens = estimateTokensApprox(promptContent);
+
+  if (estimatedInputTokens > INPUT_TOKEN_THRESHOLD) {
+    console.warn(`Stima token di input (${estimatedInputTokens}) per l'annuncio (Titolo: "${input.adTitle || 'N/A'}") supera la soglia di ${INPUT_TOKEN_THRESHOLD}. Annuncio non analizzato.`);
+    return {
+      c1Clarity: 0, c2Engagement: 0, c3Concreteness: 0, c4Coherence: 0, c5Credibility: 0, c6CallToAction: 0, c7Context: 0,
+      totalScore: 0,
+      evaluation: 'Input Troppo Lungo',
+      detailedAnalysis: `Il testo dell'annuncio e/o il titolo sono troppo lunghi (stimati ${estimatedInputTokens} token di input, soglia ${INPUT_TOKEN_THRESHOLD}). L'annuncio non è stato analizzato per prevenire costi eccessivi. Prova con un annuncio più breve o aumenta la soglia (con cautela).`,
+    };
+  }
+
   const payload = {
-    model: 'gpt-4o', // Puoi cambiarlo se necessario, es. "gpt-3.5-turbo"
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 800, // Aumentato per consentire analisi più lunghe
+    model: 'gpt-4o', 
+    messages: [{ role: 'user', content: promptContent }],
+    max_tokens: 800, 
     temperature: 0.5,
   };
 
@@ -146,7 +164,6 @@ export async function analyzeAdAngleAction(
     
     const parsedResult = parseOpenAIResponse(rawAnalysisText);
 
-    // Assicura che tutti i campi di AnalyzeFacebookAdMarketingAngleOutput siano presenti
     const finalResult: AnalyzeFacebookAdMarketingAngleOutput = {
       c1Clarity: parsedResult.c1Clarity ?? 0,
       c2Engagement: parsedResult.c2Engagement ?? 0,
@@ -160,26 +177,14 @@ export async function analyzeAdAngleAction(
       detailedAnalysis: parsedResult.detailedAnalysis ?? "Analisi dettagliata non disponibile.",
     };
     
-    // Ricalcola totalScore se non fornito correttamente o per sicurezza
-    const calculatedScore = finalResult.c1Clarity + finalResult.c2Engagement + finalResult.c3Concreteness + finalResult.c4Coherence + finalResult.c5Credibility + finalResult.c6CallToAction + finalResult.c7Context;
-    if (finalResult.totalScore !== calculatedScore && parts.length >= 10) { // 'parts' è definito solo dentro parseOpenAIResponse
-        // Solo se il parsing originale sembrava completo, altrimenti si sovrascrive un errore.
-        // console.warn(`Ricalcolo totalScore: AI ha dato ${finalResult.totalScore}, calcolato è ${calculatedScore}. Uso il calcolato.`);
-        // finalResult.totalScore = calculatedScore; 
-        // Rimuovo il ricalcolo automatico del totalScore qui, mi fido di quello che l'AI ritorna se il formato base è corretto
-        // E' più importante che l'AI sia istruita a calcolarlo correttamente.
-    }
-    
-    // Ricalcola evaluation se non fornita o se il totalScore era 0 e ora è stato corretto (non più attivo il ricalcolo sopra)
     if (finalResult.evaluation === "Valutazione non disponibile" || finalResult.evaluation === "Errore Parsing Risposta AI") {
          const score = finalResult.totalScore;
          if (score >= 12) finalResult.evaluation = 'Ottimo - copy ad alta resa';
          else if (score >= 9) finalResult.evaluation = 'Buono - migliorabile in alcuni punti';
          else if (score >= 6) finalResult.evaluation = 'Debole - serve revisione';
-         else if (score > 0) finalResult.evaluation = 'Scarso - da riscrivere';
-         // Se score è 0, e non per errore, mantiene la evaluation che potrebbe essere "Errore API/Parsing"
+         else if (score > 0 && score < 6) finalResult.evaluation = 'Scarso - da riscrivere';
+         // Se score è 0 e evaluation è una di quelle di errore, non la sovrascrivo per mantenere l'info dell'errore.
     }
-
 
     return finalResult;
 
@@ -188,8 +193,8 @@ export async function analyzeAdAngleAction(
     return {
       c1Clarity: 0, c2Engagement: 0, c3Concreteness: 0, c4Coherence: 0, c5Credibility: 0, c6CallToAction: 0, c7Context: 0,
       totalScore: 0,
-      evaluation: 'Errore Interno',
-      detailedAnalysis: `Si è verificato un errore nello script: ${error.message}`,
+      evaluation: 'Errore Interno Action',
+      detailedAnalysis: `Si è verificato un errore nello script della server action: ${error.message}`,
     };
   }
 }
