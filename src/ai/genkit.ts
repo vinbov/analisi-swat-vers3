@@ -1,12 +1,12 @@
 
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
-// import { openAI } from '@genkit-ai/openai'; // Decommentato in precedenza, ora commentato a causa di errore installazione
+// import { openAI } from '@genkit-ai/openai'; // Commentato a causa di problemi di installazione pacchetto
 
 export const ai = genkit({
   plugins: [
     googleAI(),
-    // openAI(), // Decommentato in precedenza, ora commentato a causa di errore installazione
+    // openAI(), // Commentato a causa di problemi di installazione pacchetto
               // Per riattivare:
               // 1. Risolvi i problemi nel tuo ambiente npm che impediscono l'installazione di `@genkit-ai/openai`.
               //    Potrebbe essere necessario verificare il nome corretto del pacchetto e la versione disponibile su npmjs.org.
