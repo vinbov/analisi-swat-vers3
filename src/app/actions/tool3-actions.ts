@@ -126,7 +126,7 @@ export async function analyzeAdAngleAction(
   }
 
   const payload = {
-    model: 'gpt-4o', 
+    model: 'gpt-4', 
     messages: [{ role: 'user', content: promptContent }],
     max_tokens: 800, 
     temperature: 0.5,
@@ -198,3 +198,4 @@ export async function analyzeAdAngleAction(
     };
   }
 }
+
