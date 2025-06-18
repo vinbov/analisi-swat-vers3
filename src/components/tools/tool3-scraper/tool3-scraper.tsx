@@ -11,9 +11,11 @@ import { analyzeAdAngleAction } from '@/app/actions/tool3-actions';
 import { TableScrapedAds } from './table-scraped-ads';
 import { TableAngleAnalysis } from './table-angle-analysis';
 import { exportToCSV } from '@/lib/csv';
-import { PlayIcon, Download, AlertCircle, Bot, SearchCode, Loader2, FileText, PackageX, CheckSquare, Square } from 'lucide-react';
+import { PlayIcon, Download, AlertCircle, Bot, SearchCode, Loader2, FileText, PackageX, CheckSquare, Square, StopCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
+import { Checkbox } from '@/components/ui/checkbox';
+
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -57,6 +59,11 @@ export function Tool3Scraper({
   const [error, setError] = useState<string | null>(null);
   const [openAIPluginMissingError, setOpenAIPluginMissingError] = useState(false);
   const [selectedAdIds, setSelectedAdIds] = useState<Set<string>>(new Set());
+  
+  const [totalAdsInCurrentBatch, setTotalAdsInCurrentBatch] = useState(0);
+  const [adsProcessedInCurrentBatch, setAdsProcessedInCurrentBatch] = useState(0);
+
+  const isAnalysisStoppedRef = useRef(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -73,6 +80,9 @@ export function Tool3Scraper({
     setScrapedAds([]); 
     setAdsWithAnalysis([]); 
     setSelectedAdIds(new Set());
+    setAdsProcessedInCurrentBatch(0);
+    setTotalAdsInCurrentBatch(0);
+
 
     const apifyInputPayload = {
       urls: [{ url: fbAdsUrl }],
@@ -181,6 +191,16 @@ export function Tool3Scraper({
     setSelectedAdIds(new Set());
   };
 
+  const handleStopAnalysis = () => {
+    console.log("Tool3: handleStopAnalysis - Richiesta interruzione analisi.");
+    isAnalysisStoppedRef.current = true;
+    setLoadingMessage("Interruzione analisi angle in corso... Attendi il completamento delle chiamate attive.");
+    // Non disabilitare il pulsante di stop qui, l'utente potrebbe volerlo cliccare di nuovo
+    // se l'interruzione sembra lenta (anche se non avrà effetto ulteriore).
+    // La disabilitazione del pulsante "Analizza" e la gestione di isLoadingAnalysis si occuperanno del resto.
+  };
+
+
   const runAngleAnalysis = async () => {
     console.log("Tool3: runAngleAnalysis - Inizio. Annunci selezionati:", selectedAdIds.size);
     if (selectedAdIds.size === 0) {
@@ -199,20 +219,29 @@ export function Tool3Scraper({
     }
     console.log("Tool3: runAngleAnalysis - API Key fornita.");
 
+    isAnalysisStoppedRef.current = false;
     setIsLoadingAnalysis(true);
     setLoadingMessage(`Analisi angle in corso per ${selectedAdIds.size} annunci selezionati con OpenAI...`);
     setError(null);
+    setAdsProcessedInCurrentBatch(0);
+    setTotalAdsInCurrentBatch(selectedAdIds.size);
+
 
     const adsToAnalyze = adsWithAnalysis.filter(ad => selectedAdIds.has(ad.id));
     console.log("Tool3: runAngleAnalysis - Annunci da analizzare:", adsToAnalyze.length, adsToAnalyze);
-    let processedCountForLoadingMessage = 0;
-
+    
     const analysisPromises = adsToAnalyze.map(async (ad, index) => {
+      if (isAnalysisStoppedRef.current) {
+        console.log(`Tool3: runAngleAnalysis - Analisi interrotta prima di processare ad ID: ${ad.id}`);
+        setAdsProcessedInCurrentBatch(prev => prev + 1);
+        return { ...ad, analysisError: "Analisi interrotta dall'utente prima dell'esecuzione." };
+      }
+      
       console.log(`Tool3: runAngleAnalysis - Preparazione analisi per ad ID: ${ad.id} (indice: ${index})`);
       if (ad.angleAnalysis || ad.analysisError) {
         console.log(`Tool3: runAngleAnalysis - Ad ID: ${ad.id} già processato o con errore precedente, skipping.`);
-        processedCountForLoadingMessage++;
-        setLoadingMessage(`Analisi angle: ${processedCountForLoadingMessage} di ${adsToAnalyze.length} completati...`);
+        setAdsProcessedInCurrentBatch(prev => prev + 1);
+        setLoadingMessage(`Analisi angle: ${adsProcessedInCurrentBatch + 1} di ${totalAdsInCurrentBatch} completati...`);
         return Promise.resolve(ad); 
       }
       try {
@@ -223,13 +252,13 @@ export function Tool3Scraper({
         }, currentOpenAIApiKey);
         
         console.log(`Tool3: runAngleAnalysis - Risultato da analyzeAdAngleAction per ad ID: ${ad.id}:`, analysisResult);
-        processedCountForLoadingMessage++;
-        setLoadingMessage(`Analisi angle: ${processedCountForLoadingMessage} di ${adsToAnalyze.length} completati...`);
+        setAdsProcessedInCurrentBatch(prev => prev + 1);
+        setLoadingMessage(`Analisi angle: ${adsProcessedInCurrentBatch + 1} di ${totalAdsInCurrentBatch} completati...`);
         return { ...ad, angleAnalysis: analysisResult, analysisError: undefined };
       } catch (e: any) {
         console.error(`Tool3: runAngleAnalysis - Errore analisi angle per ad ID "${ad.id}":`, e);
-        processedCountForLoadingMessage++;
-        setLoadingMessage(`Analisi angle: ${processedCountForLoadingMessage} di ${adsToAnalyze.length} completati (con errori)...`);
+        setAdsProcessedInCurrentBatch(prev => prev + 1);
+        setLoadingMessage(`Analisi angle: ${adsProcessedInCurrentBatch + 1} di ${totalAdsInCurrentBatch} completati (con errori)...`);
         return { ...ad, angleAnalysis: undefined, analysisError: e.message || "Errore sconosciuto durante analisi AI con OpenAI" };
       }
     });
@@ -250,8 +279,15 @@ export function Tool3Scraper({
         console.log("Tool3: runAngleAnalysis - Nuovo stato adsWithAnalysis:", finalUpdatedAds);
         return finalUpdatedAds;
       });
-      setLoadingMessage("Analisi angle completata!");
-      toast({ title: "Analisi Angle Completata", description: `L'analisi 7C di ${adsToAnalyze.length} annunci è terminata.` });
+
+      if (isAnalysisStoppedRef.current) {
+        setLoadingMessage(`Analisi angle interrotta. ${adsProcessedInCurrentBatch} di ${totalAdsInCurrentBatch} annunci processati.`);
+        toast({ title: "Analisi Angle Interrotta", description: `L'analisi 7C è stata interrotta. ${adsProcessedInCurrentBatch} annunci sono stati processati.` });
+      } else {
+        setLoadingMessage("Analisi angle completata!");
+        toast({ title: "Analisi Angle Completata", description: `L'analisi 7C di ${totalAdsInCurrentBatch} annunci è terminata.` });
+      }
+
     } catch (e: any) {
       console.error("Tool3: runAngleAnalysis - Errore durante Promise.all o aggiornamento stato:", e);
       setError(`Errore durante l'analisi degli angle (OpenAI): ${e.message}`);
@@ -259,6 +295,7 @@ export function Tool3Scraper({
     } finally {
       console.log("Tool3: runAngleAnalysis - Blocco finally eseguito.");
       setIsLoadingAnalysis(false);
+      // isAnalysisStoppedRef.current = false; // Resettare qui o all'inizio della prossima run? Meglio all'inizio.
     }
   };
   
@@ -303,6 +340,11 @@ export function Tool3Scraper({
     localStorage.setItem('tool3AngleAnalysisData', JSON.stringify(analyzedAds));
     router.push('/tool3/angle-analysis');
   };
+
+  const progressValue = isLoadingAnalysis 
+    ? (totalAdsInCurrentBatch > 0 ? (adsProcessedInCurrentBatch / totalAdsInCurrentBatch) * 100 : 0)
+    : (isLoadingScraping ? 25 : 0);
+
 
   return (
     <div className="space-y-8">
@@ -368,7 +410,12 @@ export function Tool3Scraper({
         <div className="text-center my-6">
           <p className="text-sky-600 text-lg mb-1">{loadingMessage}</p>
           {isLoadingScraping && <p className="text-sm text-muted-foreground">{apifyStatus}</p>}
-          <Progress value={isLoadingAnalysis ? (adsToAnalyze.length > 0 ? (processedCountForLoadingMessage / adsToAnalyze.length) * 100 : 0) : (isLoadingScraping ? 25: 0) } className="w-3/4 mx-auto mt-2" />
+          <Progress value={progressValue} className="w-3/4 mx-auto mt-2" />
+          {isLoadingAnalysis && (
+            <Button onClick={handleStopAnalysis} variant="destructive" size="sm" className="mt-3">
+                <StopCircle className="mr-2 h-4 w-4" /> Interrompi Analisi
+            </Button>
+          )}
         </div>
       )}
 
@@ -406,9 +453,9 @@ export function Tool3Scraper({
             <div className="text-center mt-8">
               <Button 
                 onClick={runAngleAnalysis} 
-                disabled={isLoadingAnalysis || selectedAdIds.size === 0} 
+                disabled={isLoadingAnalysis || selectedAdIds.size === 0 || openAIPluginMissingError} 
                 className="action-button bg-purple-600 hover:bg-purple-700 text-white text-lg"
-                title={selectedAdIds.size === 0 ? "Seleziona almeno un annuncio per l'analisi" : "Analizza angle degli annunci selezionati con OpenAI"}
+                title={selectedAdIds.size === 0 ? "Seleziona almeno un annuncio per l'analisi" : (openAIPluginMissingError ? "Funzionalità OpenAI non disponibile a causa di errore plugin" : "Analizza angle degli annunci selezionati con OpenAI")}
               >
                 {isLoadingAnalysis ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Bot className="mr-2 h-5 w-5" />}
                 {isLoadingAnalysis ? "Analisi Angle (OpenAI)..." : `Analizza ${selectedAdIds.size} Annunci Selezionati (7C con OpenAI)`} 
