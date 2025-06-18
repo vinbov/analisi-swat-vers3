@@ -11,7 +11,7 @@ import { analyzeAdAngleAction } from '@/app/actions/tool3-actions';
 import { TableScrapedAds } from './table-scraped-ads';
 import { TableAngleAnalysis } from './table-angle-analysis';
 import { exportToCSV } from '@/lib/csv';
-import { PlayIcon, Download, AlertCircle, Bot, SearchCode, Loader2, FileText, PackageX } from 'lucide-react';
+import { PlayIcon, Download, AlertCircle, Bot, SearchCode, Loader2, FileText, PackageX, CheckSquare, Square } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 
@@ -55,7 +55,8 @@ export function Tool3Scraper({
   const [loadingMessage, setLoadingMessage] = useState("");
   const [apifyStatus, setApifyStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [openAIPluginMissingError, setOpenAIPluginMissingError] = useState(false);
+  const [openAIPluginMissingError, setOpenAIPluginMissingError] = useState(false); // Mantengo per coerenza con lo stato attuale, anche se non usato con chiamate dirette
+  const [selectedAdIds, setSelectedAdIds] = useState<Set<string>>(new Set());
   const router = useRouter();
   const { toast } = useToast();
 
@@ -71,6 +72,7 @@ export function Tool3Scraper({
     setOpenAIPluginMissingError(false);
     setScrapedAds([]); 
     setAdsWithAnalysis([]); 
+    setSelectedAdIds(new Set());
 
     const apifyInputPayload = {
       urls: [{ url: fbAdsUrl }],
@@ -159,9 +161,30 @@ export function Tool3Scraper({
     }
   };
 
+  const handleToggleAdSelection = (adId: string) => {
+    setSelectedAdIds(prevSelectedIds => {
+      const newSelectedIds = new Set(prevSelectedIds);
+      if (newSelectedIds.has(adId)) {
+        newSelectedIds.delete(adId);
+      } else {
+        newSelectedIds.add(adId);
+      }
+      return newSelectedIds;
+    });
+  };
+
+  const handleSelectAllAds = () => {
+    setSelectedAdIds(new Set(scrapedAds.map(ad => ad.id)));
+  };
+
+  const handleDeselectAllAds = () => {
+    setSelectedAdIds(new Set());
+  };
+
   const runAngleAnalysis = async () => {
-    if (scrapedAds.length === 0) {
-      setError("Nessun annuncio disponibile per l'analisi. Esegui prima lo scraping.");
+    if (selectedAdIds.size === 0) {
+      setError("Nessun annuncio selezionato per l'analisi.");
+      toast({ title: "Nessuna Selezione", description: "Seleziona almeno un annuncio per l'analisi.", variant: "default" });
       return;
     }
     
@@ -173,13 +196,13 @@ export function Tool3Scraper({
     }
 
     setIsLoadingAnalysis(true);
-    setLoadingMessage("Analisi angle in corso con OpenAI...");
+    setLoadingMessage(`Analisi angle in corso per ${selectedAdIds.size} annunci selezionati con OpenAI...`);
     setError(null);
-    setOpenAIPluginMissingError(false);
 
-    const currentAdsForAnalysis = [...adsWithAnalysis]; 
+    const adsToAnalyze = adsWithAnalysis.filter(ad => selectedAdIds.has(ad.id));
+    let processedCount = 0;
 
-    const analysisPromises = currentAdsForAnalysis.map(async (ad) => {
+    const analysisPromises = adsToAnalyze.map(async (ad) => {
       if (ad.angleAnalysis || ad.analysisError) return ad; 
       try {
         const analysisResult = await analyzeAdAngleAction({
@@ -187,26 +210,32 @@ export function Tool3Scraper({
           adTitle: ad.titolo,
         }, currentOpenAIApiKey);
         
-        // Controlla se l'analisi è fallita a causa del plugin mancante
-        if (analysisResult.evaluation === "Analisi AI Non Disponibile" && analysisResult.detailedAnalysis.includes("plugin OpenAI potrebbe non essere installato")) {
-          setOpenAIPluginMissingError(true); // Imposta lo stato per mostrare l'avviso globale
-        }
+        processedCount++;
+        setLoadingMessage(`Analisi angle: ${processedCount} di ${selectedAdIds.size} completati...`);
         return { ...ad, angleAnalysis: analysisResult };
       } catch (e: any) {
         console.error(`Errore analisi angle per ad "${ad.titolo}":`, e);
-        // Se l'errore è dovuto al plugin mancante, questo potrebbe non essere catturato qui, ma nel flow
-        if (e.message && e.message.toLowerCase().includes("openai")) {
-           setOpenAIPluginMissingError(true);
-        }
+        processedCount++;
+        setLoadingMessage(`Analisi angle: ${processedCount} di ${selectedAdIds.size} completati (con errori)...`);
         return { ...ad, analysisError: e.message || "Errore sconosciuto durante analisi AI con OpenAI" };
       }
     });
 
     try {
       const results = await Promise.all(analysisPromises);
-      setAdsWithAnalysis(results); 
+      // Update adsWithAnalysis with the new results, preserving existing ones
+      setAdsWithAnalysis(prevAdsWithAnalysis => {
+        const updatedAds = [...prevAdsWithAnalysis];
+        results.forEach(result => {
+            const index = updatedAds.findIndex(a => a.id === result.id);
+            if (index !== -1) {
+                updatedAds[index] = result;
+            }
+        });
+        return updatedAds;
+      });
       setLoadingMessage("Analisi angle completata!");
-      toast({ title: "Analisi Angle Completata", description: "L'analisi 7C degli annunci (OpenAI) è terminata." });
+      toast({ title: "Analisi Angle Completata", description: `L'analisi 7C di ${selectedAdIds.size} annunci è terminata.` });
     } catch (e: any) {
       setError(`Errore durante l'analisi degli angle (OpenAI): ${e.message}`);
       toast({ title: "Errore Analisi Angle (OpenAI)", description: e.message, variant: "destructive" });
@@ -216,7 +245,8 @@ export function Tool3Scraper({
   };
   
   const handleDownloadCSV = () => {
-    if (adsWithAnalysis.length === 0) {
+    const dataToDownload = adsWithAnalysis.length > 0 ? adsWithAnalysis : scrapedAds;
+    if (dataToDownload.length === 0) {
       toast({ title: "Nessun dato", description: "Nessun risultato da scaricare.", variant: "destructive" });
       return;
     }
@@ -226,7 +256,7 @@ export function Tool3Scraper({
       "7C_C5_Credibilita", "7C_C6_CTA", "7C_C7_Contesto",
       "7C_PunteggioTotale", "7C_Valutazione", "7C_AnalisiApprofondita", "Errore Analisi"
     ];
-    const dataToExport = adsWithAnalysis.map(item => ({
+    const csvRows = dataToDownload.map(item => ({
       "Testo Ad": item.testo,
       "Titolo Ad": item.titolo,
       "Link Ad": item.link,
@@ -243,15 +273,16 @@ export function Tool3Scraper({
       "7C_AnalisiApprofondita": item.angleAnalysis?.detailedAnalysis,
       "Errore Analisi": item.analysisError || (item.angleAnalysis?.error || ""),
     }));
-    exportToCSV("fb_ads_analysis_report.csv", headers, dataToExport);
+    exportToCSV("fb_ads_analysis_report.csv", headers, csvRows);
   };
   
   const openAngleAnalysisDetailPage = () => {
-    if (adsWithAnalysis.length === 0 || !adsWithAnalysis.some(ad => ad.angleAnalysis)) {
-      toast({ title: "Dati Insufficienti", description: "Esegui prima lo scraping e l'analisi degli angle.", variant: "destructive"});
+    const analyzedAds = adsWithAnalysis.filter(ad => ad.angleAnalysis || ad.analysisError);
+    if (analyzedAds.length === 0 ) {
+      toast({ title: "Dati Insufficienti", description: "Esegui prima lo scraping e l'analisi degli angle per almeno un annuncio.", variant: "destructive"});
       return;
     }
-    localStorage.setItem('tool3AngleAnalysisData', JSON.stringify(adsWithAnalysis));
+    localStorage.setItem('tool3AngleAnalysisData', JSON.stringify(analyzedAds));
     router.push('/tool3/angle-analysis');
   };
 
@@ -291,7 +322,7 @@ export function Tool3Scraper({
             <Input type="url" id="fbAdsUrlTool3" value={fbAdsUrl} onChange={(e) => setFbAdsUrl(e.target.value)} placeholder="Es: https://www.facebook.com/ads/library/?q=nomepagina..." />
           </div>
           <div>
-            <label htmlFor="maxAdsToProcessTool3" className="block text-sm font-medium text-foreground mb-1">Numero Annunci da Analizzare (max 100)</label>
+            <label htmlFor="maxAdsToProcessTool3" className="block text-sm font-medium text-foreground mb-1">Numero Annunci da Recuperare (max 100)</label>
             <Input type="number" id="maxAdsToProcessTool3" value={maxAdsToProcess} onChange={(e) => setMaxAdsToProcess(Math.min(100, Math.max(1, parseInt(e.target.value))))} min="1" max="100" />
           </div>
            <div>
@@ -303,7 +334,7 @@ export function Tool3Scraper({
               onChange={(e) => setOpenAIApiKey(e.target.value)}
               placeholder="La tua chiave API OpenAI (es. sk-...)" 
             />
-            <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C con i modelli OpenAI.</p>
+            <p className="text-xs text-muted-foreground mt-1">Usata per l'analisi 7C con i modelli OpenAI (chiamata diretta).</p>
           </div>
         </CardContent>
       </Card>
@@ -319,7 +350,7 @@ export function Tool3Scraper({
         <div className="text-center my-6">
           <p className="text-sky-600 text-lg mb-1">{loadingMessage}</p>
           {isLoadingScraping && <p className="text-sm text-muted-foreground">{apifyStatus}</p>}
-          {(isLoadingScraping || isLoadingAnalysis) && <Progress value={isLoadingAnalysis ? 50 : 25} className="w-3/4 mx-auto mt-2" />}
+          <Progress value={isLoadingAnalysis ? (selectedAdIds.size > 0 ? (adsWithAnalysis.filter(ad => selectedAdIds.has(ad.id) && (ad.angleAnalysis || ad.analysisError)).length / selectedAdIds.size) * 100 : 0) : (isLoadingScraping ? 25: 0) } className="w-3/4 mx-auto mt-2" />
         </div>
       )}
 
@@ -335,38 +366,56 @@ export function Tool3Scraper({
         <Card className="mt-10">
           <CardHeader>
             <CardTitle className="text-2xl">Risultati Scraping Facebook Ads</CardTitle>
-            <CardDescription>{scrapedAds.length} annunci recuperati.</CardDescription>
+            <CardDescription>
+              {scrapedAds.length} annunci recuperati. Seleziona quelli che vuoi analizzare. 
+              Annunci selezionati: {selectedAdIds.size} / {scrapedAds.length}
+            </CardDescription>
+            <div className="flex space-x-2 mt-2">
+                <Button onClick={handleSelectAllAds} size="sm" variant="outline" disabled={isLoadingAnalysis}>
+                    <CheckSquare className="mr-2 h-4 w-4"/> Seleziona Tutti
+                </Button>
+                <Button onClick={handleDeselectAllAds} size="sm" variant="outline" disabled={isLoadingAnalysis || selectedAdIds.size === 0}>
+                    <Square className="mr-2 h-4 w-4"/> Deseleziona Tutti
+                </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <TableScrapedAds ads={scrapedAds} />
+            <TableScrapedAds 
+                ads={scrapedAds} 
+                selectedAdIds={selectedAdIds}
+                onToggleAdSelection={handleToggleAdSelection}
+            />
             <div className="text-center mt-8">
               <Button 
                 onClick={runAngleAnalysis} 
-                disabled={isLoadingAnalysis || openAIPluginMissingError} 
+                disabled={isLoadingAnalysis || selectedAdIds.size === 0} 
                 className="action-button bg-purple-600 hover:bg-purple-700 text-white text-lg"
-                title={openAIPluginMissingError ? "Funzionalità non disponibile a causa di problemi con l'installazione del plugin OpenAI" : "Analizza angle con OpenAI"}
+                title={selectedAdIds.size === 0 ? "Seleziona almeno un annuncio per l'analisi" : "Analizza angle degli annunci selezionati con OpenAI"}
               >
                 {isLoadingAnalysis ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Bot className="mr-2 h-5 w-5" />}
-                {isLoadingAnalysis ? "Analisi Angle (OpenAI)..." : "Analizza Angle Inserzioni (7C con OpenAI)"} 
+                {isLoadingAnalysis ? "Analisi Angle (OpenAI)..." : `Analizza ${selectedAdIds.size} Annunci Selezionati (7C con OpenAI)`} 
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {adsWithAnalysis.some(ad => ad.angleAnalysis || ad.analysisError) && !isLoadingAnalysis && (
+      {adsWithAnalysis.filter(ad => ad.angleAnalysis || ad.analysisError).length > 0 && !isLoadingAnalysis && (
         <Card className="mt-6">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-xl">Risultati Analisi Angle (Metodo 7C con OpenAI)</CardTitle>
+              <CardDescription>
+                Visualizzati i risultati per {adsWithAnalysis.filter(ad => ad.angleAnalysis || ad.analysisError).length} annunci.
+              </CardDescription>
             </div>
             <Button variant="link" onClick={openAngleAnalysisDetailPage} className="detail-button">
                 Visualizza Report Dettagliato <FileText className="ml-2 h-4 w-4"/>
             </Button>
           </CardHeader>
           <CardContent>
-             <TableAngleAnalysis adsWithAnalysis={adsWithAnalysis.slice(0,5)} /> 
-             {adsWithAnalysis.length > 5 && <p className="text-sm text-muted-foreground text-center mt-2">Mostrati i primi 5 risultati. Clicca su "Visualizza Report Dettagliato" per vederli tutti.</p>}
+             <TableAngleAnalysis adsWithAnalysis={adsWithAnalysis.filter(ad => ad.angleAnalysis || ad.analysisError).slice(0,10)} /> 
+             {adsWithAnalysis.filter(ad => ad.angleAnalysis || ad.analysisError).length > 10 && <p className="text-sm text-muted-foreground text-center mt-2">Mostrati i primi 10 risultati. Clicca su "Visualizza Report Dettagliato" per vederli tutti.</p>}
           </CardContent>
         </Card>
       )}

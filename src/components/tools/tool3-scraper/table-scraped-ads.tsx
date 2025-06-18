@@ -1,19 +1,23 @@
+
 "use client";
 
 import type { ScrapedAd } from '@/lib/types';
 import Link from 'next/link';
 import Image from 'next/image';
+import { Checkbox } from '@/components/ui/checkbox'; // Import Checkbox
 
 interface TableScrapedAdsProps {
   ads: ScrapedAd[];
+  selectedAdIds: Set<string>;
+  onToggleAdSelection: (adId: string) => void;
 }
 
-export function TableScrapedAds({ ads }: TableScrapedAdsProps) {
+export function TableScrapedAds({ ads, selectedAdIds, onToggleAdSelection }: TableScrapedAdsProps) {
   if (ads.length === 0) {
     return <p className="text-muted-foreground py-4">Nessun annuncio da visualizzare.</p>;
   }
 
-  const headers = ["Immagine", "Titolo", "Testo", "Link"];
+  const headers = ["Seleziona", "Immagine", "Titolo", "Testo", "Link"];
 
   return (
     <div className="table-container">
@@ -21,13 +25,21 @@ export function TableScrapedAds({ ads }: TableScrapedAdsProps) {
         <thead>
           <tr>
             {headers.map(header => (
-              <th key={header} scope="col">{header}</th>
+              <th key={header} scope="col" className={header === "Seleziona" ? "w-12" : ""}>{header}</th>
             ))}
           </tr>
         </thead>
         <tbody className="bg-card divide-y divide-border">
           {ads.map((ad) => (
             <tr key={ad.id}>
+              <td className="text-center">
+                <Checkbox
+                  id={`select-ad-${ad.id}`}
+                  checked={selectedAdIds.has(ad.id)}
+                  onCheckedChange={() => onToggleAdSelection(ad.id)}
+                  aria-label={`Seleziona annuncio ${ad.id}`}
+                />
+              </td>
               <td className="w-24 h-24 p-1">
                 {ad.immagine ? (
                   <Link href={ad.immagine} target="_blank" rel="noopener noreferrer">
