@@ -255,10 +255,10 @@ export interface DetailPageDataTool4 {
 
 
 // CSV Column mapping
-export const EXPECTED_COLUMNS_TOOL1: Record<keyof CsvRowTool1, string> = { 
-  keyword: 'Keyword', posizione: 'Pos', url: 'URL', volume: 'Volume',
-  difficolta: 'Keyword Difficulty', opportunity: 'Keyword Opportunity', intento: 'Intent',
-  varTraffico: 'var. traffico', trafficoStimato: 'traffico stimato', cpcMedio: 'cpc medio'
+export const COLUMN_ALIASES_TOOL1: Partial<Record<keyof CsvRowTool1, string[]>> = {
+  difficolta: ['keyword difficulty', 'key diff', 'kd'],
+  opportunity: ['keyword opportunity', 'opportunity score'],
+  posizione: ['pos', 'position']
 };
 
 export const COLUMN_ALIASES_TOOL1: Record<keyof Partial<CsvRowTool1>, string[]> = { 
