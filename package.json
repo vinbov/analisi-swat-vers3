@@ -3,15 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "./node_modules/.bin/next dev --port 9002 --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "genkit": "genkit"
   },
   "dependencies": {
-    "@genkit-ai/googleai": "^0.10.0",
-    "@genkit-ai/openai": "^0.10.0",
+    "@genkit-ai/googleai": "^1.0.0",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.0.5",
     "@radix-ui/react-avatar": "^1.0.4",
